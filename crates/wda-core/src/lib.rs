@@ -11,3 +11,4 @@ pub mod signal;
 pub use agent::Agent;
 pub use config::AgentConfig;
 pub use module::{AgentModule, ModuleHealth, ModuleStatus};
+pub use signal::{ShutdownSignal, ShutdownTrigger};

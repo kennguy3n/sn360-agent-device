@@ -6,4 +6,5 @@
 pub mod connection;
 pub mod crypto;
 pub mod enrollment;
+pub mod keepalive;
 pub mod protocol;

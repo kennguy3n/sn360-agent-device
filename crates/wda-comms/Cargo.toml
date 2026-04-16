@@ -6,6 +6,7 @@ edition.workspace = true
 license.workspace = true
 
 [dependencies]
+wda-core = { workspace = true }
 wda-event-bus = { workspace = true }
 tokio = { workspace = true }
 serde = { workspace = true }
