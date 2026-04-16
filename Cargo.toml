@@ -10,6 +10,7 @@ members = [
     "crates/wda-sca",
     "crates/wda-active-response",
     "crates/wda-rootcheck",
+    "crates/wda-agent",
 ]
 resolver = "2"
 

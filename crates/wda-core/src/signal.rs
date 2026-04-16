@@ -1,5 +1,7 @@
 //! Cross-platform signal handling for graceful shutdown.
 
+use std::sync::Arc;
+
 use tokio::sync::watch;
 use tracing::info;
 
@@ -29,16 +31,33 @@ impl ShutdownSignal {
     }
 }
 
+/// A cloneable, sendable handle that can trigger shutdown from any context.
+///
+/// Safe to move into spawned tasks (e.g. signal handlers) because it
+/// holds an `Arc` to the underlying sender.
+#[derive(Clone)]
+pub struct ShutdownTrigger {
+    tx: Arc<watch::Sender<bool>>,
+}
+
+impl ShutdownTrigger {
+    /// Trigger shutdown, notifying all signal holders.
+    pub fn shutdown(&self) {
+        info!("shutdown triggered");
+        let _ = self.tx.send(true);
+    }
+}
+
 /// Controller that triggers shutdown.
 pub struct ShutdownController {
-    tx: watch::Sender<bool>,
+    tx: Arc<watch::Sender<bool>>,
 }
 
 impl ShutdownController {
     /// Create a new shutdown controller and signal pair.
     pub fn new() -> (Self, ShutdownSignal) {
         let (tx, rx) = watch::channel(false);
-        (Self { tx }, ShutdownSignal { rx })
+        (Self { tx: Arc::new(tx) }, ShutdownSignal { rx })
     }
 
     /// Trigger shutdown, notifying all signal holders.
@@ -51,6 +70,13 @@ impl ShutdownController {
     pub fn subscribe(&self) -> ShutdownSignal {
         ShutdownSignal {
             rx: self.tx.subscribe(),
+        }
+    }
+
+    /// Get a cloneable trigger handle that can be moved into spawned tasks.
+    pub fn trigger_handle(&self) -> ShutdownTrigger {
+        ShutdownTrigger {
+            tx: Arc::clone(&self.tx),
         }
     }
 }
@@ -66,7 +92,7 @@ impl Default for ShutdownController {
 /// On Unix: handles SIGTERM and SIGINT.
 /// On Windows: handles Ctrl+C console event.
 pub async fn install_signal_handlers(controller: &ShutdownController) {
-    let _shutdown = controller.subscribe();
+    let trigger = controller.trigger_handle();
 
     #[cfg(unix)]
     {
@@ -85,7 +111,7 @@ pub async fn install_signal_handlers(controller: &ShutdownController) {
                     info!("received SIGINT");
                 }
             }
-            // shutdown signal is already sent via the controller
+            trigger.shutdown();
         });
     }
 
@@ -96,6 +122,7 @@ pub async fn install_signal_handlers(controller: &ShutdownController) {
                 .await
                 .expect("failed to install Ctrl+C handler");
             info!("received Ctrl+C");
+            trigger.shutdown();
         });
     }
 }

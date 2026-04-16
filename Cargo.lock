@@ -1398,6 +1398,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "wda-agent"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "gethostname",
+ "tokio",
+ "tracing",
+ "tracing-subscriber",
+ "wda-comms",
+ "wda-core",
+ "wda-event-bus",
+ "wda-pal",
+]
+
+[[package]]
 name = "wda-comms"
 version = "0.1.0"
 dependencies = [
@@ -1417,6 +1432,7 @@ dependencies = [
  "tokio",
  "tokio-rustls",
  "tracing",
+ "wda-core",
  "wda-event-bus",
 ]
 
