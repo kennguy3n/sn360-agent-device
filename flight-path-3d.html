@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script src="plotly-3.4.0.min.js"></script>
+
+    <style>
+        html, body {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background: #ffffff;
+        }
+
+        body {
+            position: fixed;
+            inset: 0;
+        }
+
+        #chart {
+            position: fixed;
+            inset: 0;
+        }
+    </style>
+</head>
+
+<body>
+<div id="chart"></div>
+
+<script>
+
+    // =======================================
+    // DATA STORE
+    // =======================================
+    const x = [];
+    const y = [];
+    const z = [];
+    const speed = [];
+
+    // =======================================
+    // TRACE: FLIGHT PATH
+    // =======================================
+    const pathTrace = {
+        x: x,
+        y: y,
+        z: z,
+
+        mode: 'lines+markers',
+        type: 'scatter3d',
+
+        line: {
+            width: 5,
+            color: speed,
+            colorscale: 'Turbo',
+
+            colorbar: {
+                title: 'Speed (m/s)',
+                x: 0.98,
+                y: 0.5,
+                len: 0.82,
+                thickness: 10,
+                outlinewidth: 0
+            }
+        },
+
+        marker: {
+            size: 4,
+            color: speed,
+            colorscale: 'Turbo'
+        },
+
+        name: 'Flight Path'
+    };
+
+    // =======================================
+    // TRACE: START POINT
+    // =======================================
+    const startTrace = {
+        x: [],
+        y: [],
+        z: [],
+
+        mode: 'markers',
+        type: 'scatter3d',
+
+        marker: {
+            size: 9,
+            color: 'green'
+        },
+
+        name: 'Start'
+    };
+
+    // =======================================
+    // TRACE: END POINT
+    // =======================================
+    const endTrace = {
+        x: [],
+        y: [],
+        z: [],
+
+        mode: 'markers',
+        type: 'scatter3d',
+
+        marker: {
+            size: 9,
+            color: 'orange'
+        },
+
+        name: 'End'
+    };
+
+    // =======================================
+    // LAYOUT
+    // =======================================
+    const layout = {
+
+        paper_bgcolor: '#ffffff',
+        plot_bgcolor: '#ffffff',
+
+        margin: {
+            l: 10,
+            r: 30,
+            t: 10,
+            b: 10
+        },
+
+        showlegend: true,
+
+        legend: {
+            x: 0.98,
+            y: 1,
+            xanchor: 'right',
+            yanchor: 'top',
+
+            bgcolor: 'rgba(0,0,0,0.45)',
+
+            font: {
+                color: 'white',
+                size: 14
+            }
+        },
+
+        scene: {
+
+            domain: {
+                x: [0.0, 0.93],
+                y: [0, 1]
+            },
+
+            xaxis: {
+                title: 'X',
+                showbackground: true,
+                backgroundcolor: '#f5f5f5',
+                gridcolor: '#d8d8d8'
+            },
+
+            yaxis: {
+                title: 'Y',
+                showbackground: true,
+                backgroundcolor: '#f5f5f5',
+                gridcolor: '#d8d8d8'
+            },
+
+            zaxis: {
+                title: 'Z',
+                showbackground: true,
+                backgroundcolor: '#f5f5f5',
+                gridcolor: '#d8d8d8'
+            },
+
+            aspectmode: 'cube',
+
+            camera: {
+                eye: {
+                    x: 1.45,
+                    y: 1.45,
+                    z: 1.25
+                }
+            }
+        }
+    };
+
+    // =======================================
+    // CONFIG
+    // =======================================
+    const config = {
+        responsive: true,
+        displayModeBar: false
+    };
+
+    // =======================================
+    // INIT CHART
+    // =======================================
+    Plotly.newPlot(
+        'chart',
+        [pathTrace, startTrace, endTrace],
+        layout,
+        config
+    );
+
+    // =======================================
+    // REALTIME API FOR ANDROID
+    // addPoint(x, y, z, speed)
+    // =======================================
+    function addPoint(px, py, pz, pspeed) {
+
+        x.push(Number(px));
+        y.push(Number(py));
+        z.push(Number(pz));
+        speed.push(Number(pspeed));
+
+        // update path
+        Plotly.extendTraces(
+            'chart',
+            {
+                x: [[Number(px)]],
+                y: [[Number(py)]],
+                z: [[Number(pz)]],
+                'marker.color': [[Number(pspeed)]],
+                'line.color': [[Number(pspeed)]]
+            },
+            [0]
+        );
+
+        // first point = start
+        if (x.length === 1) {
+
+            Plotly.restyle(
+                'chart',
+                {
+                    x: [[Number(px)]],
+                    y: [[Number(py)]],
+                    z: [[Number(pz)]]
+                },
+                [1]
+            );
+        }
+
+        // latest point = end
+        Plotly.restyle(
+            'chart',
+            {
+                x: [[Number(px)]],
+                y: [[Number(py)]],
+                z: [[Number(pz)]]
+            },
+            [2]
+        );
+
+        // anti lag
+        if (x.length > 1000) {
+            x.shift();
+            y.shift();
+            z.shift();
+            speed.shift();
+        }
+    }
+
+    // =======================================
+    // OPTIONAL CLEAR API
+    // =======================================
+    function clearData() {
+
+        x.length = 0;
+        y.length = 0;
+        z.length = 0;
+        speed.length = 0;
+
+        Plotly.react(
+            'chart',
+            [pathTrace, startTrace, endTrace],
+            layout,
+            config
+        );
+    }
+
+    // =======================================
+    // RESIZE FIX
+    // =======================================
+    window.addEventListener('resize', function () {
+        Plotly.Plots.resize('chart');
+    });
+
+</script>
+</body>
+</html>
