@@ -79,7 +79,7 @@ impl WazuhCipher {
     ///
     /// Expects the IV prepended to the ciphertext (first 16 bytes).
     pub fn decrypt(&self, data: &[u8]) -> Result<Vec<u8>, CryptoError> {
-        if data.len() < 17 {
+        if data.len() < 32 {
             return Err(CryptoError::DecryptionFailed(
                 "data too short (need at least IV + 1 block)".to_string(),
             ));
