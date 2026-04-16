@@ -1,0 +1,350 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script src="plotly-3.4.0.min.js"></script>
+
+    <style>
+        html, body {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+        }
+
+        body {
+            position: fixed;
+            inset: 0;
+        }
+
+        #chart {
+            position: fixed;
+            inset: 0;
+        }
+    </style>
+</head>
+
+<body>
+
+<div id="chart"></div>
+
+<script>
+
+    // ====================================================
+    // DATA
+    // ====================================================
+    let replayTimer = null;
+    let currentIndex = 0;
+
+    const lats = [];
+    const lons = [];
+    const alts = [];
+    const times = [];
+
+    // ====================================================
+    // REPLAY
+    // ====================================================
+    function moveTo(index) {
+
+        if (index < 0 || index >= lats.length) return;
+
+        Plotly.restyle(
+            'chart',
+            {
+                x: [[lats[index]]],
+                y: [[lons[index]]],
+                z: [[alts[index]]],
+                customdata: [[times[index]]]
+            },
+            [1]
+        );
+    }
+
+    function playReplay(speedMs = 100, reset = false) {
+
+        stopReplay();
+
+        if (reset) {
+            currentIndex = 0;
+        }
+
+        replayTimer = setInterval(() => {
+
+            moveTo(currentIndex);
+
+            currentIndex++;
+
+            if (currentIndex >= lats.length) {
+                stopReplay();
+            }
+
+        }, speedMs);
+    }
+
+    function stopReplay() {
+        if (replayTimer) {
+            clearInterval(replayTimer);
+            replayTimer = null;
+        }
+    }
+
+    function seek(percent) {
+
+        if (!lats.length) return;
+
+        currentIndex =
+            Math.floor(percent * (lats.length - 1));
+
+        moveTo(currentIndex);
+    }
+
+    // ====================================================
+    // TRACES
+    // ====================================================
+    const pathTrace = {
+        x: [],
+        y: [],
+        z: [],
+        mode: 'lines',
+        type: 'scatter3d',
+
+        line: {
+            width: 4,
+            color: '#5EB6FF'
+        },
+
+        name: 'Flight Path'
+    };
+
+    const currentPointTrace = {
+        x: [],
+        y: [],
+        z: [],
+        mode: 'markers',
+        type: 'scatter3d',
+
+        marker: {
+            size: 8,
+            color: '#FF7676'
+        },
+
+        name: 'Current'
+    };
+
+    // ====================================================
+    // LAYOUT – 3D scene ưu tiên hiển thị lớn nhất
+    // ====================================================
+    const layout = {
+
+        margin: {
+            l: 0,
+            r: 0,
+            b: 0,
+            t: 0
+        },
+
+        paper_bgcolor: '#040723',
+        plot_bgcolor: '#040723',
+
+        showlegend: true,
+
+        uirevision: 'keep-camera',
+
+        legend: {
+            x: 1,
+            y: 1,
+            xanchor: 'right',
+            yanchor: 'top',
+            bgcolor: 'rgba(0,0,0,0.45)',
+            font: {
+                color: 'white',
+                size: 11
+            }
+        },
+
+        scene: {
+
+            domain: {
+                x: [0, 1],
+                y: [0, 1]
+            },
+
+            xaxis: { title: 'Lat' },
+            yaxis: { title: 'Lon' },
+            zaxis: { title: 'Alt' },
+
+            aspectmode: 'cube',
+
+            camera: {
+                eye: {
+                    x: 1.8,
+                    y: -1.35,
+                    z: 0.65
+                }
+            }
+        },
+
+        // ===== BUTTONS – overlay nhỏ gọn góc phải =====
+        updatemenus: [
+            {
+                type: 'buttons',
+                direction: 'down',
+
+                x: 1,
+                y: 0.5,
+
+                xanchor: 'right',
+                yanchor: 'middle',
+
+                showactive: false,
+
+                bgcolor: 'rgba(0,0,0,0.55)',
+                bordercolor: 'rgba(255,255,255,0.15)',
+                font: {
+                    color: 'white',
+                    size: 11
+                },
+
+                pad: {
+                    r: 6,
+                    t: 2,
+                    b: 2
+                },
+
+                buttons: [
+
+                    {
+                        label: 'Replay',
+                        method: 'skip',
+                        execute: false
+                    },
+
+                    {
+                        label: 'Pause',
+                        method: 'skip',
+                        execute: false
+                    },
+
+                    {
+                        label: 'Fast',
+                        method: 'skip',
+                        execute: false
+                    },
+
+                    {
+                        label: 'Start',
+                        method: 'skip',
+                        execute: false
+                    },
+
+                    {
+                        label: 'End',
+                        method: 'skip',
+                        execute: false
+                    }
+                ]
+            }
+        ]
+    };
+
+    const config = {
+        responsive: true,
+        displayModeBar: false
+    };
+
+    // ====================================================
+    // INIT
+    // ====================================================
+    Plotly.newPlot(
+        'chart',
+        [pathTrace, currentPointTrace],
+        layout,
+        config
+    ).then(function(chart){
+
+        chart.on('plotly_buttonclicked', function(e){
+
+            const label = e.button.label;
+
+            if (label.includes('Replay')) {
+                playReplay(80, true);
+            }
+
+            if (label.includes('Pause')) {
+                stopReplay();
+            }
+
+            if (label.includes('Fast')) {
+                playReplay(40, false);
+            }
+
+            if (label.includes('Start')) {
+                seek(0);
+            }
+
+            if (label.includes('End')) {
+                seek(1);
+            }
+        });
+    });
+
+    // ====================================================
+    // ANDROID API
+    // ====================================================
+    function setPath(points) {
+
+        stopReplay();
+
+        lats.length = 0;
+        lons.length = 0;
+        alts.length = 0;
+        times.length = 0;
+
+        for (let i = 0; i < points.length; i++) {
+
+            lats.push(Number(points[i].lat));
+            lons.push(Number(points[i].lon));
+            alts.push(Number(points[i].alt));
+            times.push(Number(points[i].t));
+        }
+
+        const firstLat = lats.length ? lats[0] : null;
+        const firstLon = lons.length ? lons[0] : null;
+        const firstAlt = alts.length ? alts[0] : null;
+        const firstT = times.length ? times[0] : null;
+
+        currentIndex = 0;
+
+        Plotly.react(
+            'chart',
+            [
+                {
+                    ...pathTrace,
+                    x: lats,
+                    y: lons,
+                    z: alts
+                },
+                {
+                    ...currentPointTrace,
+                    x: firstLat === null ? [] : [firstLat],
+                    y: firstLon === null ? [] : [firstLon],
+                    z: firstAlt === null ? [] : [firstAlt],
+                    customdata: firstT === null ? [] : [firstT]
+                }
+            ],
+            layout,
+            config
+        );
+
+        return "DRAW_DONE";
+    }
+
+    window.addEventListener('resize', function () {
+        Plotly.Plots.resize('chart');
+    });
+
+</script>
+
+</body>
+</html>
