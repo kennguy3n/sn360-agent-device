@@ -34,25 +34,22 @@
     // =======================================
     // DATA STORE
     // =======================================
-    const x = [];
-    const y = [];
-    const z = [];
-    const speed = [];
+    let pointCount = 0;
 
     // =======================================
     // TRACE: FLIGHT PATH
     // =======================================
     const pathTrace = {
-        x: x,
-        y: y,
-        z: z,
+        x: [],
+        y: [],
+        z: [],
 
         mode: 'lines+markers',
         type: 'scatter3d',
 
         line: {
             width: 5,
-            color: speed,
+            color: [],
             colorscale: 'Turbo',
 
             colorbar: {
@@ -67,7 +64,7 @@
 
         marker: {
             size: 4,
-            color: speed,
+            color: [],
             colorscale: 'Turbo'
         },
 
@@ -207,12 +204,9 @@
     // =======================================
     function addPoint(px, py, pz, pspeed) {
 
-        x.push(Number(px));
-        y.push(Number(py));
-        z.push(Number(pz));
-        speed.push(Number(pspeed));
+        pointCount++;
 
-        // update path
+        // update path (maxPoints = 1000 for anti-lag)
         Plotly.extendTraces(
             'chart',
             {
@@ -222,11 +216,12 @@
                 'marker.color': [[Number(pspeed)]],
                 'line.color': [[Number(pspeed)]]
             },
-            [0]
+            [0],
+            1000
         );
 
         // first point = start
-        if (x.length === 1) {
+        if (pointCount === 1) {
 
             Plotly.restyle(
                 'chart',
@@ -249,14 +244,6 @@
             },
             [2]
         );
-
-        // anti lag
-        if (x.length > 1000) {
-            x.shift();
-            y.shift();
-            z.shift();
-            speed.shift();
-        }
     }
 
     // =======================================
@@ -264,10 +251,7 @@
     // =======================================
     function clearData() {
 
-        x.length = 0;
-        y.length = 0;
-        z.length = 0;
-        speed.length = 0;
+        pointCount = 0;
 
         Plotly.react(
             'chart',
