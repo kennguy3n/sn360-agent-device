@@ -1,0 +1,231 @@
+//! Wazuh protocol message formatting.
+//!
+//! Implements the Wazuh wire protocol:
+//! `AgentID : MessageType : Payload`
+
+use serde::{Deserialize, Serialize};
+
+/// Wazuh protocol message types.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub enum MessageType {
+    /// Syscheck (FIM) event.
+    Syscheck,
+    /// Log collection event.
+    Log,
+    /// Rootcheck event.
+    Rootcheck,
+    /// SCA event.
+    Sca,
+    /// Syscollector (inventory) event.
+    Syscollector,
+    /// Agent keepalive.
+    Keepalive,
+    /// Active response result.
+    ActiveResponse,
+    /// Agent startup notification.
+    Startup,
+    /// Agent shutdown notification.
+    Shutdown,
+    /// Request from server.
+    Request,
+    /// Generic message.
+    Generic,
+}
+
+impl MessageType {
+    /// Get the Wazuh protocol string for this message type.
+    pub fn as_protocol_str(&self) -> &'static str {
+        match self {
+            MessageType::Syscheck => "syscheck",
+            MessageType::Log => "log",
+            MessageType::Rootcheck => "rootcheck",
+            MessageType::Sca => "sca",
+            MessageType::Syscollector => "syscollector",
+            MessageType::Keepalive => "keep_alive",
+            MessageType::ActiveResponse => "active-response",
+            MessageType::Startup => "agent_start",
+            MessageType::Shutdown => "agent_stop",
+            MessageType::Request => "request",
+            MessageType::Generic => "message",
+        }
+    }
+
+    /// Parse a protocol string into a message type.
+    pub fn from_protocol_str(s: &str) -> Self {
+        match s {
+            "syscheck" => MessageType::Syscheck,
+            "log" => MessageType::Log,
+            "rootcheck" => MessageType::Rootcheck,
+            "sca" => MessageType::Sca,
+            "syscollector" => MessageType::Syscollector,
+            "keep_alive" => MessageType::Keepalive,
+            "active-response" => MessageType::ActiveResponse,
+            "agent_start" => MessageType::Startup,
+            "agent_stop" => MessageType::Shutdown,
+            "request" => MessageType::Request,
+            _ => MessageType::Generic,
+        }
+    }
+}
+
+/// A Wazuh protocol message ready for transmission.
+#[derive(Debug, Clone)]
+pub struct WazuhMessage {
+    /// Agent ID (e.g., "001").
+    pub agent_id: String,
+    /// Message type.
+    pub msg_type: MessageType,
+    /// Message payload.
+    pub payload: String,
+    /// Whether to compress the payload.
+    pub compress: bool,
+}
+
+impl WazuhMessage {
+    /// Create a new message.
+    pub fn new(
+        agent_id: impl Into<String>,
+        msg_type: MessageType,
+        payload: impl Into<String>,
+    ) -> Self {
+        Self {
+            agent_id: agent_id.into(),
+            msg_type,
+            payload: payload.into(),
+            compress: false,
+        }
+    }
+
+    /// Enable compression for this message.
+    pub fn with_compression(mut self) -> Self {
+        self.compress = true;
+        self
+    }
+
+    /// Encode the message into the Wazuh wire format.
+    ///
+    /// Format: `{agent_id}:{msg_type}:{payload}`
+    pub fn encode(&self) -> Vec<u8> {
+        let wire = format!(
+            "{}:{}:{}",
+            self.agent_id,
+            self.msg_type.as_protocol_str(),
+            self.payload,
+        );
+
+        if self.compress {
+            compress_payload(wire.as_bytes())
+        } else {
+            wire.into_bytes()
+        }
+    }
+
+    /// Decode a message from the Wazuh wire format.
+    pub fn decode(data: &[u8]) -> Option<Self> {
+        let text = std::str::from_utf8(data).ok()?;
+        let mut parts = text.splitn(3, ':');
+
+        let agent_id = parts.next()?.to_string();
+        let msg_type_str = parts.next()?;
+        let payload = parts.next().unwrap_or("").to_string();
+
+        Some(Self {
+            agent_id,
+            msg_type: MessageType::from_protocol_str(msg_type_str),
+            payload,
+            compress: false,
+        })
+    }
+
+    /// Create a keepalive message.
+    pub fn keepalive(agent_id: &str) -> Self {
+        Self::new(agent_id, MessageType::Keepalive, "#!-agent keep_alive")
+    }
+
+    /// Create an agent startup message.
+    pub fn startup(agent_id: &str) -> Self {
+        Self::new(agent_id, MessageType::Startup, "#!-agent startup")
+    }
+}
+
+/// Compress data using zlib/deflate.
+fn compress_payload(data: &[u8]) -> Vec<u8> {
+    use flate2::write::ZlibEncoder;
+    use flate2::Compression;
+    use std::io::Write;
+
+    let mut encoder = ZlibEncoder::new(Vec::new(), Compression::fast());
+    encoder.write_all(data).expect("compression failed");
+    encoder.finish().expect("compression finalization failed")
+}
+
+/// Decompress zlib/deflate data.
+pub fn decompress_payload(data: &[u8]) -> Option<Vec<u8>> {
+    use flate2::read::ZlibDecoder;
+    use std::io::Read;
+
+    let mut decoder = ZlibDecoder::new(data);
+    let mut result = Vec::new();
+    decoder.read_to_end(&mut result).ok()?;
+    Some(result)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_message_encode() {
+        let msg = WazuhMessage::new("001", MessageType::Keepalive, "#!-agent keep_alive");
+        let encoded = msg.encode();
+        let expected = b"001:keep_alive:#!-agent keep_alive";
+        assert_eq!(encoded, expected);
+    }
+
+    #[test]
+    fn test_message_decode() {
+        let data = b"001:syscheck:{\"path\":\"/etc/passwd\"}";
+        let msg = WazuhMessage::decode(data).unwrap();
+        assert_eq!(msg.agent_id, "001");
+        assert_eq!(msg.msg_type, MessageType::Syscheck);
+        assert_eq!(msg.payload, "{\"path\":\"/etc/passwd\"}");
+    }
+
+    #[test]
+    fn test_compress_decompress() {
+        let data = b"hello world hello world hello world";
+        let compressed = compress_payload(data);
+        let decompressed = decompress_payload(&compressed).unwrap();
+        assert_eq!(decompressed, data);
+    }
+
+    #[test]
+    fn test_keepalive_message() {
+        let msg = WazuhMessage::keepalive("002");
+        assert_eq!(msg.agent_id, "002");
+        assert_eq!(msg.msg_type, MessageType::Keepalive);
+    }
+
+    #[test]
+    fn test_message_type_roundtrip() {
+        let types = vec![
+            MessageType::Syscheck,
+            MessageType::Log,
+            MessageType::Rootcheck,
+            MessageType::Sca,
+            MessageType::Syscollector,
+            MessageType::Keepalive,
+            MessageType::ActiveResponse,
+            MessageType::Startup,
+            MessageType::Shutdown,
+            MessageType::Request,
+            MessageType::Generic,
+        ];
+
+        for mt in types {
+            let s = mt.as_protocol_str();
+            let parsed = MessageType::from_protocol_str(s);
+            assert_eq!(mt, parsed);
+        }
+    }
+}
