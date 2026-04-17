@@ -1409,6 +1409,7 @@ dependencies = [
  "wda-comms",
  "wda-core",
  "wda-event-bus",
+ "wda-fim",
  "wda-pal",
 ]
 
@@ -1480,6 +1481,7 @@ dependencies = [
  "serde",
  "serde_json",
  "sha2",
+ "tempfile",
  "thiserror",
  "tokio",
  "tracing",

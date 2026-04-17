@@ -129,7 +129,18 @@ async fn main() -> Result<()> {
         .await;
     });
 
-    // 10. Start agent and wait for shutdown signal
+    // 10. Start FIM module if enabled
+    if config.modules.fim.enabled {
+        info!("starting FIM module");
+        let fim_handle = wda_fim::FimModule::start(
+            &config,
+            agent.event_bus(),
+            agent.shutdown_signal(),
+        );
+        agent.register_module(fim_handle);
+    }
+
+    // 11. Start agent and wait for shutdown signal
     agent.start().await;
     agent.wait_for_shutdown().await;
 
