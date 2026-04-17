@@ -78,7 +78,7 @@ pub struct EnrollmentConfig {
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct ModulesConfig {
     #[serde(default)]
-    pub fim: ModuleToggle,
+    pub fim: FimConfig,
     #[serde(default)]
     pub logcollector: ModuleToggle,
     #[serde(default)]
@@ -89,6 +89,42 @@ pub struct ModulesConfig {
     pub active_response: ModuleToggle,
     #[serde(default)]
     pub rootcheck: ModuleToggle,
+}
+
+/// FIM-specific configuration.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct FimConfig {
+    /// Whether the FIM module is enabled.
+    #[serde(default = "default_true")]
+    pub enabled: bool,
+    /// Directories to monitor.
+    #[serde(default)]
+    pub directories: Vec<FimDirectory>,
+    /// Baseline scan interval in seconds (default 12h).
+    #[serde(default = "default_fim_scan_interval")]
+    pub scan_interval: u64,
+    /// Debounce window in milliseconds (default 100).
+    #[serde(default = "default_fim_debounce_ms")]
+    pub debounce_ms: u64,
+}
+
+/// A directory entry in FIM configuration.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct FimDirectory {
+    /// Path to monitor.
+    pub path: String,
+    /// Whether to watch recursively.
+    #[serde(default = "default_true")]
+    pub recursive: bool,
+    /// Whether to enable real-time monitoring.
+    #[serde(default = "default_true")]
+    pub realtime: bool,
+    /// Whether to compute SHA-256 hashes.
+    #[serde(default = "default_true")]
+    pub check_sha256: bool,
+    /// Glob patterns to exclude.
+    #[serde(default)]
+    pub exclude: Vec<String>,
 }
 
 /// Simple module enable/disable toggle.
@@ -168,6 +204,12 @@ fn default_log_level() -> String {
 fn default_log_format() -> String {
     "text".to_string()
 }
+fn default_fim_scan_interval() -> u64 {
+    43200 // 12 hours
+}
+fn default_fim_debounce_ms() -> u64 {
+    100
+}
 
 // --- Trait implementations ---
 
@@ -198,6 +240,17 @@ impl Default for EnrollmentConfig {
 impl Default for ModuleToggle {
     fn default() -> Self {
         Self { enabled: true }
+    }
+}
+
+impl Default for FimConfig {
+    fn default() -> Self {
+        Self {
+            enabled: true,
+            directories: Vec::new(),
+            scan_interval: default_fim_scan_interval(),
+            debounce_ms: default_fim_debounce_ms(),
+        }
     }
 }
 
