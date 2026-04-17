@@ -22,6 +22,8 @@
 12. [Implementation Roadmap](#12-implementation-roadmap)
 13. [Risk Assessment](#13-risk-assessment)
 14. [Appendix: Wazuh Source Analysis](#14-appendix-wazuh-source-analysis)
+15. [Local Wazuh Server Test Environment](#15-local-wazuh-server-test-environment)
+16. [Summary](#16-summary)
 
 ---
 
@@ -1072,7 +1074,166 @@ WDA (projected same endpoint):
 
 ---
 
-## Summary
+## 15. Local Wazuh Server Test Environment
+
+This section describes how to stand up a **local Wazuh server** for development and integration testing of the WDA agent. The recommended approach uses the official Wazuh Docker deployment — it is the fastest way to get the full stack (manager, indexer, dashboard) running on a single machine.
+
+### 15.1 Prerequisites
+
+- **Docker Engine 24+** and **Docker Compose v2**
+- At least **4 GB RAM** available for the server stack
+- The following ports must be available on the host:
+  | Port | Service |
+  |---|---|
+  | 1514 | Agent communication (events) |
+  | 1515 | Agent enrollment (authd) |
+  | 443 | Wazuh dashboard (web UI) |
+  | 55000 | Wazuh manager API |
+
+### 15.2 Download & Start the Wazuh Server (Docker)
+
+```bash
+# Clone the official Wazuh Docker deployment
+git clone https://github.com/wazuh/wazuh-docker.git -b v4.9.2
+cd wazuh-docker/single-node
+
+# Generate self-signed certificates for the stack
+docker compose -f generate-indexer-certs.yml run --rm generator
+
+# Start the Wazuh server stack (manager + indexer + dashboard)
+docker compose up -d
+```
+
+> **Note:** The stack includes three containers — `wazuh.manager`, `wazuh.indexer`, and `wazuh.dashboard`. The manager is the component the WDA agent communicates with.
+>
+> **Default credentials:** `admin` / `SecretPassword` (for the dashboard at https://localhost:443).
+
+### 15.3 Verify the Server Is Running
+
+```bash
+# Check all containers are healthy
+docker compose ps
+
+# Verify the manager API is responding
+curl -k -u admin:SecretPassword https://localhost:55000/?pretty
+```
+
+### 15.4 Configure the Server for WDA Testing
+
+**Retrieve the enrollment password** from the manager container:
+
+```bash
+docker exec -it single-node-wazuh.manager-1 cat /var/ossec/etc/authd.pass
+```
+
+**Optionally set a known enrollment password** (easier for automated testing):
+
+```bash
+docker exec -it single-node-wazuh.manager-1 bash -c \
+  'echo "MyTestPassword" > /var/ossec/etc/authd.pass && /var/ossec/bin/wazuh-control restart'
+```
+
+**Ensure the manager is listening** on ports 1514 (events) and 1515 (enrollment):
+
+```bash
+docker exec -it single-node-wazuh.manager-1 \
+  /var/ossec/bin/wazuh-control status
+```
+
+### 15.5 Enroll & Connect the WDA Agent
+
+Create a test configuration file (`test-config.yaml`) pointing at the local Docker server:
+
+```yaml
+agent:
+  server:
+    address: "127.0.0.1"
+    port: 1514
+    protocol: tcp
+  enrollment:
+    server: "127.0.0.1"
+    port: 1515
+    password: "MyTestPassword"
+    auto_enroll: true
+  keepalive_interval: 30   # shorter for testing
+
+modules:
+  fim:
+    enabled: true
+    directories:
+      - path: /tmp/wda-test-fim
+        recursive: true
+        realtime: true
+    scan_interval: 60
+  logcollector:
+    enabled: true
+    sources:
+      - type: file
+        path: /tmp/wda-test-logs/test.log
+        format: syslog
+  sca:
+    enabled: true
+    scan_on_idle: false     # run immediately for testing
+  inventory:
+    enabled: true
+    interval: 60
+  active_response:
+    enabled: true
+    actions:
+      - block_ip
+
+resource_limits:
+  max_cpu_percent: 10
+  max_memory_mb: 100
+  battery_mode: normal
+  idle_detection: false
+```
+
+Build and run the agent against the local server:
+
+```bash
+# Build the agent
+cargo build
+
+# Run with the test config
+RUST_LOG=debug cargo run --bin wda-agent -- --config ./test-config.yaml
+```
+
+### 15.6 Functional Verification Checklist
+
+Use the following checklist to verify each module works against the local test server:
+
+| Module | Test Procedure | Expected Server-Side Result |
+|---|---|---|
+| **Enrollment** | Start the agent; it should auto-enroll | Agent appears in `docker exec single-node-wazuh.manager-1 /var/ossec/bin/manage_agents -l` |
+| **Keepalive** | Agent stays running | Agent shows as "Active" in the Wazuh dashboard (Agents page) |
+| **FIM** | `mkdir -p /tmp/wda-test-fim && echo "test" > /tmp/wda-test-fim/hello.txt` | FIM alert in Dashboard → Security Events with rule.groups containing "syscheck" |
+| **Log Collection** | `mkdir -p /tmp/wda-test-logs && echo "Apr 17 12:00:00 localhost sshd[1234]: Failed password for root" >> /tmp/wda-test-logs/test.log` | Log event visible in Dashboard → Security Events |
+| **Inventory** | Agent sends inventory on startup | Dashboard → Agents → (agent) → Inventory shows packages, network, OS info |
+| **SCA** | Agent runs SCA policies | Dashboard → Agents → (agent) → SCA shows policy results |
+| **Active Response** | Trigger from server: `/var/ossec/bin/agent_control -b 10.0.0.99 -f firewall-drop0 -u <AGENT_ID>` | Agent logs show active response execution |
+
+### 15.7 Teardown
+
+```bash
+cd wazuh-docker/single-node
+docker compose down -v   # -v removes volumes (all data)
+```
+
+### 15.8 Alternative: Bare-Metal / VM Server Install
+
+For longer-lived test environments, you can install the Wazuh server directly on a Linux VM using the official quickstart:
+
+```bash
+curl -sO https://packages.wazuh.com/4.9/wazuh-install.sh && \
+  sudo bash ./wazuh-install.sh -a
+```
+
+This installs the full stack (manager + indexer + dashboard) on a single machine. Refer to the official docs at https://documentation.wazuh.com/current/quickstart.html for details.
+
+---
+
+## 16. Summary
 
 The Wazuh Desktop Agent (WDA) is a ground-up reimagining of the Wazuh endpoint agent for user-facing devices. By leveraging Rust's zero-cost abstractions, event-driven OS APIs, adaptive resource management, and a modular architecture that loads only what's needed, WDA achieves a 7-10x reduction in memory usage and near-invisible CPU impact compared to the current agent.
 
