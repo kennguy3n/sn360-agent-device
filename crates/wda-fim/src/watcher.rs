@@ -17,6 +17,7 @@ pub struct DebouncedWatcher {
     inner: FsWatcher,
     debounce_window: Duration,
     pending: HashMap<PathBuf, (FsEventKind, Instant)>,
+    channel_closed: bool,
 }
 
 impl DebouncedWatcher {
@@ -29,6 +30,7 @@ impl DebouncedWatcher {
             inner,
             debounce_window: Duration::from_millis(debounce_ms),
             pending: HashMap::new(),
+            channel_closed: false,
         })
     }
 
@@ -75,22 +77,27 @@ impl DebouncedWatcher {
             // Either wait for a new raw event or for the next pending timeout.
             match sleep_dur {
                 Some(dur) if !dur.is_zero() => {
-                    tokio::select! {
-                        raw = self.inner.recv() => {
-                            match raw {
-                                Some(ev) => {
-                                    self.pending.insert(ev.path, (ev.kind, Instant::now()));
-                                }
-                                None => {
-                                    // Watcher dropped; drain pending.
-                                    if self.pending.is_empty() {
-                                        return None;
+                    if self.channel_closed {
+                        // Channel is closed; just sleep until the next pending event is ready.
+                        tokio::time::sleep(dur).await;
+                    } else {
+                        tokio::select! {
+                            raw = self.inner.recv() => {
+                                match raw {
+                                    Some(ev) => {
+                                        self.pending.insert(ev.path, (ev.kind, Instant::now()));
+                                    }
+                                    None => {
+                                        self.channel_closed = true;
+                                        if self.pending.is_empty() {
+                                            return None;
+                                        }
                                     }
                                 }
                             }
-                        }
-                        _ = tokio::time::sleep(dur) => {
-                            // A pending event is now ready; loop back.
+                            _ = tokio::time::sleep(dur) => {
+                                // A pending event is now ready; loop back.
+                            }
                         }
                     }
                 }
@@ -99,12 +106,18 @@ impl DebouncedWatcher {
                     continue;
                 }
                 None => {
+                    if self.channel_closed {
+                        return None;
+                    }
                     // No pending events; just wait for new raw events.
                     match self.inner.recv().await {
                         Some(ev) => {
                             self.pending.insert(ev.path, (ev.kind, Instant::now()));
                         }
-                        None => return None,
+                        None => {
+                            self.channel_closed = true;
+                            return None;
+                        }
                     }
                 }
             }

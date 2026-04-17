@@ -214,10 +214,17 @@ async fn run(
                 match kind {
                     FsEventKind::Created => {
                         let path_clone = path.clone();
-                        let new_entry = tokio::task::spawn_blocking(move || {
+                        let new_entry = match tokio::task::spawn_blocking(move || {
                             collect_metadata(&path_clone, check_sha256)
                         })
-                        .await??;
+                        .await?
+                        {
+                            Ok(entry) => entry,
+                            Err(e) => {
+                                debug!(error = %e, path = %path.display(), "file disappeared before stat");
+                                continue;
+                            }
+                        };
 
                         let syscheck_json = format_syscheck_event(
                             ChangeType::Added,
