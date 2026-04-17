@@ -134,9 +134,7 @@ async fn main() -> Result<()> {
     let forward_conn = Arc::clone(&conn);
     let forward_agent_id = agent_key.id.clone();
     let mut forward_shutdown = agent.shutdown_signal();
-    let mut server_rx = agent
-        .take_server_rx()
-        .expect("server_rx already taken");
+    let mut server_rx = agent.take_server_rx().expect("server_rx already taken");
 
     let forward_handle = tokio::spawn(async move {
         info!("event forwarding loop started");
@@ -220,33 +218,31 @@ fn map_event_to_message(agent_id: &str, kind: &EventKind) -> Option<WazuhMessage
         | EventKind::FileModified { .. }
         | EventKind::FileDeleted { .. }
         | EventKind::FileMetadataChanged { .. } => {
-            let json = serde_json::to_string(kind)
-                .unwrap_or_else(|e| format!("{{\"error\":\"{}\"}}", e));
+            let json =
+                serde_json::to_string(kind).unwrap_or_else(|e| format!("{{\"error\":\"{}\"}}", e));
             (MessageType::Syscheck, json)
         }
         EventKind::LogCollected { .. } => {
-            let json = serde_json::to_string(kind)
-                .unwrap_or_else(|e| format!("{{\"error\":\"{}\"}}", e));
+            let json =
+                serde_json::to_string(kind).unwrap_or_else(|e| format!("{{\"error\":\"{}\"}}", e));
             (MessageType::Log, json)
         }
         EventKind::InventoryUpdate { .. } => {
-            let json = serde_json::to_string(kind)
-                .unwrap_or_else(|e| format!("{{\"error\":\"{}\"}}", e));
+            let json =
+                serde_json::to_string(kind).unwrap_or_else(|e| format!("{{\"error\":\"{}\"}}", e));
             (MessageType::Syscollector, json)
         }
         EventKind::ScaResult { .. } => {
-            let json = serde_json::to_string(kind)
-                .unwrap_or_else(|e| format!("{{\"error\":\"{}\"}}", e));
+            let json =
+                serde_json::to_string(kind).unwrap_or_else(|e| format!("{{\"error\":\"{}\"}}", e));
             (MessageType::Sca, json)
         }
         EventKind::ActiveResponseResult { .. } => {
-            let json = serde_json::to_string(kind)
-                .unwrap_or_else(|e| format!("{{\"error\":\"{}\"}}", e));
+            let json =
+                serde_json::to_string(kind).unwrap_or_else(|e| format!("{{\"error\":\"{}\"}}", e));
             (MessageType::ActiveResponse, json)
         }
-        EventKind::ServerMessage { payload } => {
-            (MessageType::Generic, payload.clone())
-        }
+        EventKind::ServerMessage { payload } => (MessageType::Generic, payload.clone()),
         // Lifecycle / internal events are not forwarded.
         _ => return None,
     };
