@@ -39,11 +39,7 @@ pub struct FimModule {
 
 impl FimModule {
     /// Start the FIM module, returning a `ModuleHandle` that owns the spawned task.
-    pub fn start(
-        config: &AgentConfig,
-        bus: EventBus,
-        shutdown: ShutdownSignal,
-    ) -> ModuleHandle {
+    pub fn start(config: &AgentConfig, bus: EventBus, shutdown: ShutdownSignal) -> ModuleHandle {
         let fim_config = config.modules.fim.clone();
         let status = std::sync::Arc::new(AtomicU8::new(STATUS_INITIALIZED));
         let task_status = std::sync::Arc::clone(&status);

@@ -2,11 +2,17 @@
 //!
 //! Implements the authd enrollment protocol on port 1515.
 //! Supports both pre-shared key and password-based enrollment.
+//! Uses TLS for the enrollment connection (Wazuh authd requires SSL).
 
 use std::path::PathBuf;
+use std::sync::Arc;
 
+use rustls::client::danger::{HandshakeSignatureValid, ServerCertVerified, ServerCertVerifier};
+use rustls::pki_types::{CertificateDer, ServerName, UnixTime};
+use rustls::{ClientConfig, DigitallySignedStruct, Error as RustlsError, SignatureScheme};
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 use tokio::net::TcpStream;
+use tokio_rustls::TlsConnector;
 use tracing::info;
 
 /// Enrollment errors.
@@ -98,18 +104,41 @@ impl EnrollmentClient {
     }
 
     /// Perform enrollment and return the assigned agent key.
+    ///
+    /// Connects to the Wazuh authd service over TLS (port 1515).
+    /// Accepts self-signed certificates since Wazuh uses its own CA.
     pub async fn enroll(&self) -> Result<AgentKey, EnrollmentError> {
         let addr = format!("{}:{}", self.server, self.port);
         info!(address = %addr, agent = %self.agent_name, "starting enrollment");
 
-        // Connect to enrollment server
+        // Connect to enrollment server over TLS
         let timeout = std::time::Duration::from_secs(30);
-        let stream = tokio::time::timeout(timeout, TcpStream::connect(&addr))
+        let tcp_stream = tokio::time::timeout(timeout, TcpStream::connect(&addr))
             .await
             .map_err(|_| EnrollmentError::Timeout)?
             .map_err(|e| EnrollmentError::ConnectionFailed(e.to_string()))?;
 
-        let (reader, mut writer) = stream.into_split();
+        // Configure TLS (accept self-signed certs from Wazuh authd)
+        let tls_config = ClientConfig::builder()
+            .dangerous()
+            .with_custom_certificate_verifier(Arc::new(AcceptAnyCert))
+            .with_no_client_auth();
+        let connector = TlsConnector::from(Arc::new(tls_config));
+        let server_name: ServerName<'static> =
+            if let Ok(ip) = self.server.parse::<std::net::IpAddr>() {
+                ServerName::IpAddress(ip.into())
+            } else {
+                ServerName::try_from(self.server.clone()).map_err(|e| {
+                    EnrollmentError::ConnectionFailed(format!("invalid server name: {e}"))
+                })?
+            };
+
+        let tls_stream = tokio::time::timeout(timeout, connector.connect(server_name, tcp_stream))
+            .await
+            .map_err(|_| EnrollmentError::Timeout)?
+            .map_err(|e| EnrollmentError::ConnectionFailed(format!("TLS handshake failed: {e}")))?;
+
+        let (reader, mut writer) = tokio::io::split(tls_stream);
         let mut reader = BufReader::new(reader);
 
         // Build enrollment request
@@ -131,12 +160,21 @@ impl EnrollmentClient {
             .await
             .map_err(|e| EnrollmentError::ConnectionFailed(e.to_string()))?;
 
-        // Read response
+        // Read response (with timeout)
+        // Wazuh authd may close the connection without TLS close_notify,
+        // so we tolerate the missing close_notify when we already have data.
         let mut response = String::new();
-        reader
-            .read_line(&mut response)
-            .await
-            .map_err(|e| EnrollmentError::InvalidResponse(e.to_string()))?;
+        match tokio::time::timeout(timeout, reader.read_line(&mut response)).await {
+            Ok(Ok(_)) => {}
+            Ok(Err(e)) => {
+                // If we already got data, the EOF error is expected from Wazuh authd
+                if response.is_empty() {
+                    return Err(EnrollmentError::InvalidResponse(e.to_string()));
+                }
+                // Otherwise we have the response, just the connection closed abruptly
+            }
+            Err(_) => return Err(EnrollmentError::Timeout),
+        }
 
         let response = response.trim();
         info!(response = %response, "enrollment response received");
@@ -161,6 +199,60 @@ impl EnrollmentClient {
         } else {
             Err(EnrollmentError::InvalidResponse(response.to_string()))
         }
+    }
+}
+
+/// A TLS certificate verifier that accepts any certificate.
+///
+/// Wazuh authd uses self-signed certificates, so we need to skip
+/// certificate verification during enrollment. The enrollment
+/// protocol itself uses a password for authentication.
+#[derive(Debug)]
+struct AcceptAnyCert;
+
+impl ServerCertVerifier for AcceptAnyCert {
+    fn verify_server_cert(
+        &self,
+        _end_entity: &CertificateDer<'_>,
+        _intermediates: &[CertificateDer<'_>],
+        _server_name: &ServerName<'_>,
+        _ocsp_response: &[u8],
+        _now: UnixTime,
+    ) -> Result<ServerCertVerified, RustlsError> {
+        Ok(ServerCertVerified::assertion())
+    }
+
+    fn verify_tls12_signature(
+        &self,
+        _message: &[u8],
+        _cert: &CertificateDer<'_>,
+        _dss: &DigitallySignedStruct,
+    ) -> Result<HandshakeSignatureValid, RustlsError> {
+        Ok(HandshakeSignatureValid::assertion())
+    }
+
+    fn verify_tls13_signature(
+        &self,
+        _message: &[u8],
+        _cert: &CertificateDer<'_>,
+        _dss: &DigitallySignedStruct,
+    ) -> Result<HandshakeSignatureValid, RustlsError> {
+        Ok(HandshakeSignatureValid::assertion())
+    }
+
+    fn supported_verify_schemes(&self) -> Vec<SignatureScheme> {
+        vec![
+            SignatureScheme::RSA_PKCS1_SHA256,
+            SignatureScheme::RSA_PKCS1_SHA384,
+            SignatureScheme::RSA_PKCS1_SHA512,
+            SignatureScheme::ECDSA_NISTP256_SHA256,
+            SignatureScheme::ECDSA_NISTP384_SHA384,
+            SignatureScheme::ECDSA_NISTP521_SHA512,
+            SignatureScheme::RSA_PSS_SHA256,
+            SignatureScheme::RSA_PSS_SHA384,
+            SignatureScheme::RSA_PSS_SHA512,
+            SignatureScheme::ED25519,
+        ]
     }
 }
 

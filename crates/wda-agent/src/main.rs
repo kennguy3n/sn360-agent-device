@@ -132,11 +132,8 @@ async fn main() -> Result<()> {
     // 10. Start FIM module if enabled
     if config.modules.fim.enabled {
         info!("starting FIM module");
-        let fim_handle = wda_fim::FimModule::start(
-            &config,
-            agent.event_bus(),
-            agent.shutdown_signal(),
-        );
+        let fim_handle =
+            wda_fim::FimModule::start(&config, agent.event_bus(), agent.shutdown_signal());
         agent.register_module(fim_handle);
     }
 
