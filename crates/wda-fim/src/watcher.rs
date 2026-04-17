@@ -156,11 +156,8 @@ mod tests {
         // We should get at most a small number of events for the path
         // (possibly 1 create + 1 modify, but not 3+ separate modify events).
         let mut count = 0;
-        loop {
-            match timeout(Duration::from_millis(300), watcher.next_event()).await {
-                Ok(Some(_)) => count += 1,
-                _ => break,
-            }
+        while let Ok(Some(_)) = timeout(Duration::from_millis(300), watcher.next_event()).await {
+            count += 1;
         }
         // The debouncer should have collapsed the rapid writes.
         // We expect fewer events than the 3+ raw events generated.

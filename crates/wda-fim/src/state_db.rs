@@ -155,7 +155,7 @@ impl StateDb {
 
     /// Return the path where the database is stored (if on-disk).
     pub fn path(&self) -> Option<PathBuf> {
-        self.conn.path().map(|p| PathBuf::from(p))
+        self.conn.path().map(PathBuf::from)
     }
 }
 
