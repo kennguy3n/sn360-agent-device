@@ -6,17 +6,34 @@ REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 
 cd "$REPO_ROOT"
 
+AGENT_PID=""
+
+cleanup() {
+  echo "Cleaning up..."
+  kill $AGENT_PID 2>/dev/null || true
+  sudo rm -f /etc/wda-test-fim-trigger
+  sudo rm -f /etc/wazuh-desktop-agent/client.keys
+  docker compose -f tests/docker-compose.yml down -v 2>/dev/null || true
+}
+trap cleanup EXIT
+
 # 1. Start Wazuh server
 docker compose -f tests/docker-compose.yml up -d
 echo "Waiting for Wazuh manager to be ready..."
 # Wait for authd to be listening on 1515
+WAZUH_READY=false
 for i in $(seq 1 60); do
   if docker compose -f tests/docker-compose.yml exec -T wazuh-manager /var/ossec/bin/wazuh-control status 2>/dev/null | grep -q "running"; then
     echo "Wazuh manager is ready"
+    WAZUH_READY=true
     break
   fi
   sleep 2
 done
+if [ "$WAZUH_READY" = false ]; then
+  echo "FAIL: Wazuh manager did not become ready within timeout"
+  exit 1
+fi
 
 # 2. Build the agent
 cargo build --release
@@ -34,7 +51,7 @@ if echo "$AGENT_LIST" | grep -q "ID:"; then
   echo "PASS: Agent enrolled successfully"
 else
   echo "FAIL: Agent not enrolled"
-  kill $AGENT_PID 2>/dev/null; exit 1
+  exit 1
 fi
 
 # 5. Trigger FIM event -- create a file in a watched directory
@@ -49,9 +66,3 @@ if [ "$ALERTS" -gt 0 ]; then
 else
   echo "WARN: No syscheck alerts found (may need more time or format adjustment)"
 fi
-
-# 7. Cleanup
-kill $AGENT_PID 2>/dev/null || true
-sudo rm -f /etc/wda-test-fim-trigger
-sudo rm -f /etc/wazuh-desktop-agent/client.keys
-docker compose -f tests/docker-compose.yml down -v
