@@ -6,10 +6,10 @@ pub use wda_core::config::{FimConfig, FimDirectory};
 pub fn default_db_path() -> std::path::PathBuf {
     #[cfg(unix)]
     {
-        std::path::PathBuf::from("/var/lib/wda/fim.db")
+        std::path::PathBuf::from("/var/lib/wazuh-desktop-agent/fim.db")
     }
     #[cfg(windows)]
     {
-        std::path::PathBuf::from(r"C:\ProgramData\WDA\fim.db")
+        std::path::PathBuf::from(r"C:\ProgramData\WazuhDesktopAgent\fim.db")
     }
 }
