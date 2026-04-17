@@ -20,7 +20,7 @@ TARGETS := \
 	aarch64-apple-darwin \
 	x86_64-pc-windows-msvc
 
-.PHONY: build release test lint fmt clippy all-targets clean
+.PHONY: build release test lint fmt clippy all-targets clean e2e
 
 build:
 	$(CARGO) build
@@ -43,6 +43,9 @@ all-targets: $(addprefix build-,$(TARGETS))
 
 build-%:
 	$(CROSS) build --release --target $*
+
+e2e:
+	bash tests/scripts/run-e2e.sh
 
 clean:
 	$(CARGO) clean

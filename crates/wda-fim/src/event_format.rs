@@ -1,6 +1,6 @@
 //! Format FIM changes as Wazuh syscheck-compatible JSON.
 
-use crate::state_db::FimEntry;
+use crate::db::FimEntry;
 
 /// The type of change detected.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -106,7 +106,7 @@ fn escape_json_string(s: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::state_db::FimEntry;
+    use crate::db::FimEntry;
 
     fn sample_entry(sha: &str, size: i64) -> FimEntry {
         FimEntry {

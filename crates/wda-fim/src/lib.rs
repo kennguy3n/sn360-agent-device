@@ -5,9 +5,10 @@
 //! to the event bus for server delivery.
 
 pub mod config;
+pub mod db;
+pub mod debounce;
 pub mod event_format;
 pub mod hasher;
-pub mod state_db;
 pub mod watcher;
 
 use std::path::Path;
@@ -20,8 +21,8 @@ use wda_core::module::{ModuleHandle, ModuleHealth, ModuleStatus};
 use wda_core::signal::ShutdownSignal;
 use wda_event_bus::{Event, EventBus, EventKind, Priority};
 
+use crate::db::{FimEntry, StateDb};
 use crate::event_format::{format_syscheck_event, ChangeType};
-use crate::state_db::{FimEntry, StateDb};
 use crate::watcher::DebouncedWatcher;
 
 use wda_pal::types::FsEventKind;
@@ -371,4 +372,73 @@ async fn run(
     status.store(STATUS_STOPPED, Ordering::Relaxed);
     info!("FIM module stopped");
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::time::Duration;
+    use tempfile::TempDir;
+    use wda_core::config::{FimConfig, FimDirectory, ModulesConfig};
+    use wda_core::signal::ShutdownController;
+
+    /// Build a minimal `AgentConfig` that watches `dir`.
+    fn test_config(dir: &str) -> wda_core::config::AgentConfig {
+        wda_core::config::AgentConfig {
+            modules: ModulesConfig {
+                fim: FimConfig {
+                    enabled: true,
+                    directories: vec![FimDirectory {
+                        path: dir.to_string(),
+                        recursive: true,
+                        realtime: true,
+                        check_sha256: true,
+                        exclude: Vec::new(),
+                    }],
+                    scan_interval: 86400,
+                    debounce_ms: 50,
+                },
+                ..Default::default()
+            },
+            ..Default::default()
+        }
+    }
+
+    #[tokio::test]
+    async fn test_fim_module_detects_file_creation_and_publishes_event() {
+        let tmp = TempDir::new().unwrap();
+        let config = test_config(tmp.path().to_str().unwrap());
+
+        let (bus, mut server_rx) = EventBus::new(256, 256);
+        let (controller, signal) = ShutdownController::new();
+
+        let _handle = FimModule::start(&config, bus, signal);
+
+        // Wait for the watcher to register.
+        tokio::time::sleep(Duration::from_millis(200)).await;
+
+        // Create a file.
+        let file_path = tmp.path().join("unit_test.txt");
+        std::fs::write(&file_path, "unit test content").unwrap();
+
+        // Wait for a FileCreated event on the server channel.
+        let event = tokio::time::timeout(Duration::from_secs(10), server_rx.recv())
+            .await
+            .expect("timed out waiting for FIM event")
+            .expect("server_rx closed");
+
+        match &event.kind {
+            EventKind::FileCreated { path }
+            | EventKind::FileModified { path }
+            | EventKind::FileMetadataChanged { path } => {
+                assert!(
+                    path.contains("unit_test.txt"),
+                    "event path should contain file name, got: {path}"
+                );
+            }
+            other => panic!("expected FileCreated/FileModified, got: {other:?}"),
+        }
+
+        controller.shutdown();
+    }
 }

@@ -1,0 +1,13 @@
+server:
+  address: "127.0.0.1"
+  port: 1514
+  protocol: "tcp"
+  keepalive_interval: 30
+enrollment:
+  port: 1515
+  auto_enroll: true
+modules:
+  fim:
+    enabled: true
+logging:
+  level: "debug"

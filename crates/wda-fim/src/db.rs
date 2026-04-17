@@ -259,4 +259,39 @@ mod tests {
         let fetched = db.get_entry("/tmp/nosha").unwrap().unwrap();
         assert_eq!(fetched.sha256, None);
     }
+
+    #[test]
+    fn test_open_creates_parent_dirs() {
+        let tmp = tempfile::TempDir::new().unwrap();
+        let db_path = tmp.path().join("nested").join("dir").join("fim.db");
+        let db = StateDb::open(&db_path);
+        assert!(db.is_ok(), "should create parent directories automatically");
+        assert!(db_path.exists());
+    }
+
+    #[test]
+    fn test_open_on_disk_and_reopen() {
+        let tmp = tempfile::TempDir::new().unwrap();
+        let db_path = tmp.path().join("fim.db");
+
+        // Write an entry and drop the DB.
+        {
+            let db = StateDb::open(&db_path).unwrap();
+            db.upsert_entry(&sample_entry("/etc/hosts")).unwrap();
+        }
+
+        // Re-open and verify persistence.
+        let db = StateDb::open(&db_path).unwrap();
+        let fetched = db.get_entry("/etc/hosts").unwrap();
+        assert!(fetched.is_some(), "entry should persist across reopen");
+        assert_eq!(fetched.unwrap().path, "/etc/hosts");
+    }
+
+    #[test]
+    fn test_delete_nonexistent_is_ok() {
+        let db = StateDb::open_in_memory().unwrap();
+        // Deleting a path that was never inserted should not error.
+        let result = db.delete_entry("/no/such/path");
+        assert!(result.is_ok());
+    }
 }
