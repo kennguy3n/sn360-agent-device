@@ -98,7 +98,7 @@ pub struct FimConfig {
     #[serde(default = "default_true")]
     pub enabled: bool,
     /// Directories to monitor.
-    #[serde(default)]
+    #[serde(default = "default_fim_directories")]
     pub directories: Vec<FimDirectory>,
     /// Baseline scan interval in seconds (default 12h).
     #[serde(default = "default_fim_scan_interval")]
