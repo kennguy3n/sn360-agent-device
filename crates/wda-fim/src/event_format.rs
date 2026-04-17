@@ -127,12 +127,8 @@ mod tests {
         let old = sample_entry("old_hash", 100);
         let new = sample_entry("new_hash", 200);
 
-        let json = format_syscheck_event(
-            ChangeType::Modified,
-            "/etc/passwd",
-            Some(&old),
-            Some(&new),
-        );
+        let json =
+            format_syscheck_event(ChangeType::Modified, "/etc/passwd", Some(&old), Some(&new));
 
         // Verify it's valid JSON.
         let parsed: serde_json::Value = serde_json::from_str(&json).unwrap();
@@ -142,9 +138,7 @@ mod tests {
         assert_eq!(parsed["data"]["type"], "modified");
         assert_eq!(parsed["data"]["mode"], "realtime");
 
-        let changed = parsed["data"]["changed_attributes"]
-            .as_array()
-            .unwrap();
+        let changed = parsed["data"]["changed_attributes"].as_array().unwrap();
         assert!(changed.contains(&serde_json::Value::String("sha256".into())));
         assert!(changed.contains(&serde_json::Value::String("size".into())));
 
@@ -181,8 +175,12 @@ mod tests {
     #[test]
     fn test_format_with_special_chars_in_path() {
         let new = sample_entry("hash", 100);
-        let json =
-            format_syscheck_event(ChangeType::Added, "/tmp/file with \"quotes\"", None, Some(&new));
+        let json = format_syscheck_event(
+            ChangeType::Added,
+            "/tmp/file with \"quotes\"",
+            None,
+            Some(&new),
+        );
 
         let parsed: serde_json::Value = serde_json::from_str(&json).unwrap();
         assert_eq!(parsed["data"]["path"], "/tmp/file with \"quotes\"");
@@ -191,8 +189,7 @@ mod tests {
     #[test]
     fn test_permissions_format() {
         let entry = sample_entry("hash", 100);
-        let json =
-            format_syscheck_event(ChangeType::Added, "/etc/test", None, Some(&entry));
+        let json = format_syscheck_event(ChangeType::Added, "/etc/test", None, Some(&entry));
         let parsed: serde_json::Value = serde_json::from_str(&json).unwrap();
         // 0o644 decimal = 420, formatted as octal "0644"
         assert_eq!(parsed["data"]["new_attributes"]["perm"], "0644");

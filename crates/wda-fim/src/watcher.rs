@@ -165,7 +165,10 @@ mod tests {
         // The debouncer should have collapsed the rapid writes.
         // We expect fewer events than the 3+ raw events generated.
         assert!(count >= 1, "should receive at least one event");
-        assert!(count <= 3, "debounce should collapse rapid events, got {count}");
+        assert!(
+            count <= 3,
+            "debounce should collapse rapid events, got {count}"
+        );
     }
 
     #[tokio::test]

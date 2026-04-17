@@ -128,13 +128,14 @@ impl EnrollmentClient {
             if let Ok(ip) = self.server.parse::<std::net::IpAddr>() {
                 ServerName::IpAddress(ip.into())
             } else {
-                ServerName::try_from(self.server.clone())
-                    .map_err(|e| EnrollmentError::ConnectionFailed(format!("invalid server name: {e}")))?
+                ServerName::try_from(self.server.clone()).map_err(|e| {
+                    EnrollmentError::ConnectionFailed(format!("invalid server name: {e}"))
+                })?
             };
 
-        let tls_stream = connector
-            .connect(server_name, tcp_stream)
+        let tls_stream = tokio::time::timeout(timeout, connector.connect(server_name, tcp_stream))
             .await
+            .map_err(|_| EnrollmentError::Timeout)?
             .map_err(|e| EnrollmentError::ConnectionFailed(format!("TLS handshake failed: {e}")))?;
 
         let (reader, mut writer) = tokio::io::split(tls_stream);
@@ -159,19 +160,20 @@ impl EnrollmentClient {
             .await
             .map_err(|e| EnrollmentError::ConnectionFailed(e.to_string()))?;
 
-        // Read response
+        // Read response (with timeout)
         // Wazuh authd may close the connection without TLS close_notify,
-        // so we read until EOF and tolerate the missing close_notify.
+        // so we tolerate the missing close_notify when we already have data.
         let mut response = String::new();
-        match reader.read_line(&mut response).await {
-            Ok(_) => {}
-            Err(e) => {
+        match tokio::time::timeout(timeout, reader.read_line(&mut response)).await {
+            Ok(Ok(_)) => {}
+            Ok(Err(e)) => {
                 // If we already got data, the EOF error is expected from Wazuh authd
                 if response.is_empty() {
                     return Err(EnrollmentError::InvalidResponse(e.to_string()));
                 }
                 // Otherwise we have the response, just the connection closed abruptly
             }
+            Err(_) => return Err(EnrollmentError::Timeout),
         }
 
         let response = response.trim();
