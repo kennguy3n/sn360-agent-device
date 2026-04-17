@@ -247,10 +247,69 @@ impl Default for FimConfig {
     fn default() -> Self {
         Self {
             enabled: true,
-            directories: Vec::new(),
+            directories: default_fim_directories(),
             scan_interval: default_fim_scan_interval(),
             debounce_ms: default_fim_debounce_ms(),
         }
+    }
+}
+
+fn default_fim_directories() -> Vec<FimDirectory> {
+    #[cfg(unix)]
+    {
+        vec![
+            FimDirectory {
+                path: "/etc".to_string(),
+                recursive: true,
+                realtime: true,
+                check_sha256: true,
+                exclude: Vec::new(),
+            },
+            FimDirectory {
+                path: "/usr/bin".to_string(),
+                recursive: false,
+                realtime: true,
+                check_sha256: true,
+                exclude: Vec::new(),
+            },
+            FimDirectory {
+                path: "/usr/sbin".to_string(),
+                recursive: false,
+                realtime: true,
+                check_sha256: true,
+                exclude: Vec::new(),
+            },
+            FimDirectory {
+                path: "/boot".to_string(),
+                recursive: true,
+                realtime: true,
+                check_sha256: true,
+                exclude: Vec::new(),
+            },
+        ]
+    }
+    #[cfg(windows)]
+    {
+        vec![
+            FimDirectory {
+                path: r"C:\Windows\System32\drivers\etc".to_string(),
+                recursive: true,
+                realtime: true,
+                check_sha256: true,
+                exclude: Vec::new(),
+            },
+            FimDirectory {
+                path: r"C:\Windows\System32".to_string(),
+                recursive: false,
+                realtime: true,
+                check_sha256: true,
+                exclude: Vec::new(),
+            },
+        ]
+    }
+    #[cfg(not(any(unix, windows)))]
+    {
+        Vec::new()
     }
 }
 

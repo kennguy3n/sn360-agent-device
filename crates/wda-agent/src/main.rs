@@ -14,9 +14,10 @@ use wda_comms::connection::{ConnectionConfig, ConnectionManager, TransportProtoc
 use wda_comms::crypto::WazuhCipher;
 use wda_comms::enrollment::{load_agent_key, save_agent_key, EnrollmentClient};
 use wda_comms::keepalive::run_keepalive_loop;
-use wda_comms::protocol::WazuhMessage;
+use wda_comms::protocol::{MessageType, WazuhMessage};
 use wda_core::config::AgentConfig;
 use wda_core::Agent;
+use wda_event_bus::EventKind;
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -129,7 +130,50 @@ async fn main() -> Result<()> {
         .await;
     });
 
-    // 10. Start FIM module if enabled
+    // 10. Spawn event forwarding loop
+    let forward_conn = Arc::clone(&conn);
+    let forward_agent_id = agent_key.id.clone();
+    let mut forward_shutdown = agent.shutdown_signal();
+    let mut server_rx = agent
+        .take_server_rx()
+        .expect("server_rx already taken");
+
+    let forward_handle = tokio::spawn(async move {
+        info!("event forwarding loop started");
+        loop {
+            tokio::select! {
+                biased;
+
+                _ = forward_shutdown.wait() => {
+                    info!("event forwarding loop shutting down");
+                    break;
+                }
+
+                event = server_rx.recv() => {
+                    let event = match event {
+                        Some(ev) => ev,
+                        None => {
+                            info!("server event channel closed, stopping forward loop");
+                            break;
+                        }
+                    };
+
+                    let msg = match map_event_to_message(&forward_agent_id, &event.kind) {
+                        Some(m) => m,
+                        None => continue,
+                    };
+
+                    let mut guard = forward_conn.lock().await;
+                    if let Err(e) = guard.send(&msg).await {
+                        error!(error = %e, "failed to forward event to server");
+                    }
+                }
+            }
+        }
+        info!("event forwarding loop stopped");
+    });
+
+    // 11. Start FIM module if enabled
     if config.modules.fim.enabled {
         info!("starting FIM module");
         let fim_handle =
@@ -137,11 +181,11 @@ async fn main() -> Result<()> {
         agent.register_module(fim_handle);
     }
 
-    // 11. Start agent and wait for shutdown signal
+    // 12. Start agent and wait for shutdown signal
     agent.start().await;
     agent.wait_for_shutdown().await;
 
-    // 11. Send shutdown message, disconnect, shut down agent
+    // 13. Send shutdown message, disconnect, shut down agent
     info!("sending shutdown message");
     {
         let shutdown_msg = WazuhMessage::new(
@@ -156,8 +200,9 @@ async fn main() -> Result<()> {
         guard.disconnect().await;
     }
 
-    // Wait for keepalive task to finish
+    // Wait for keepalive and forwarding tasks to finish
     let _ = keepalive_handle.await;
+    let _ = forward_handle.await;
 
     agent.shutdown().await;
     info!("wazuh desktop agent stopped");
@@ -165,7 +210,196 @@ async fn main() -> Result<()> {
     Ok(())
 }
 
+/// Map an `EventKind` to a `WazuhMessage` ready for server delivery.
+///
+/// Returns `None` for event kinds that should not be forwarded (e.g.
+/// lifecycle events that are handled separately).
+fn map_event_to_message(agent_id: &str, kind: &EventKind) -> Option<WazuhMessage> {
+    let (msg_type, payload) = match kind {
+        EventKind::FileCreated { .. }
+        | EventKind::FileModified { .. }
+        | EventKind::FileDeleted { .. }
+        | EventKind::FileMetadataChanged { .. } => {
+            let json = serde_json::to_string(kind)
+                .unwrap_or_else(|e| format!("{{\"error\":\"{}\"}}", e));
+            (MessageType::Syscheck, json)
+        }
+        EventKind::LogCollected { .. } => {
+            let json = serde_json::to_string(kind)
+                .unwrap_or_else(|e| format!("{{\"error\":\"{}\"}}", e));
+            (MessageType::Log, json)
+        }
+        EventKind::InventoryUpdate { .. } => {
+            let json = serde_json::to_string(kind)
+                .unwrap_or_else(|e| format!("{{\"error\":\"{}\"}}", e));
+            (MessageType::Syscollector, json)
+        }
+        EventKind::ScaResult { .. } => {
+            let json = serde_json::to_string(kind)
+                .unwrap_or_else(|e| format!("{{\"error\":\"{}\"}}", e));
+            (MessageType::Sca, json)
+        }
+        EventKind::ActiveResponseResult { .. } => {
+            let json = serde_json::to_string(kind)
+                .unwrap_or_else(|e| format!("{{\"error\":\"{}\"}}", e));
+            (MessageType::ActiveResponse, json)
+        }
+        EventKind::ServerMessage { payload } => {
+            (MessageType::Generic, payload.clone())
+        }
+        // Lifecycle / internal events are not forwarded.
+        _ => return None,
+    };
+
+    Some(WazuhMessage::new(agent_id, msg_type, payload))
+}
+
 /// Get the system hostname as a fallback agent name.
 fn gethostname() -> String {
     ::gethostname::gethostname().to_string_lossy().into_owned()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use wda_comms::protocol::MessageType;
+    use wda_event_bus::{Event, EventKind, Priority};
+
+    #[test]
+    fn test_file_created_maps_to_syscheck() {
+        let kind = EventKind::FileCreated {
+            path: "/etc/passwd".to_string(),
+        };
+        let msg = map_event_to_message("001", &kind).unwrap();
+        assert_eq!(msg.msg_type, MessageType::Syscheck);
+        assert_eq!(msg.agent_id, "001");
+        assert!(msg.payload.contains("/etc/passwd"));
+    }
+
+    #[test]
+    fn test_file_modified_maps_to_syscheck() {
+        let kind = EventKind::FileModified {
+            path: "/etc/shadow".to_string(),
+        };
+        let msg = map_event_to_message("002", &kind).unwrap();
+        assert_eq!(msg.msg_type, MessageType::Syscheck);
+        assert!(msg.payload.contains("/etc/shadow"));
+    }
+
+    #[test]
+    fn test_file_deleted_maps_to_syscheck() {
+        let kind = EventKind::FileDeleted {
+            path: "/tmp/gone.txt".to_string(),
+        };
+        let msg = map_event_to_message("003", &kind).unwrap();
+        assert_eq!(msg.msg_type, MessageType::Syscheck);
+        assert!(msg.payload.contains("/tmp/gone.txt"));
+    }
+
+    #[test]
+    fn test_file_metadata_changed_maps_to_syscheck() {
+        let kind = EventKind::FileMetadataChanged {
+            path: "/usr/bin/test".to_string(),
+        };
+        let msg = map_event_to_message("004", &kind).unwrap();
+        assert_eq!(msg.msg_type, MessageType::Syscheck);
+    }
+
+    #[test]
+    fn test_log_collected_maps_to_log() {
+        let kind = EventKind::LogCollected {
+            source: "syslog".to_string(),
+            message: "test log line".to_string(),
+            format: "syslog".to_string(),
+        };
+        let msg = map_event_to_message("005", &kind).unwrap();
+        assert_eq!(msg.msg_type, MessageType::Log);
+        assert!(msg.payload.contains("test log line"));
+    }
+
+    #[test]
+    fn test_inventory_maps_to_syscollector() {
+        let kind = EventKind::InventoryUpdate {
+            category: "packages".to_string(),
+            data: serde_json::json!({"name": "vim"}),
+        };
+        let msg = map_event_to_message("006", &kind).unwrap();
+        assert_eq!(msg.msg_type, MessageType::Syscollector);
+    }
+
+    #[test]
+    fn test_sca_maps_to_sca() {
+        let kind = EventKind::ScaResult {
+            policy_id: "cis_ubuntu".to_string(),
+            check_id: "1001".to_string(),
+            result: "passed".to_string(),
+        };
+        let msg = map_event_to_message("007", &kind).unwrap();
+        assert_eq!(msg.msg_type, MessageType::Sca);
+    }
+
+    #[test]
+    fn test_active_response_maps_to_active_response() {
+        let kind = EventKind::ActiveResponseResult {
+            action: "block_ip".to_string(),
+            success: true,
+            output: "blocked".to_string(),
+        };
+        let msg = map_event_to_message("008", &kind).unwrap();
+        assert_eq!(msg.msg_type, MessageType::ActiveResponse);
+    }
+
+    #[test]
+    fn test_server_message_maps_to_generic() {
+        let kind = EventKind::ServerMessage {
+            payload: "raw payload".to_string(),
+        };
+        let msg = map_event_to_message("009", &kind).unwrap();
+        assert_eq!(msg.msg_type, MessageType::Generic);
+        assert_eq!(msg.payload, "raw payload");
+    }
+
+    #[test]
+    fn test_keepalive_not_forwarded() {
+        let kind = EventKind::Keepalive;
+        assert!(map_event_to_message("010", &kind).is_none());
+    }
+
+    #[test]
+    fn test_shutdown_not_forwarded() {
+        let kind = EventKind::Shutdown;
+        assert!(map_event_to_message("010", &kind).is_none());
+    }
+
+    #[test]
+    fn test_config_reloaded_not_forwarded() {
+        let kind = EventKind::ConfigReloaded;
+        assert!(map_event_to_message("010", &kind).is_none());
+    }
+
+    #[tokio::test]
+    async fn test_event_forwarding_via_bus() {
+        // Verify events published via publish_to_server appear on server_rx
+        // and can be correctly mapped to WazuhMessages.
+        let (bus, mut server_rx) = wda_event_bus::EventBus::new(64, 64);
+
+        let event = Event::new(
+            "fim",
+            Priority::Normal,
+            EventKind::FileCreated {
+                path: "/etc/test.conf".to_string(),
+            },
+        );
+        bus.publish_to_server(event).await.unwrap();
+
+        let received = server_rx.recv().await.unwrap();
+        let msg = map_event_to_message("001", &received.kind).unwrap();
+        assert_eq!(msg.msg_type, MessageType::Syscheck);
+        assert_eq!(msg.agent_id, "001");
+        assert!(msg.payload.contains("/etc/test.conf"));
+
+        // Verify the message encodes to the expected wire format.
+        let encoded = String::from_utf8(msg.encode()).unwrap();
+        assert!(encoded.starts_with("001:syscheck:"));
+    }
 }
