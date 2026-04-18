@@ -145,16 +145,24 @@ async fn collect_and_publish(categories: &[String], bus: &EventBus) {
                         Vec::new()
                     });
 
-                for payload in &payloads {
-                    let wire = wrap_syscollector(payload);
+                if !payloads.is_empty() {
+                    let batched = serde_json::json!({
+                        "type": "dbsync_network_batch",
+                        "items": payloads,
+                    });
+                    let wire = wrap_syscollector(&batched);
                     publish_inventory_event(bus, "network", &wire).await;
                 }
             }
             "packages" => {
                 let payloads = packages::collect_packages().await;
 
-                for payload in &payloads {
-                    let wire = wrap_syscollector(payload);
+                if !payloads.is_empty() {
+                    let batched = serde_json::json!({
+                        "type": "dbsync_packages_batch",
+                        "items": payloads,
+                    });
+                    let wire = wrap_syscollector(&batched);
                     publish_inventory_event(bus, "packages", &wire).await;
                 }
             }
