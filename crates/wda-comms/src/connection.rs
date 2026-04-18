@@ -217,8 +217,7 @@ impl ConnectionManager {
 
             // Wire format: !{agent_id}!{crypto_token}{encrypted_payload}
             // crypto_token is ":" for Blowfish, "#AES:" for AES
-            let mut wire =
-                format!("!{}!{}", message.agent_id, cipher.crypto_token()).into_bytes();
+            let mut wire = format!("!{}!{}", message.agent_id, cipher.crypto_token()).into_bytes();
             wire.extend_from_slice(&encrypted);
             wire
         } else {

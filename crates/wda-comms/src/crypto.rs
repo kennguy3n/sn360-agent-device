@@ -149,7 +149,11 @@ impl WazuhCipher {
         let cmp_size = compressed.len() + 1;
         let bfsize = {
             let rem = cmp_size % 8;
-            if rem == 0 { 0 } else { 8 - rem }
+            if rem == 0 {
+                0
+            } else {
+                8 - rem
+            }
         };
         let num_padding = bfsize + 1; // always at least 1 '!' byte
         let total = num_padding + compressed.len(); // = cmp_size + bfsize
@@ -224,9 +228,8 @@ impl WazuhCipher {
         }
         let compressed = &data[start..];
 
-        let decompressed = zlib_decompress(compressed).ok_or_else(|| {
-            CryptoError::DecryptionFailed("zlib decompression failed".into())
-        })?;
+        let decompressed = zlib_decompress(compressed)
+            .ok_or_else(|| CryptoError::DecryptionFailed("zlib decompression failed".into()))?;
 
         if decompressed.len() < 53 {
             return Err(CryptoError::DecryptionFailed(
