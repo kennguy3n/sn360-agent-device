@@ -86,7 +86,7 @@ pub struct ModulesConfig {
     #[serde(default)]
     pub sca: ModuleToggle,
     #[serde(default)]
-    pub active_response: ModuleToggle,
+    pub active_response: ActiveResponseConfig,
     #[serde(default)]
     pub rootcheck: ModuleToggle,
 }
@@ -174,6 +174,20 @@ pub struct InventoryConfig {
 pub struct ModuleToggle {
     #[serde(default = "default_true")]
     pub enabled: bool,
+}
+
+/// Active response module configuration.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ActiveResponseConfig {
+    /// Whether the active response module is enabled.
+    #[serde(default = "default_true")]
+    pub enabled: bool,
+    /// Command execution timeout in seconds.
+    #[serde(default = "default_ar_timeout")]
+    pub timeout: u64,
+    /// Allowed response actions.
+    #[serde(default = "default_ar_actions")]
+    pub actions: Vec<String>,
 }
 
 /// Resource limit configuration.
@@ -269,6 +283,16 @@ fn default_inventory_collect() -> Vec<String> {
         "hardware".to_string(),
     ]
 }
+fn default_ar_timeout() -> u64 {
+    30
+}
+fn default_ar_actions() -> Vec<String> {
+    vec![
+        "block_ip".to_string(),
+        "kill_process".to_string(),
+        "disable_account".to_string(),
+    ]
+}
 
 // --- Trait implementations ---
 
@@ -309,6 +333,16 @@ impl Default for InventoryConfig {
 impl Default for ModuleToggle {
     fn default() -> Self {
         Self { enabled: true }
+    }
+}
+
+impl Default for ActiveResponseConfig {
+    fn default() -> Self {
+        Self {
+            enabled: true,
+            timeout: default_ar_timeout(),
+            actions: default_ar_actions(),
+        }
     }
 }
 
