@@ -109,7 +109,7 @@ fn parse_ar_command(payload: &str) -> Option<(String, ActionParams)> {
                     .and_then(|v| v.as_str())
                     .or_else(|| p.get("ip").and_then(|v| v.as_str()))
                     .map(String::from);
-                let pid = p.get("pid").and_then(|v| v.as_u64()).map(|v| v as u32);
+                let pid = p.get("pid").and_then(|v| v.as_u64()).and_then(|v| u32::try_from(v).ok());
                 let user = p.get("user").and_then(|v| v.as_str()).map(String::from);
                 let timeout = p.get("timeout").and_then(|v| v.as_u64()).unwrap_or(0);
 
@@ -232,7 +232,7 @@ async fn run(
                             .unwrap_or_else(|_| {
                                 ActionParams {
                                     ip: parameters.get("ip").and_then(|v| v.as_str()).map(String::from),
-                                    pid: parameters.get("pid").and_then(|v| v.as_u64()).map(|v| v as u32),
+                                    pid: parameters.get("pid").and_then(|v| v.as_u64()).and_then(|v| u32::try_from(v).ok()),
                                     user: parameters.get("user").and_then(|v| v.as_str()).map(String::from),
                                     timeout: parameters.get("timeout").and_then(|v| v.as_u64()).unwrap_or(0),
                                     extra: std::collections::HashMap::new(),
