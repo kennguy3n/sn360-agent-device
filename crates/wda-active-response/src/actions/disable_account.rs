@@ -68,6 +68,11 @@ impl ResponseAction for DisableAccountAction {
             None => return ActionResult::err("missing 'user' parameter for enable_account action"),
         };
 
+        // Refuse to re-enable root
+        if user == "root" {
+            return ActionResult::err("refusing to re-enable root account");
+        }
+
         if !is_valid_username(user) {
             return ActionResult::err(format!("invalid username: {}", user));
         }
