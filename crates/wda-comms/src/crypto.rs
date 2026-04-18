@@ -294,16 +294,26 @@ mod tests {
 
     #[test]
     fn test_key_derivation() {
-        let cipher =
-            WazuhCipher::new("001", "agent1", "any", "secretkey123", CryptoMethod::Blowfish);
+        let cipher = WazuhCipher::new(
+            "001",
+            "agent1",
+            "any",
+            "secretkey123",
+            CryptoMethod::Blowfish,
+        );
         // Key material should be 64 printable hex characters.
         assert_eq!(cipher.aes_key.len(), 32);
     }
 
     #[test]
     fn test_blowfish_roundtrip() {
-        let cipher =
-            WazuhCipher::new("001", "myhost", "any", "abc123def456", CryptoMethod::Blowfish);
+        let cipher = WazuhCipher::new(
+            "001",
+            "myhost",
+            "any",
+            "abc123def456",
+            CryptoMethod::Blowfish,
+        );
         let plaintext = b"#!-agent keepalive";
 
         let encrypted = cipher.encrypt(plaintext).unwrap();
@@ -325,10 +335,8 @@ mod tests {
 
     #[test]
     fn test_different_keys_fail_blowfish() {
-        let cipher1 =
-            WazuhCipher::new("001", "host1", "any", "key1", CryptoMethod::Blowfish);
-        let cipher2 =
-            WazuhCipher::new("002", "host2", "any", "key2", CryptoMethod::Blowfish);
+        let cipher1 = WazuhCipher::new("001", "host1", "any", "key1", CryptoMethod::Blowfish);
+        let cipher2 = WazuhCipher::new("002", "host2", "any", "key2", CryptoMethod::Blowfish);
 
         let encrypted = cipher1.encrypt(b"secret data").unwrap();
         // Decryption may produce garbage; framing parse should fail.
@@ -373,8 +381,14 @@ mod tests {
 
         let s1 = String::from_utf8_lossy(&framed1);
         let s2 = String::from_utf8_lossy(&framed2);
-        assert!(s1.contains(":0:"), "first message should have counter 0: {s1}");
-        assert!(s2.contains(":1:"), "second message should have counter 1: {s2}");
+        assert!(
+            s1.contains(":0:"),
+            "first message should have counter 0: {s1}"
+        );
+        assert!(
+            s2.contains(":1:"),
+            "second message should have counter 1: {s2}"
+        );
     }
 
     #[test]
