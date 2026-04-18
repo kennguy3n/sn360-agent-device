@@ -57,7 +57,7 @@ async fn test_fim_detects_file_creation() {
     // The OS may deliver a Created followed by a Modified (due to the write),
     // or just a Modified if the watcher debounce collapses them.  Accept either.
     match &event.kind {
-        EventKind::FileCreated { path } | EventKind::FileModified { path } => {
+        EventKind::FileCreated { path, .. } | EventKind::FileModified { path, .. } => {
             assert!(
                 path.contains("hello.txt"),
                 "expected path to contain 'hello.txt', got: {path}"

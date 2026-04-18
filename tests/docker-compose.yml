@@ -11,6 +11,12 @@ services:
     volumes:
       - wazuh-data:/var/ossec/data
       - wazuh-logs:/var/ossec/logs
+    healthcheck:
+      test: ["/var/ossec/bin/wazuh-control", "status"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
 volumes:
   wazuh-data:
   wazuh-logs:
