@@ -113,7 +113,7 @@ const SHELL_STATE_DIR: &str = "/var/lib/wda-shell-state";
 async fn platform_disable_account(user: &str, timeout: Duration) -> ActionResult {
     let user_path = format!("/Users/{}", user);
 
-    // Save the user's current shell before disabling, so we can restore it.
+    // Verify the user exists by reading their current shell.
     let read_result = executor::execute_command(
         "dscl",
         &[".", "-read", &user_path, "UserShell"],
@@ -121,18 +121,23 @@ async fn platform_disable_account(user: &str, timeout: Duration) -> ActionResult
         false,
     )
     .await;
-    if read_result.success {
-        let output = read_result.stdout.trim().to_string();
-        // Output format: "UserShell: /bin/zsh"
-        if let Some(shell) = output.split_whitespace().last() {
-            if shell != "/usr/bin/false" && shell != "/bin/false" {
-                let _ = std::fs::create_dir_all(SHELL_STATE_DIR);
-                let state_file = format!("{}/{}", SHELL_STATE_DIR, user);
-                // Only save if no state file exists yet, to avoid overwriting
-                // the original shell if disable_account is called twice.
-                if !std::path::Path::new(&state_file).exists() {
-                    let _ = std::fs::write(&state_file, shell);
-                }
+    if !read_result.success {
+        return ActionResult::err(format!(
+            "user '{}' does not exist in directory service",
+            user
+        ));
+    }
+
+    let output = read_result.stdout.trim().to_string();
+    // Output format: "UserShell: /bin/zsh"
+    if let Some(shell) = output.split_whitespace().last() {
+        if shell != "/usr/bin/false" && shell != "/bin/false" {
+            let _ = std::fs::create_dir_all(SHELL_STATE_DIR);
+            let state_file = format!("{}/{}", SHELL_STATE_DIR, user);
+            // Only save if no state file exists yet, to avoid overwriting
+            // the original shell if disable_account is called twice.
+            if !std::path::Path::new(&state_file).exists() {
+                let _ = std::fs::write(&state_file, shell);
             }
         }
     }

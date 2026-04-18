@@ -70,30 +70,33 @@ impl ResponseAction for FirewallDropAction {
 /// Strips a trailing `%<zone_id>` (e.g. `fe80::1%eth0`) before parsing so
 /// that link-local IPv6 addresses with a scope ID are accepted.
 fn is_valid_ip(ip: &str) -> bool {
-    let addr_part = match ip.find('%') {
-        Some(idx) => &ip[..idx],
-        None => ip,
-    };
-    addr_part.parse::<IpAddr>().is_ok()
+    strip_zone_id(ip).parse::<IpAddr>().is_ok()
 }
 
 /// Returns `true` when the (zone-stripped) address is IPv6.
 fn is_ipv6(ip: &str) -> bool {
-    let addr_part = match ip.find('%') {
+    let addr_part = strip_zone_id(ip);
+    matches!(addr_part.parse::<IpAddr>(), Ok(IpAddr::V6(_)))
+}
+
+/// Strip the `%<zone_id>` suffix from an IPv6 address so the bare address
+/// can be passed to firewall commands that do not accept scope IDs.
+fn strip_zone_id(ip: &str) -> &str {
+    match ip.find('%') {
         Some(idx) => &ip[..idx],
         None => ip,
-    };
-    matches!(addr_part.parse::<IpAddr>(), Ok(IpAddr::V6(_)))
+    }
 }
 
 // ── Linux ────────────────────────────────────────────────────────────────────
 
 #[cfg(target_os = "linux")]
 async fn platform_block_ip(ip: &str, timeout: Duration) -> ActionResult {
+    let addr = strip_zone_id(ip);
     let cmd = if is_ipv6(ip) { "ip6tables" } else { "iptables" };
     let result = executor::execute_command(
         cmd,
-        &["-I", "INPUT", "-s", ip, "-j", "DROP"],
+        &["-I", "INPUT", "-s", addr, "-j", "DROP"],
         timeout,
         false,
     )
@@ -113,10 +116,11 @@ async fn platform_block_ip(ip: &str, timeout: Duration) -> ActionResult {
 
 #[cfg(target_os = "linux")]
 async fn platform_unblock_ip(ip: &str, timeout: Duration) -> ActionResult {
+    let addr = strip_zone_id(ip);
     let cmd = if is_ipv6(ip) { "ip6tables" } else { "iptables" };
     let result = executor::execute_command(
         cmd,
-        &["-D", "INPUT", "-s", ip, "-j", "DROP"],
+        &["-D", "INPUT", "-s", addr, "-j", "DROP"],
         timeout,
         false,
     )
@@ -137,9 +141,10 @@ async fn platform_unblock_ip(ip: &str, timeout: Duration) -> ActionResult {
 
 #[cfg(target_os = "macos")]
 async fn platform_block_ip(ip: &str, timeout: Duration) -> ActionResult {
+    let addr = strip_zone_id(ip);
     let result = executor::execute_command(
         "pfctl",
-        &["-t", "wda_blocked", "-T", "add", ip],
+        &["-t", "wda_blocked", "-T", "add", addr],
         timeout,
         false,
     )
@@ -159,9 +164,10 @@ async fn platform_block_ip(ip: &str, timeout: Duration) -> ActionResult {
 
 #[cfg(target_os = "macos")]
 async fn platform_unblock_ip(ip: &str, timeout: Duration) -> ActionResult {
+    let addr = strip_zone_id(ip);
     let result = executor::execute_command(
         "pfctl",
-        &["-t", "wda_blocked", "-T", "delete", ip],
+        &["-t", "wda_blocked", "-T", "delete", addr],
         timeout,
         false,
     )
@@ -182,7 +188,8 @@ async fn platform_unblock_ip(ip: &str, timeout: Duration) -> ActionResult {
 
 #[cfg(target_os = "windows")]
 async fn platform_block_ip(ip: &str, timeout: Duration) -> ActionResult {
-    let rule_name = format!("WDA Block {}", ip);
+    let addr = strip_zone_id(ip);
+    let rule_name = format!("WDA Block {}", addr);
     let result = executor::execute_command(
         "netsh",
         &[
@@ -193,7 +200,7 @@ async fn platform_block_ip(ip: &str, timeout: Duration) -> ActionResult {
             &format!("name={}", rule_name),
             "dir=in",
             "action=block",
-            &format!("remoteip={}", ip),
+            &format!("remoteip={}", addr),
         ],
         timeout,
         false,
@@ -214,7 +221,8 @@ async fn platform_block_ip(ip: &str, timeout: Duration) -> ActionResult {
 
 #[cfg(target_os = "windows")]
 async fn platform_unblock_ip(ip: &str, timeout: Duration) -> ActionResult {
-    let rule_name = format!("WDA Block {}", ip);
+    let addr = strip_zone_id(ip);
+    let rule_name = format!("WDA Block {}", addr);
     let result = executor::execute_command(
         "netsh",
         &[
