@@ -144,7 +144,7 @@ impl WazuhCipher {
         let cmp_size = compressed.len() + 1;
         let bfsize = {
             let rem = cmp_size % 8;
-            if rem == 0 { 0 } else { 8 - rem }
+            if rem == 0 { 8 } else { 8 - rem }
         };
         let total = bfsize + cmp_size;
 
