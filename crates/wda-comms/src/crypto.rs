@@ -141,17 +141,22 @@ impl WazuhCipher {
             .finish()
             .map_err(|e| CryptoError::EncryptionFailed(format!("compression finish: {e}")))?;
 
+        // Match Wazuh CreateSecMSG padding logic exactly:
+        // cmp_size = compressed.len() + 1  (the C code does cmp_size++ after compress)
+        // bfsize = 8 - (cmp_size % 8), if bfsize == 8 then bfsize = 0
+        // Encrypted region starts at _tmpmsg[7 - bfsize], giving (bfsize + 1) '!' bytes
+        // Total encrypted = cmp_size + bfsize (always multiple of 8)
         let cmp_size = compressed.len() + 1;
         let bfsize = {
             let rem = cmp_size % 8;
-            if rem == 0 { 8 } else { 8 - rem }
+            if rem == 0 { 0 } else { 8 - rem }
         };
-        let total = bfsize + cmp_size;
+        let num_padding = bfsize + 1; // always at least 1 '!' byte
+        let total = num_padding + compressed.len(); // = cmp_size + bfsize
 
         let mut padded = Vec::with_capacity(total);
-        padded.extend(std::iter::repeat_n(b'!', bfsize));
+        padded.extend(std::iter::repeat_n(b'!', num_padding));
         padded.extend_from_slice(&compressed);
-        padded.push(0u8);
 
         let ciphertext = match self.method {
             CryptoMethod::Blowfish => bf_cbc_encrypt(&self.blowfish, &padded),
