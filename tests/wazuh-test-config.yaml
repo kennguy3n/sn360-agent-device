@@ -6,6 +6,7 @@ server:
 enrollment:
   port: 1515
   auto_enroll: true
+  key: "TestPassword123"
 modules:
   fim:
     enabled: true

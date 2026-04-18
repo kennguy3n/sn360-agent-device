@@ -26,12 +26,7 @@ pub struct FileReader {
 
 impl FileReader {
     /// Create a new file reader.
-    pub fn new(
-        paths: Vec<PathBuf>,
-        formats: Vec<String>,
-        state: SeekState,
-        bus: EventBus,
-    ) -> Self {
+    pub fn new(paths: Vec<PathBuf>, formats: Vec<String>, state: SeekState, bus: EventBus) -> Self {
         Self {
             paths,
             formats,
@@ -107,9 +102,7 @@ impl FileReader {
         for path in &self.paths {
             if let Some(parent) = path.parent() {
                 if watched_dirs.insert(parent.to_path_buf()) && parent.exists() {
-                    if let Err(e) =
-                        watcher.watch(parent, notify::RecursiveMode::NonRecursive)
-                    {
+                    if let Err(e) = watcher.watch(parent, notify::RecursiveMode::NonRecursive) {
                         warn!(path = %parent.display(), error = %e, "failed to watch log directory");
                     } else {
                         debug!(path = %parent.display(), "watching log directory");
@@ -188,9 +181,7 @@ impl FileReader {
 
         let file = File::open(path).await?;
         let mut reader = BufReader::new(file);
-        reader
-            .seek(std::io::SeekFrom::Start(seek_to))
-            .await?;
+        reader.seek(std::io::SeekFrom::Start(seek_to)).await?;
 
         let mut line = String::new();
         let mut new_offset = seek_to;
@@ -292,13 +283,10 @@ mod tests {
         }
 
         // Wait for events.
-        let event = tokio::time::timeout(
-            std::time::Duration::from_secs(10),
-            server_rx.recv(),
-        )
-        .await
-        .expect("timed out waiting for log event")
-        .expect("channel closed");
+        let event = tokio::time::timeout(std::time::Duration::from_secs(10), server_rx.recv())
+            .await
+            .expect("timed out waiting for log event")
+            .expect("channel closed");
 
         match &event.kind {
             EventKind::LogCollected {
@@ -311,13 +299,10 @@ mod tests {
         }
 
         // Second line should also arrive.
-        let event2 = tokio::time::timeout(
-            std::time::Duration::from_secs(5),
-            server_rx.recv(),
-        )
-        .await
-        .expect("timed out waiting for second log event")
-        .expect("channel closed");
+        let event2 = tokio::time::timeout(std::time::Duration::from_secs(5), server_rx.recv())
+            .await
+            .expect("timed out waiting for second log event")
+            .expect("channel closed");
 
         match &event2.kind {
             EventKind::LogCollected { message, .. } => {
@@ -362,13 +347,10 @@ mod tests {
         // Simulate log rotation: truncate and write new content.
         std::fs::write(&log_path, "rotated line\n").unwrap();
 
-        let event = tokio::time::timeout(
-            std::time::Duration::from_secs(10),
-            server_rx.recv(),
-        )
-        .await
-        .expect("timed out waiting for rotated log event")
-        .expect("channel closed");
+        let event = tokio::time::timeout(std::time::Duration::from_secs(10), server_rx.recv())
+            .await
+            .expect("timed out waiting for rotated log event")
+            .expect("channel closed");
 
         match &event.kind {
             EventKind::LogCollected { message, .. } => {

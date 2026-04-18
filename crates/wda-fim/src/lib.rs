@@ -455,8 +455,8 @@ mod tests {
                     "syscheck_payload should be present"
                 );
                 let payload = syscheck_payload.as_ref().unwrap();
-                let parsed: serde_json::Value = serde_json::from_str(payload)
-                    .expect("syscheck_payload should be valid JSON");
+                let parsed: serde_json::Value =
+                    serde_json::from_str(payload).expect("syscheck_payload should be valid JSON");
                 assert_eq!(parsed["type"], "event");
                 assert!(parsed["data"]["path"]
                     .as_str()

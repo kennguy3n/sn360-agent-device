@@ -20,12 +20,11 @@ impl SeekState {
     pub fn load(state_file: PathBuf) -> Self {
         let offsets = if state_file.exists() {
             match std::fs::read_to_string(&state_file) {
-                Ok(contents) => {
-                    serde_json::from_str::<HashMap<String, u64>>(&contents).unwrap_or_else(|e| {
+                Ok(contents) => serde_json::from_str::<HashMap<String, u64>>(&contents)
+                    .unwrap_or_else(|e| {
                         warn!(error = %e, "corrupt seek state file, starting fresh");
                         HashMap::new()
-                    })
-                }
+                    }),
                 Err(e) => {
                     warn!(error = %e, "failed to read seek state file, starting fresh");
                     HashMap::new()

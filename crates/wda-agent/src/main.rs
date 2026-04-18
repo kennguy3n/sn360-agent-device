@@ -238,8 +238,7 @@ fn map_event_to_message(agent_id: &str, kind: &EventKind) -> Option<WazuhMessage
             syscheck_payload, ..
         } => {
             let json = syscheck_payload.clone().unwrap_or_else(|| {
-                serde_json::to_string(kind)
-                    .unwrap_or_else(|e| format!("{{\"error\":\"{}\"}}", e))
+                serde_json::to_string(kind).unwrap_or_else(|e| format!("{{\"error\":\"{}\"}}", e))
             });
             (MessageType::Syscheck, json)
         }
