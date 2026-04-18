@@ -144,21 +144,24 @@ fn parse_ar_command(payload: &str) -> Option<(String, ActionParams)> {
         let args: Vec<&str> = tokens[1..].iter().filter(|t| **t != "-").copied().collect();
 
         let mut ip = None;
+        let mut user = None;
         let mut timeout = 0u64;
 
-        // First non-separator arg that looks like an IP
         for arg in &args {
             if arg.parse::<std::net::IpAddr>().is_ok() {
                 ip = Some(arg.to_string());
             } else if let Ok(t) = arg.parse::<u64>() {
                 timeout = t;
+            } else if user.is_none() {
+                // First non-IP, non-numeric token is treated as a username
+                user = Some(arg.to_string());
             }
         }
 
         let params = ActionParams {
             ip,
             pid: None,
-            user: None,
+            user,
             timeout,
             extra: std::collections::HashMap::new(),
         };
@@ -358,6 +361,15 @@ mod tests {
         assert_eq!(action, "block_ip");
         assert_eq!(params.ip.as_deref(), Some("10.99.99.99"));
         assert_eq!(params.timeout, 600);
+    }
+
+    #[test]
+    fn test_parse_ar_legacy_disable_account() {
+        let payload = "disable-account0 - jdoe - - 300";
+        let (action, params) = parse_ar_command(payload).unwrap();
+        assert_eq!(action, "disable_account");
+        assert_eq!(params.user.as_deref(), Some("jdoe"));
+        assert_eq!(params.timeout, 300);
     }
 
     #[test]
