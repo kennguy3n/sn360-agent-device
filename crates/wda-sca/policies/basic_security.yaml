@@ -32,7 +32,7 @@ checks:
     type: "file"
     params:
       path: "/etc/ssh/sshd_config"
-      pattern: "PermitRootLogin no"
+      pattern: "^PermitRootLogin\\s+no"
 
   - id: "sshd_running"
     title: "Ensure SSH daemon is running"
@@ -47,7 +47,7 @@ checks:
     type: "command"
     params:
       command: "awk -F: '($2 == \"\") {print $1}' /etc/shadow 2>/dev/null | wc -l"
-      pattern: "0"
+      pattern: "^\\s*0\\s*$"
 
   - id: "firewall_active"
     title: "Ensure a firewall is active"

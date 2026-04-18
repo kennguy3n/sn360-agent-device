@@ -11,6 +11,7 @@
 
 use std::path::Path;
 
+use regex::Regex;
 use serde::{Deserialize, Serialize};
 use tracing::{debug, info};
 
@@ -211,23 +212,34 @@ fn evaluate_file_check(check: &ScaCheck) -> CheckResult {
         };
     }
 
-    // If a pattern is specified, check file content.
+    // If a pattern is specified, check file content via regex.
     if let Some(ref pattern) = check.params.pattern {
+        let re = match Regex::new(pattern) {
+            Ok(r) => r,
+            Err(e) => {
+                return CheckResult {
+                    check_id: check.id.clone(),
+                    title: check.title.clone(),
+                    result: CheckStatus::Error,
+                    reason: format!("invalid regex pattern '{}': {}", pattern, e),
+                };
+            }
+        };
         match std::fs::read_to_string(path) {
             Ok(content) => {
-                if content.contains(pattern) {
+                if re.is_match(&content) {
                     CheckResult {
                         check_id: check.id.clone(),
                         title: check.title.clone(),
                         result: CheckStatus::Passed,
-                        reason: format!("file contains pattern: {}", pattern),
+                        reason: format!("file matches pattern: {}", pattern),
                     }
                 } else {
                     CheckResult {
                         check_id: check.id.clone(),
                         title: check.title.clone(),
                         result: CheckStatus::Failed,
-                        reason: format!("file does not contain pattern: {}", pattern),
+                        reason: format!("file does not match pattern: {}", pattern),
                     }
                 }
             }
@@ -358,21 +370,32 @@ async fn evaluate_command_check(check: &ScaCheck) -> CheckResult {
                 };
             }
 
-            // If a pattern is specified, check stdout.
+            // If a pattern is specified, check stdout via regex.
             if let Some(ref pattern) = check.params.pattern {
-                if stdout.contains(pattern) {
+                let re = match Regex::new(pattern) {
+                    Ok(r) => r,
+                    Err(e) => {
+                        return CheckResult {
+                            check_id: check.id.clone(),
+                            title: check.title.clone(),
+                            result: CheckStatus::Error,
+                            reason: format!("invalid regex pattern '{}': {}", pattern, e),
+                        };
+                    }
+                };
+                if re.is_match(&stdout) {
                     CheckResult {
                         check_id: check.id.clone(),
                         title: check.title.clone(),
                         result: CheckStatus::Passed,
-                        reason: format!("command output contains pattern: {}", pattern),
+                        reason: format!("command output matches pattern: {}", pattern),
                     }
                 } else {
                     CheckResult {
                         check_id: check.id.clone(),
                         title: check.title.clone(),
                         result: CheckStatus::Failed,
-                        reason: format!("command output does not contain pattern: {}", pattern),
+                        reason: format!("command output does not match pattern: {}", pattern),
                     }
                 }
             } else {

@@ -125,12 +125,14 @@ async fn platform_disable_account(user: &str, timeout: Duration) -> ActionResult
         let output = read_result.stdout.trim().to_string();
         // Output format: "UserShell: /bin/zsh"
         if let Some(shell) = output.split_whitespace().last() {
-            let _ = std::fs::create_dir_all(SHELL_STATE_DIR);
-            let state_file = format!("{}/{}", SHELL_STATE_DIR, user);
-            // Only save if no state file exists yet, to avoid overwriting
-            // the original shell if disable_account is called twice.
-            if !std::path::Path::new(&state_file).exists() {
-                let _ = std::fs::write(&state_file, shell);
+            if shell != "/usr/bin/false" && shell != "/bin/false" {
+                let _ = std::fs::create_dir_all(SHELL_STATE_DIR);
+                let state_file = format!("{}/{}", SHELL_STATE_DIR, user);
+                // Only save if no state file exists yet, to avoid overwriting
+                // the original shell if disable_account is called twice.
+                if !std::path::Path::new(&state_file).exists() {
+                    let _ = std::fs::write(&state_file, shell);
+                }
             }
         }
     }
