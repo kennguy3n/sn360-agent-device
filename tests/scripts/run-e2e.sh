@@ -100,6 +100,7 @@ echo "==> Step 2: Setting enrollment password..."
 docker compose -f tests/docker-compose.yml exec -T wazuh-manager bash -c \
   "echo '${E2E_ENROLL_PASS}' > /var/ossec/etc/authd.pass && \
    sed -i 's|<use_password>no</use_password>|<use_password>yes</use_password>|' /var/ossec/etc/ossec.conf && \
+   sed -i 's|<logall>no</logall>|<logall>yes</logall>|;s|<logall_json>no</logall_json>|<logall_json>yes</logall_json>|' /var/ossec/etc/ossec.conf && \
    /var/ossec/bin/wazuh-control restart"
 # Wait for restart.
 sleep 15
