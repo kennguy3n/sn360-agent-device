@@ -179,11 +179,22 @@ async fn main() -> Result<()> {
         agent.register_module(fim_handle);
     }
 
-    // 12. Start agent and wait for shutdown signal
+    // 12. Start LogCollector module if enabled
+    if config.modules.logcollector.enabled {
+        info!("starting logcollector module");
+        let lc_handle = wda_logcollector::LogCollectorModule::start(
+            &config,
+            agent.event_bus(),
+            agent.shutdown_signal(),
+        );
+        agent.register_module(lc_handle);
+    }
+
+    // 13. Start agent and wait for shutdown signal
     agent.start().await;
     agent.wait_for_shutdown().await;
 
-    // 13. Send shutdown message, disconnect, shut down agent
+    // 14. Send shutdown message, disconnect, shut down agent
     info!("sending shutdown message");
     {
         let shutdown_msg = WazuhMessage::new(
@@ -214,18 +225,28 @@ async fn main() -> Result<()> {
 /// lifecycle events that are handled separately).
 fn map_event_to_message(agent_id: &str, kind: &EventKind) -> Option<WazuhMessage> {
     let (msg_type, payload) = match kind {
-        EventKind::FileCreated { .. }
-        | EventKind::FileModified { .. }
-        | EventKind::FileDeleted { .. }
-        | EventKind::FileMetadataChanged { .. } => {
-            let json =
-                serde_json::to_string(kind).unwrap_or_else(|e| format!("{{\"error\":\"{}\"}}", e));
+        EventKind::FileCreated {
+            syscheck_payload, ..
+        }
+        | EventKind::FileModified {
+            syscheck_payload, ..
+        }
+        | EventKind::FileDeleted {
+            syscheck_payload, ..
+        }
+        | EventKind::FileMetadataChanged {
+            syscheck_payload, ..
+        } => {
+            let json = syscheck_payload.clone().unwrap_or_else(|| {
+                serde_json::to_string(kind).unwrap_or_else(|e| format!("{{\"error\":\"{}\"}}", e))
+            });
             (MessageType::Syscheck, json)
         }
-        EventKind::LogCollected { .. } => {
-            let json =
-                serde_json::to_string(kind).unwrap_or_else(|e| format!("{{\"error\":\"{}\"}}", e));
-            (MessageType::Log, json)
+        EventKind::LogCollected {
+            source, message, ..
+        } => {
+            let payload = format!("{}:{}", source, message);
+            (MessageType::Log, payload)
         }
         EventKind::InventoryUpdate { .. } => {
             let json =
@@ -262,55 +283,80 @@ mod tests {
     use wda_event_bus::{Event, EventKind, Priority};
 
     #[test]
-    fn test_file_created_maps_to_syscheck() {
+    fn test_file_created_maps_to_syscheck_with_payload() {
+        let syscheck_json = r#"{"type":"event","data":{"path":"/etc/passwd","mode":"realtime","type":"added","changed_attributes":[],"old_attributes":{},"new_attributes":{"size":1024}}}"#.to_string();
         let kind = EventKind::FileCreated {
             path: "/etc/passwd".to_string(),
+            syscheck_payload: Some(syscheck_json.clone()),
         };
         let msg = map_event_to_message("001", &kind).unwrap();
         assert_eq!(msg.msg_type, MessageType::Syscheck);
         assert_eq!(msg.agent_id, "001");
+        assert_eq!(msg.payload, syscheck_json);
+    }
+
+    #[test]
+    fn test_file_created_without_syscheck_payload_falls_back() {
+        let kind = EventKind::FileCreated {
+            path: "/etc/passwd".to_string(),
+            syscheck_payload: None,
+        };
+        let msg = map_event_to_message("001", &kind).unwrap();
+        assert_eq!(msg.msg_type, MessageType::Syscheck);
         assert!(msg.payload.contains("/etc/passwd"));
     }
 
     #[test]
-    fn test_file_modified_maps_to_syscheck() {
+    fn test_file_modified_maps_to_syscheck_with_payload() {
+        let syscheck_json = r#"{"type":"event","data":{"path":"/etc/shadow","mode":"realtime","type":"modified","changed_attributes":["sha256"],"old_attributes":{},"new_attributes":{}}}"#.to_string();
         let kind = EventKind::FileModified {
             path: "/etc/shadow".to_string(),
+            syscheck_payload: Some(syscheck_json.clone()),
         };
         let msg = map_event_to_message("002", &kind).unwrap();
         assert_eq!(msg.msg_type, MessageType::Syscheck);
-        assert!(msg.payload.contains("/etc/shadow"));
+        assert_eq!(msg.payload, syscheck_json);
     }
 
     #[test]
-    fn test_file_deleted_maps_to_syscheck() {
+    fn test_file_deleted_maps_to_syscheck_with_payload() {
+        let syscheck_json = r#"{"type":"event","data":{"path":"/tmp/gone.txt","mode":"realtime","type":"deleted","changed_attributes":[],"old_attributes":{"size":100},"new_attributes":{}}}"#.to_string();
         let kind = EventKind::FileDeleted {
             path: "/tmp/gone.txt".to_string(),
+            syscheck_payload: Some(syscheck_json.clone()),
         };
         let msg = map_event_to_message("003", &kind).unwrap();
         assert_eq!(msg.msg_type, MessageType::Syscheck);
-        assert!(msg.payload.contains("/tmp/gone.txt"));
+        assert_eq!(msg.payload, syscheck_json);
     }
 
     #[test]
-    fn test_file_metadata_changed_maps_to_syscheck() {
+    fn test_file_metadata_changed_maps_to_syscheck_with_payload() {
+        let syscheck_json = r#"{"type":"event","data":{"path":"/usr/bin/test","mode":"realtime","type":"modified","changed_attributes":["perm"],"old_attributes":{},"new_attributes":{}}}"#.to_string();
         let kind = EventKind::FileMetadataChanged {
             path: "/usr/bin/test".to_string(),
+            syscheck_payload: Some(syscheck_json.clone()),
         };
         let msg = map_event_to_message("004", &kind).unwrap();
         assert_eq!(msg.msg_type, MessageType::Syscheck);
+        assert_eq!(msg.payload, syscheck_json);
     }
 
     #[test]
-    fn test_log_collected_maps_to_log() {
+    fn test_log_collected_maps_to_log_wire_format() {
         let kind = EventKind::LogCollected {
-            source: "syslog".to_string(),
-            message: "test log line".to_string(),
+            source: "/var/log/auth.log".to_string(),
+            message: "Failed password for root from 10.0.0.1 port 22 ssh2".to_string(),
             format: "syslog".to_string(),
         };
         let msg = map_event_to_message("005", &kind).unwrap();
         assert_eq!(msg.msg_type, MessageType::Log);
-        assert!(msg.payload.contains("test log line"));
+        assert_eq!(
+            msg.payload,
+            "/var/log/auth.log:Failed password for root from 10.0.0.1 port 22 ssh2"
+        );
+        let encoded = String::from_utf8(msg.encode()).unwrap();
+        assert!(encoded.starts_with("005:log:"));
     }
 
     #[test]
@@ -375,15 +421,15 @@ mod tests {
 
     #[tokio::test]
     async fn test_event_forwarding_via_bus() {
-        // Verify events published via publish_to_server appear on server_rx
-        // and can be correctly mapped to WazuhMessages.
         let (bus, mut server_rx) = wda_event_bus::EventBus::new(64, 64);
+        let syscheck_json = r#"{"type":"event","data":{"path":"/etc/test.conf","mode":"realtime","type":"added","changed_attributes":[],"old_attributes":{},"new_attributes":{"size":512}}}"#.to_string();
 
         let event = Event::new(
             "fim",
             Priority::Normal,
             EventKind::FileCreated {
                 path: "/etc/test.conf".to_string(),
+                syscheck_payload: Some(syscheck_json.clone()),
             },
         );
         bus.publish_to_server(event).await.unwrap();
@@ -392,10 +438,10 @@ mod tests {
         let msg = map_event_to_message("001", &received.kind).unwrap();
         assert_eq!(msg.msg_type, MessageType::Syscheck);
         assert_eq!(msg.agent_id, "001");
-        assert!(msg.payload.contains("/etc/test.conf"));
+        assert_eq!(msg.payload, syscheck_json);
 
-        // Verify the message encodes to the expected wire format.
         let encoded = String::from_utf8(msg.encode()).unwrap();
         assert!(encoded.starts_with("001:syscheck:"));
+        assert!(encoded.contains(r#""type":"event""#));
     }
 }

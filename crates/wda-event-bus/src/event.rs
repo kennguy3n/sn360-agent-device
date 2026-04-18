@@ -17,13 +17,29 @@ pub enum Priority {
 pub enum EventKind {
     // --- FIM events ---
     /// A file was created.
-    FileCreated { path: String },
+    FileCreated {
+        path: String,
+        /// Pre-formatted Wazuh syscheck JSON payload.
+        syscheck_payload: Option<String>,
+    },
     /// A file was modified.
-    FileModified { path: String },
+    FileModified {
+        path: String,
+        /// Pre-formatted Wazuh syscheck JSON payload.
+        syscheck_payload: Option<String>,
+    },
     /// A file was deleted.
-    FileDeleted { path: String },
+    FileDeleted {
+        path: String,
+        /// Pre-formatted Wazuh syscheck JSON payload.
+        syscheck_payload: Option<String>,
+    },
     /// A file's metadata (permissions, ownership) changed.
-    FileMetadataChanged { path: String },
+    FileMetadataChanged {
+        path: String,
+        /// Pre-formatted Wazuh syscheck JSON payload.
+        syscheck_payload: Option<String>,
+    },
 
     // --- Log events ---
     /// A new log line was collected.

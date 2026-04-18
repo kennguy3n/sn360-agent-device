@@ -237,6 +237,7 @@ async fn run(
                             Priority::Normal,
                             EventKind::FileCreated {
                                 path: path.to_string_lossy().to_string(),
+                                syscheck_payload: Some(syscheck_json.clone()),
                             },
                         );
                         if let Err(e) = bus.publish_to_server(bus_event).await {
@@ -288,10 +289,12 @@ async fn run(
                             let event_kind = if kind == FsEventKind::MetadataChanged {
                                 EventKind::FileMetadataChanged {
                                     path: path_str.clone(),
+                                    syscheck_payload: Some(syscheck_json.clone()),
                                 }
                             } else {
                                 EventKind::FileModified {
                                     path: path_str.clone(),
+                                    syscheck_payload: Some(syscheck_json.clone()),
                                 }
                             };
 
@@ -321,6 +324,7 @@ async fn run(
                             Priority::Normal,
                             EventKind::FileDeleted {
                                 path: path_str,
+                                syscheck_payload: Some(syscheck_json.clone()),
                             },
                         );
                         if let Err(e) = bus.publish_to_server(bus_event).await {
@@ -333,17 +337,18 @@ async fn run(
                         let path_str = path.to_string_lossy().to_string();
                         let old_entry = db.get_entry(&path_str)?;
 
-                        if old_entry.is_some() {
-                            db.delete_entry(&path_str)?;
-                            let bus_event = Event::new(
-                                "fim",
-                                Priority::Normal,
-                                EventKind::FileDeleted {
-                                    path: path_str.clone(),
-                                },
-                            );
-                            let _ = bus.publish_to_server(bus_event).await;
-                        }
+                            if old_entry.is_some() {
+                                db.delete_entry(&path_str)?;
+                                let bus_event = Event::new(
+                                    "fim",
+                                    Priority::Normal,
+                                    EventKind::FileDeleted {
+                                        path: path_str.clone(),
+                                        syscheck_payload: None,
+                                    },
+                                );
+                                let _ = bus.publish_to_server(bus_event).await;
+                            }
 
                         if path.exists() {
                             let path_clone = path.clone();
@@ -358,6 +363,7 @@ async fn run(
                                     Priority::Normal,
                                     EventKind::FileCreated {
                                         path: path_str,
+                                        syscheck_payload: None,
                                     },
                                 );
                                 let _ = bus.publish_to_server(bus_event).await;
@@ -428,13 +434,34 @@ mod tests {
             .expect("server_rx closed");
 
         match &event.kind {
-            EventKind::FileCreated { path }
-            | EventKind::FileModified { path }
-            | EventKind::FileMetadataChanged { path } => {
+            EventKind::FileCreated {
+                path,
+                syscheck_payload,
+            }
+            | EventKind::FileModified {
+                path,
+                syscheck_payload,
+            }
+            | EventKind::FileMetadataChanged {
+                path,
+                syscheck_payload,
+            } => {
                 assert!(
                     path.contains("unit_test.txt"),
                     "event path should contain file name, got: {path}"
                 );
+                assert!(
+                    syscheck_payload.is_some(),
+                    "syscheck_payload should be present"
+                );
+                let payload = syscheck_payload.as_ref().unwrap();
+                let parsed: serde_json::Value =
+                    serde_json::from_str(payload).expect("syscheck_payload should be valid JSON");
+                assert_eq!(parsed["type"], "event");
+                assert!(parsed["data"]["path"]
+                    .as_str()
+                    .unwrap()
+                    .contains("unit_test.txt"));
             }
             other => panic!("expected FileCreated/FileModified, got: {other:?}"),
         }

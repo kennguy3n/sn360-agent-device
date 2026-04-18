@@ -60,9 +60,9 @@ async fn test_fim_detects_file_creation() {
         .expect("server_rx closed unexpectedly");
 
     match &event.kind {
-        EventKind::FileCreated { path }
-        | EventKind::FileModified { path }
-        | EventKind::FileMetadataChanged { path } => {
+        EventKind::FileCreated { path, .. }
+        | EventKind::FileModified { path, .. }
+        | EventKind::FileMetadataChanged { path, .. } => {
             assert!(
                 path.contains("integration_test.txt"),
                 "event path should contain the created file name, got: {path}"
@@ -105,14 +105,14 @@ async fn test_fim_detects_file_modification() {
         .expect("server_rx closed");
 
     match &event.kind {
-        EventKind::FileModified { path } | EventKind::FileMetadataChanged { path } => {
+        EventKind::FileModified { path, .. } | EventKind::FileMetadataChanged { path, .. } => {
             assert!(
                 path.contains("modify_test.txt"),
                 "event path should reference the modified file, got: {path}"
             );
         }
         // Some platforms may report a second FileCreated for an overwrite.
-        EventKind::FileCreated { path } => {
+        EventKind::FileCreated { path, .. } => {
             assert!(path.contains("modify_test.txt"));
         }
         other => panic!("expected FileModified or FileCreated, got: {other:?}"),
@@ -151,7 +151,7 @@ async fn test_fim_detects_file_deletion() {
         .expect("server_rx closed");
 
     match &event.kind {
-        EventKind::FileDeleted { path } => {
+        EventKind::FileDeleted { path, .. } => {
             assert!(
                 path.contains("delete_test.txt"),
                 "event path should reference the deleted file, got: {path}"

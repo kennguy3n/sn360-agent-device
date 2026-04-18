@@ -6,8 +6,18 @@ server:
 enrollment:
   port: 1515
   auto_enroll: true
+  key: "TestPassword123"
 modules:
   fim:
     enabled: true
+    directories:
+      - path: "/tmp/wda-e2e-fim"
+        realtime: true
+  logcollector:
+    enabled: true
+    sources:
+      - source_type: "file"
+        path: "/tmp/wda-e2e-logs/test.log"
+        format: "syslog"
 logging:
   level: "debug"

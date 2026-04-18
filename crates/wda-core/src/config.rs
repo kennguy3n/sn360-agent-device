@@ -80,7 +80,7 @@ pub struct ModulesConfig {
     #[serde(default)]
     pub fim: FimConfig,
     #[serde(default)]
-    pub logcollector: ModuleToggle,
+    pub logcollector: LogCollectorConfig,
     #[serde(default)]
     pub inventory: ModuleToggle,
     #[serde(default)]
@@ -125,6 +125,31 @@ pub struct FimDirectory {
     /// Glob patterns to exclude.
     #[serde(default)]
     pub exclude: Vec<String>,
+}
+
+/// Log collector configuration.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct LogCollectorConfig {
+    /// Whether the log collector module is enabled.
+    #[serde(default)]
+    pub enabled: bool,
+    /// Log sources to monitor.
+    #[serde(default)]
+    pub sources: Vec<LogSource>,
+}
+
+/// A log source entry.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct LogSource {
+    /// Source type: "file" or "journald".
+    #[serde(default = "default_source_type")]
+    pub source_type: String,
+    /// Path to the log file (for file sources).
+    #[serde(default)]
+    pub path: Option<String>,
+    /// Log format: "syslog", "json", or "plain".
+    #[serde(default = "default_log_source_format")]
+    pub format: String,
 }
 
 /// Simple module enable/disable toggle.
@@ -209,6 +234,12 @@ fn default_fim_scan_interval() -> u64 {
 }
 fn default_fim_debounce_ms() -> u64 {
     100
+}
+fn default_source_type() -> String {
+    "file".to_string()
+}
+fn default_log_source_format() -> String {
+    "syslog".to_string()
 }
 
 // --- Trait implementations ---
