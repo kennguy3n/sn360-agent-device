@@ -1498,6 +1498,7 @@ dependencies = [
  "thiserror",
  "tokio",
  "tracing",
+ "walkdir",
  "wda-core",
  "wda-event-bus",
  "wda-pal",

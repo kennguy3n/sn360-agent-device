@@ -157,6 +157,44 @@ impl StateDb {
     pub fn path(&self) -> Option<PathBuf> {
         self.conn.path().map(PathBuf::from)
     }
+
+    /// Update only the `last_scan` timestamp for an existing entry.
+    pub fn update_last_scan(&self, path: &str, last_scan: &str) -> anyhow::Result<()> {
+        self.conn.execute(
+            "UPDATE fim_state SET last_scan = ?2 WHERE path = ?1",
+            params![path, last_scan],
+        )?;
+        Ok(())
+    }
+
+    /// Return entries whose `last_scan` is older than `before`.
+    ///
+    /// Used by the baseline scanner to detect files that were not seen
+    /// during the current walk (i.e. deleted while the agent was offline).
+    pub fn get_entries_with_old_scan(&self, before: &str) -> anyhow::Result<Vec<FimEntry>> {
+        let mut stmt = self.conn.prepare(
+            "SELECT path, sha256, size, permissions, uid, gid, mtime, inode, last_scan
+             FROM fim_state WHERE last_scan < ?1 ORDER BY path",
+        )?;
+
+        let entries = stmt
+            .query_map(params![before], |row| {
+                Ok(FimEntry {
+                    path: row.get(0)?,
+                    sha256: row.get(1)?,
+                    size: row.get(2)?,
+                    permissions: row.get(3)?,
+                    uid: row.get(4)?,
+                    gid: row.get(5)?,
+                    mtime: row.get(6)?,
+                    inode: row.get(7)?,
+                    last_scan: row.get(8)?,
+                })
+            })?
+            .collect::<Result<Vec<_>, _>>()?;
+
+        Ok(entries)
+    }
 }
 
 #[cfg(test)]
@@ -293,5 +331,45 @@ mod tests {
         // Deleting a path that was never inserted should not error.
         let result = db.delete_entry("/no/such/path");
         assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_update_last_scan() {
+        let db = StateDb::open_in_memory().unwrap();
+        let entry = sample_entry("/etc/passwd");
+        db.upsert_entry(&entry).unwrap();
+
+        db.update_last_scan("/etc/passwd", "2026-04-18T00:00:00Z")
+            .unwrap();
+
+        let fetched = db.get_entry("/etc/passwd").unwrap().unwrap();
+        assert_eq!(fetched.last_scan, "2026-04-18T00:00:00Z");
+        // Other fields should be unchanged.
+        assert_eq!(fetched.sha256, entry.sha256);
+        assert_eq!(fetched.size, entry.size);
+    }
+
+    #[test]
+    fn test_get_entries_with_old_scan() {
+        let db = StateDb::open_in_memory().unwrap();
+
+        let mut e1 = sample_entry("/a");
+        e1.last_scan = "2026-01-01T00:00:00Z".to_string();
+        db.upsert_entry(&e1).unwrap();
+
+        let mut e2 = sample_entry("/b");
+        e2.last_scan = "2026-06-01T00:00:00Z".to_string();
+        db.upsert_entry(&e2).unwrap();
+
+        let mut e3 = sample_entry("/c");
+        e3.last_scan = "2026-01-15T00:00:00Z".to_string();
+        db.upsert_entry(&e3).unwrap();
+
+        let old = db
+            .get_entries_with_old_scan("2026-03-01T00:00:00Z")
+            .unwrap();
+        assert_eq!(old.len(), 2);
+        assert_eq!(old[0].path, "/a");
+        assert_eq!(old[1].path, "/c");
     }
 }

@@ -172,6 +172,42 @@ else
   echo "    --- end ossec.log ---"
 fi
 
+# ── Step 8b: Verify baseline scan events ─────────────────────────────
+echo "==> Step 8b: Verifying baseline scan..."
+echo "content1" > /tmp/wda-e2e-fim/scan-test-1.txt
+echo "content2" > /tmp/wda-e2e-fim/scan-test-2.txt
+echo "content3" > /tmp/wda-e2e-fim/scan-test-3.txt
+
+echo "    Waiting for baseline scan cycle..."
+sleep 30
+
+SCAN_ALERTS=$(docker compose -f tests/docker-compose.yml exec -T wazuh-manager \
+  cat /var/ossec/logs/alerts/alerts.json 2>/dev/null | grep -c "scan-test" || true)
+echo "    Baseline scan alerts found: $SCAN_ALERTS"
+if [ "$SCAN_ALERTS" -gt 0 ]; then
+  record PASS "Baseline scan syscheck alerts received by server"
+else
+  record FAIL "No baseline scan alerts found in alerts.json"
+  echo "    --- Last 30 lines of ossec.log ---"
+  docker compose -f tests/docker-compose.yml exec -T wazuh-manager \
+    tail -30 /var/ossec/logs/ossec.log 2>/dev/null || true
+fi
+
+# ── Step 8c: Verify deletion detection via baseline scan ─────────────
+echo "==> Step 8c: Verifying deletion detection..."
+rm /tmp/wda-e2e-fim/scan-test-2.txt
+echo "    Waiting for next scan cycle to detect deletion..."
+sleep 30
+
+DELETE_ALERTS=$(docker compose -f tests/docker-compose.yml exec -T wazuh-manager \
+  cat /var/ossec/logs/alerts/alerts.json 2>/dev/null | grep -c "deleted" || true)
+echo "    Deletion alerts found: $DELETE_ALERTS"
+if [ "$DELETE_ALERTS" -gt 0 ]; then
+  record PASS "Baseline scan detected file deletion"
+else
+  record FAIL "Baseline scan did not detect file deletion"
+fi
+
 # ── Step 9: Trigger log collection event ─────────────────────────────
 echo "==> Step 9: Triggering log collection event..."
 echo 'Apr 18 12:00:00 localhost sshd[9999]: Failed password for root from 10.0.0.1 port 22 ssh2' \

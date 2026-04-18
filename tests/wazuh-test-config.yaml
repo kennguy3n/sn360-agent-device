@@ -10,9 +10,11 @@ enrollment:
 modules:
   fim:
     enabled: true
+    scan_interval: 20
     directories:
       - path: "/tmp/wda-e2e-fim"
         realtime: true
+        check_sha256: true
   logcollector:
     enabled: true
     sources:

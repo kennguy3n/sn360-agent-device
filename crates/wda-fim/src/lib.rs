@@ -9,10 +9,13 @@ pub mod db;
 pub mod debounce;
 pub mod event_format;
 pub mod hasher;
+pub mod idle;
+pub mod scanner;
 pub mod watcher;
 
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU8, Ordering};
+use std::time::Duration;
 
 use tracing::{debug, error, info, warn};
 
@@ -183,6 +186,26 @@ async fn run(
     status.store(STATUS_RUNNING, Ordering::Relaxed);
     info!("FIM module running");
 
+    // Set up the baseline scan timer.
+    let scan_interval = Duration::from_secs(fim_config.scan_interval);
+    let mut scan_timer = tokio::time::interval(scan_interval);
+    // The first tick completes immediately — this triggers the initial baseline scan.
+    scan_timer.tick().await;
+
+    let scan_db_path: Option<PathBuf> = db.path();
+    let scan_directories = fim_config.directories.clone();
+    let scan_bus = bus.clone();
+
+    // Run initial baseline scan on startup.
+    {
+        let db_path = scan_db_path.clone();
+        let dirs = scan_directories.clone();
+        let scan_bus = scan_bus.clone();
+        tokio::spawn(async move {
+            run_baseline_scan_task(db_path, dirs, scan_bus).await;
+        });
+    }
+
     // Main event loop.
     loop {
         tokio::select! {
@@ -191,6 +214,16 @@ async fn run(
             _ = shutdown.wait() => {
                 info!("FIM module received shutdown signal");
                 break;
+            }
+
+            _ = scan_timer.tick() => {
+                info!("baseline scan timer fired");
+                let db_path = scan_db_path.clone();
+                let dirs = scan_directories.clone();
+                let scan_bus = scan_bus.clone();
+                tokio::spawn(async move {
+                    run_baseline_scan_task(db_path, dirs, scan_bus).await;
+                });
             }
 
             event = watcher.next_event() => {
@@ -390,6 +423,53 @@ async fn run(
     status.store(STATUS_STOPPED, Ordering::Relaxed);
     info!("FIM module stopped");
     Ok(())
+}
+
+/// Async wrapper that runs the baseline scan in a blocking task and
+/// publishes collected events on the event bus afterward.
+async fn run_baseline_scan_task(
+    db_path: Option<PathBuf>,
+    directories: Vec<wda_core::config::FimDirectory>,
+    bus: EventBus,
+) {
+    let db_path = match db_path {
+        Some(p) => p,
+        None => {
+            warn!("baseline scan skipped: no on-disk DB path (in-memory fallback)");
+            return;
+        }
+    };
+
+    let result = tokio::task::spawn_blocking(move || {
+        // Check idle before scanning.
+        scanner::wait_for_idle(3, 60);
+        scanner::run_baseline_scan(&db_path, &directories)
+    })
+    .await;
+
+    match result {
+        Ok(Ok((scan_result, events))) => {
+            info!(
+                scanned = scan_result.files_scanned,
+                new = scan_result.new_files,
+                modified = scan_result.modified_files,
+                deleted = scan_result.deleted_files,
+                "baseline scan complete"
+            );
+            for pending in events {
+                let bus_event = Event::new("fim-scanner", Priority::Low, pending.kind);
+                if let Err(e) = bus.publish_to_server(bus_event).await {
+                    warn!(error = %e, "failed to publish baseline scan event");
+                }
+            }
+        }
+        Ok(Err(e)) => {
+            error!(error = %e, "baseline scan failed");
+        }
+        Err(e) => {
+            error!(error = %e, "baseline scan task panicked");
+        }
+    }
 }
 
 #[cfg(test)]
