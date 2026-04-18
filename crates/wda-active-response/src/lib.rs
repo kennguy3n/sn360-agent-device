@@ -109,7 +109,10 @@ fn parse_ar_command(payload: &str) -> Option<(String, ActionParams, bool)> {
                     .and_then(|v| v.as_str())
                     .or_else(|| p.get("ip").and_then(|v| v.as_str()))
                     .map(String::from);
-                let pid = p.get("pid").and_then(|v| v.as_u64()).and_then(|v| u32::try_from(v).ok());
+                let pid = p
+                    .get("pid")
+                    .and_then(|v| v.as_u64())
+                    .and_then(|v| u32::try_from(v).ok());
                 let user = p.get("user").and_then(|v| v.as_str()).map(String::from);
                 let timeout = p.get("timeout").and_then(|v| v.as_u64()).unwrap_or(0);
 
@@ -394,12 +397,30 @@ mod tests {
 
     #[test]
     fn test_extract_action_name() {
-        assert_eq!(extract_action_name("firewall-drop0"), ("block_ip".to_string(), false));
-        assert_eq!(extract_action_name("firewall-drop1"), ("block_ip".to_string(), true));
-        assert_eq!(extract_action_name("firewall-drop"), ("block_ip".to_string(), false));
-        assert_eq!(extract_action_name("disable-account0"), ("disable_account".to_string(), false));
-        assert_eq!(extract_action_name("disable-account1"), ("disable_account".to_string(), true));
-        assert_eq!(extract_action_name("custom-action0"), ("custom_action".to_string(), false));
+        assert_eq!(
+            extract_action_name("firewall-drop0"),
+            ("block_ip".to_string(), false)
+        );
+        assert_eq!(
+            extract_action_name("firewall-drop1"),
+            ("block_ip".to_string(), true)
+        );
+        assert_eq!(
+            extract_action_name("firewall-drop"),
+            ("block_ip".to_string(), false)
+        );
+        assert_eq!(
+            extract_action_name("disable-account0"),
+            ("disable_account".to_string(), false)
+        );
+        assert_eq!(
+            extract_action_name("disable-account1"),
+            ("disable_account".to_string(), true)
+        );
+        assert_eq!(
+            extract_action_name("custom-action0"),
+            ("custom_action".to_string(), false)
+        );
     }
 
     #[test]
