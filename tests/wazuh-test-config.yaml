@@ -31,5 +31,12 @@ modules:
       - network
       - packages
       - hardware
+  active_response:
+    enabled: true
+    timeout: 30
+    actions:
+      - block_ip
+      - kill_process
+      - disable_account
 logging:
   level: "debug"

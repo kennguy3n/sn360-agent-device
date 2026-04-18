@@ -292,6 +292,40 @@ else
     tail -30 /var/ossec/logs/ossec.log 2>/dev/null || true
 fi
 
-# ── Step 10: Cleanup handled by trap ─────────────────────────────────
-echo "==> Step 10: Tests complete, cleaning up..."
+# ── Step 10: Verify active response ──────────────────────────────────
+echo "==> Step 10: Testing active response..."
+
+# Get the agent ID from the server
+AGENT_ID=$(docker compose -f tests/docker-compose.yml exec -T wazuh-manager \
+  /var/ossec/bin/manage_agents -l 2>/dev/null | grep -oP 'ID:\s*\K[0-9]+' | head -1)
+
+if [ -n "$AGENT_ID" ]; then
+  # Trigger active response via agent_control
+  docker compose -f tests/docker-compose.yml exec -T wazuh-manager \
+    /var/ossec/bin/agent_control -b 10.99.99.99 -f firewall-drop0 -u "$AGENT_ID" 2>/dev/null || true
+
+  echo "    Waiting 15s for active response execution..."
+  sleep 15
+
+  # Check agent logs or server logs for AR execution confirmation
+  AR_LOG=$(docker compose -f tests/docker-compose.yml exec -T wazuh-manager \
+    grep -c "active-response" /var/ossec/logs/ossec.log 2>/dev/null || true)
+
+  # Also check archives for AR messages from the agent
+  AR_ARCHIVES=$(docker compose -f tests/docker-compose.yml exec -T wazuh-manager \
+    cat /var/ossec/logs/archives/archives.json 2>/dev/null | grep -c "active-response" || true)
+
+  if [ "${AR_LOG:-0}" -gt 0 ] || [ "${AR_ARCHIVES:-0}" -gt 0 ]; then
+    record PASS "Active response command processed"
+  else
+    record FAIL "No active response execution evidence found"
+    docker compose -f tests/docker-compose.yml exec -T wazuh-manager \
+      tail -30 /var/ossec/logs/ossec.log 2>/dev/null || true
+  fi
+else
+  record FAIL "Could not determine agent ID for active response test"
+fi
+
+# ── Step 11: Cleanup handled by trap ─────────────────────────────────
+echo "==> Step 11: Tests complete, cleaning up..."
 exit "$EXIT_CODE"
