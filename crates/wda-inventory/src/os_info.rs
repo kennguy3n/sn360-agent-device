@@ -11,14 +11,13 @@ use crate::syscollector_format::build_osinfo;
 pub fn collect_os_info() -> Value {
     let os_release = parse_os_release();
 
-    let hostname = read_file_trimmed("/etc/hostname")
-        .unwrap_or_else(gethostname_fallback);
+    let hostname = read_file_trimmed("/etc/hostname").unwrap_or_else(gethostname_fallback);
 
-    let kernel_release = read_file_trimmed("/proc/sys/kernel/osrelease")
-        .unwrap_or_else(|| "unknown".to_string());
+    let kernel_release =
+        read_file_trimmed("/proc/sys/kernel/osrelease").unwrap_or_else(|| "unknown".to_string());
 
-    let kernel_name = read_file_trimmed("/proc/sys/kernel/ostype")
-        .unwrap_or_else(|| "Linux".to_string());
+    let kernel_name =
+        read_file_trimmed("/proc/sys/kernel/ostype").unwrap_or_else(|| "Linux".to_string());
 
     let architecture = std::env::consts::ARCH.to_string();
 
@@ -50,19 +49,11 @@ pub(crate) struct OsRelease {
 
 impl OsRelease {
     fn version_major(&self) -> String {
-        self.version
-            .split('.')
-            .next()
-            .unwrap_or("")
-            .to_string()
+        self.version.split('.').next().unwrap_or("").to_string()
     }
 
     fn version_minor(&self) -> String {
-        self.version
-            .split('.')
-            .nth(1)
-            .unwrap_or("")
-            .to_string()
+        self.version.split('.').nth(1).unwrap_or("").to_string()
     }
 }
 

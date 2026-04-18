@@ -78,7 +78,10 @@ async fn run(
     let categories = inv_config.collect.clone();
 
     status.store(STATUS_RUNNING, Ordering::Relaxed);
-    info!(interval_secs = inv_config.interval, "inventory module running");
+    info!(
+        interval_secs = inv_config.interval,
+        "inventory module running"
+    );
 
     // Collect immediately on startup.
     collect_and_publish(&categories, &bus).await;
