@@ -51,7 +51,7 @@ extern "C" {
 /// Return codes from `sd_journal_process`.
 const SD_JOURNAL_NOP: libc::c_int = 0;
 const SD_JOURNAL_APPEND: libc::c_int = 1;
-const _SD_JOURNAL_INVALIDATE: libc::c_int = 2;
+const SD_JOURNAL_INVALIDATE: libc::c_int = 2;
 
 // ---------------------------------------------------------------------------
 // Safe wrapper around the raw sd_journal pointer
@@ -322,7 +322,7 @@ impl JournalReader {
                     let rc = journal.process();
                     guard.clear_ready();
 
-                    if rc == SD_JOURNAL_APPEND || rc == SD_JOURNAL_NOP {
+                    if rc == SD_JOURNAL_APPEND || rc == SD_JOURNAL_NOP || rc == SD_JOURNAL_INVALIDATE {
                         // Read all newly appended entries.
                         while journal.next()? {
                             if let Some(entry) = extract_entry(&journal) {
