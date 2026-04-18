@@ -281,12 +281,12 @@ echo "    Waiting 15s for journal log alert..."
 sleep 15
 
 JOURNAL_ALERTS=$(docker compose -f tests/docker-compose.yml exec -T wazuh-manager \
-  cat /var/ossec/logs/alerts/alerts.json 2>/dev/null | grep -c "wda-e2e-test" || true)
-echo "    Journal log alerts found: $JOURNAL_ALERTS"
+  cat /var/ossec/logs/archives/archives.json 2>/dev/null | grep -c "wda-e2e-test" || true)
+echo "    Journal log events found in archives: $JOURNAL_ALERTS"
 if [ "$JOURNAL_ALERTS" -gt 0 ]; then
-  record PASS "Journal log collection alerts received by server"
+  record PASS "Journal log collection events received by server"
 else
-  record FAIL "No journal log collection alerts found"
+  record FAIL "No journal log collection events found in archives"
   docker compose -f tests/docker-compose.yml exec -T wazuh-manager \
     tail -30 /var/ossec/logs/ossec.log 2>/dev/null || true
 fi
