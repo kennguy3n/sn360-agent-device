@@ -16,6 +16,7 @@ wda-event-bus = { workspace = true }
 wda-pal = { workspace = true }
 wda-fim = { workspace = true }
 wda-logcollector = { workspace = true }
+wda-inventory = { workspace = true }
 tokio = { workspace = true, features = ["rt-multi-thread"] }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true }

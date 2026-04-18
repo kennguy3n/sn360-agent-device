@@ -207,6 +207,17 @@ async fn main() -> Result<()> {
         agent.register_module(lc_handle);
     }
 
+    // 12b. Start Inventory module if enabled
+    if config.modules.inventory.enabled {
+        info!("starting inventory module");
+        let inv_handle = wda_inventory::InventoryModule::start(
+            &config,
+            agent.event_bus(),
+            agent.shutdown_signal(),
+        );
+        agent.register_module(inv_handle);
+    }
+
     // 13. Start agent and wait for shutdown signal
     agent.start().await;
     agent.wait_for_shutdown().await;
@@ -265,10 +276,13 @@ fn map_event_to_message(agent_id: &str, kind: &EventKind) -> Option<WazuhMessage
             let payload = format!("{}:{}", source, message);
             (MessageType::Log, payload)
         }
-        EventKind::InventoryUpdate { .. } => {
-            let json =
-                serde_json::to_string(kind).unwrap_or_else(|e| format!("{{\"error\":\"{}\"}}", e));
-            (MessageType::Syscollector, json)
+        EventKind::InventoryUpdate { data, .. } => {
+            let payload = match data.as_str() {
+                Some(s) => s.to_string(),
+                None => serde_json::to_string(kind)
+                    .unwrap_or_else(|e| format!("{{\"error\":\"{}\"}}", e)),
+            };
+            (MessageType::Syscollector, payload)
         }
         EventKind::ScaResult { .. } => {
             let json =
