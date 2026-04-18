@@ -195,7 +195,11 @@ async fn run(
 ) -> anyhow::Result<()> {
     info!("active response module starting");
 
-    let timeout = Duration::from_secs(ar_config.timeout);
+    let timeout = if ar_config.timeout == 0 {
+        Duration::from_secs(300)
+    } else {
+        Duration::from_secs(ar_config.timeout)
+    };
     let registry = ActionRegistry::new(&ar_config.actions);
     let mut rx: EventReceiver = bus.subscribe();
 
