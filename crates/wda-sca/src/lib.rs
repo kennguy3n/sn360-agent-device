@@ -155,7 +155,7 @@ impl ScaModule {
                         result: result.result.to_string(),
                     },
                 );
-                let _ = bus.publish(event);
+                let _ = bus.publish_to_server(event).await;
             }
         }
     }
@@ -501,15 +501,14 @@ checks:
         let mut module = ScaModule::new();
         module.load_policy_str(SAMPLE_POLICY).unwrap();
 
-        let (bus, _server_rx) = EventBus::new(64, 64);
-        let mut rx = bus.subscribe();
+        let (bus, mut server_rx) = EventBus::new(64, 64);
 
         module.evaluate_all(&bus).await;
 
-        // We should receive 4 ScaResult events (one per check).
+        // We should receive 4 ScaResult events on the server channel.
         let mut count = 0;
         while let Ok(Some(event)) =
-            tokio::time::timeout(std::time::Duration::from_millis(100), rx.recv()).await
+            tokio::time::timeout(std::time::Duration::from_millis(100), server_rx.recv()).await
         {
             if matches!(event.kind, EventKind::ScaResult { .. }) {
                 count += 1;
