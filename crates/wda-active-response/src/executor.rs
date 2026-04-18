@@ -61,7 +61,13 @@ pub async fn execute_command(
     timeout: Duration,
     drop_privileges: bool,
 ) -> ExecutionResult {
-    debug!(program, ?args, ?timeout, drop_privileges, "executing command");
+    debug!(
+        program,
+        ?args,
+        ?timeout,
+        drop_privileges,
+        "executing command"
+    );
 
     let mut cmd = Command::new(program);
     cmd.args(args);
@@ -111,12 +117,7 @@ pub async fn execute_command(
             let success = output.status.success();
             let exit_code = output.status.code();
 
-            debug!(
-                program,
-                success,
-                ?exit_code,
-                "command completed"
-            );
+            debug!(program, success, ?exit_code, "command completed");
 
             ExecutionResult {
                 success,
@@ -173,20 +174,21 @@ mod tests {
 
     #[tokio::test]
     async fn test_execute_nonexistent_command() {
-        let result = execute_command(
-            "/nonexistent/binary",
-            &[],
-            Duration::from_secs(5),
-            false,
-        )
-        .await;
+        let result =
+            execute_command("/nonexistent/binary", &[], Duration::from_secs(5), false).await;
         assert!(!result.success);
         assert!(result.stderr.contains("failed to spawn"));
     }
 
     #[tokio::test]
     async fn test_combined_output() {
-        let result = execute_command("sh", &["-c", "echo out; echo err >&2"], Duration::from_secs(5), false).await;
+        let result = execute_command(
+            "sh",
+            &["-c", "echo out; echo err >&2"],
+            Duration::from_secs(5),
+            false,
+        )
+        .await;
         assert!(result.success);
         assert_eq!(result.stdout.trim(), "out");
         assert_eq!(result.stderr.trim(), "err");

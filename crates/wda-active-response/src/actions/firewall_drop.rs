@@ -94,9 +94,9 @@ impl ResponseAction for FirewallDropAction {
     }
 }
 
-/// Basic IP address validation (IPv4 only for now).
+/// Basic IP address validation (IPv4 only — iptables is IPv4-only).
 fn is_valid_ip(ip: &str) -> bool {
-    ip.parse::<std::net::IpAddr>().is_ok()
+    ip.parse::<std::net::Ipv4Addr>().is_ok()
 }
 
 #[cfg(test)]
@@ -108,7 +108,7 @@ mod tests {
     fn test_valid_ip() {
         assert!(is_valid_ip("192.168.1.1"));
         assert!(is_valid_ip("10.0.0.1"));
-        assert!(is_valid_ip("::1"));
+        assert!(!is_valid_ip("::1")); // IPv6 not supported by iptables
         assert!(!is_valid_ip("not-an-ip"));
         assert!(!is_valid_ip(""));
         assert!(!is_valid_ip("256.1.1.1"));

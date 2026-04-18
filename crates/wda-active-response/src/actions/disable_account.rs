@@ -33,9 +33,7 @@ impl ResponseAction for DisableAccountAction {
         let user = match &params.user {
             Some(user) => user,
             None => {
-                return ActionResult::err(
-                    "missing 'user' parameter for disable_account action",
-                )
+                return ActionResult::err("missing 'user' parameter for disable_account action")
             }
         };
 
@@ -51,8 +49,7 @@ impl ResponseAction for DisableAccountAction {
 
         info!(user, "disabling user account");
 
-        let result =
-            executor::execute_command("passwd", &["-l", user], timeout, false).await;
+        let result = executor::execute_command("passwd", &["-l", user], timeout, false).await;
 
         if result.success {
             ActionResult::ok(format!("disabled account {}", user))
@@ -68,11 +65,7 @@ impl ResponseAction for DisableAccountAction {
     async fn undo(&self, params: &ActionParams, timeout: Duration) -> ActionResult {
         let user = match &params.user {
             Some(user) => user,
-            None => {
-                return ActionResult::err(
-                    "missing 'user' parameter for enable_account action",
-                )
-            }
+            None => return ActionResult::err("missing 'user' parameter for enable_account action"),
         };
 
         if !is_valid_username(user) {
@@ -81,8 +74,7 @@ impl ResponseAction for DisableAccountAction {
 
         info!(user, "re-enabling user account");
 
-        let result =
-            executor::execute_command("passwd", &["-u", user], timeout, false).await;
+        let result = executor::execute_command("passwd", &["-u", user], timeout, false).await;
 
         if result.success {
             ActionResult::ok(format!("re-enabled account {}", user))

@@ -42,8 +42,7 @@ impl ResponseAction for KillProcessAction {
         info!(pid, "killing process");
 
         let pid_str = pid.to_string();
-        let result =
-            executor::execute_command("kill", &["-9", &pid_str], timeout, false).await;
+        let result = executor::execute_command("kill", &["-9", &pid_str], timeout, false).await;
 
         if result.success {
             ActionResult::ok(format!("killed process {}", pid))

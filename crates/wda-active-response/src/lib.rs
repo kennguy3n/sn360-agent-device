@@ -109,18 +109,9 @@ fn parse_ar_command(payload: &str) -> Option<(String, ActionParams)> {
                     .and_then(|v| v.as_str())
                     .or_else(|| p.get("ip").and_then(|v| v.as_str()))
                     .map(String::from);
-                let pid = p
-                    .get("pid")
-                    .and_then(|v| v.as_u64())
-                    .map(|v| v as u32);
-                let user = p
-                    .get("user")
-                    .and_then(|v| v.as_str())
-                    .map(String::from);
-                let timeout = p
-                    .get("timeout")
-                    .and_then(|v| v.as_u64())
-                    .unwrap_or(0);
+                let pid = p.get("pid").and_then(|v| v.as_u64()).map(|v| v as u32);
+                let user = p.get("user").and_then(|v| v.as_str()).map(String::from);
+                let timeout = p.get("timeout").and_then(|v| v.as_u64()).unwrap_or(0);
 
                 ActionParams {
                     ip,
@@ -150,11 +141,7 @@ fn parse_ar_command(payload: &str) -> Option<(String, ActionParams)> {
         let action = extract_action_name(raw_action);
 
         // Collect non-separator tokens after the action name
-        let args: Vec<&str> = tokens[1..]
-            .iter()
-            .filter(|t| **t != "-")
-            .copied()
-            .collect();
+        let args: Vec<&str> = tokens[1..].iter().filter(|t| **t != "-").copied().collect();
 
         let mut ip = None;
         let mut timeout = 0u64;
@@ -181,11 +168,13 @@ fn parse_ar_command(payload: &str) -> Option<(String, ActionParams)> {
     None
 }
 
-/// Extract the base action name, stripping trailing '0'/'1' (Wazuh convention).
+/// Extract the base action name, stripping trailing '0' or '1' (Wazuh convention).
 fn extract_action_name(raw: &str) -> String {
     let name = raw.trim();
-    let name = name.strip_suffix('0').unwrap_or(name);
-    let name = name.strip_suffix('1').unwrap_or(name);
+    let name = name
+        .strip_suffix('0')
+        .or_else(|| name.strip_suffix('1'))
+        .unwrap_or(name);
     match name {
         "firewall-drop" => "block_ip".to_string(),
         "disable-account" => "disable_account".to_string(),
@@ -477,7 +466,9 @@ mod tests {
             Priority::Critical,
             EventKind::ServerCommand {
                 command: "execd".to_string(),
-                payload: r#"{"command":"firewall-drop0","parameters":{"ip":"10.99.99.99","timeout":0}}"#.to_string(),
+                payload:
+                    r#"{"command":"firewall-drop0","parameters":{"ip":"10.99.99.99","timeout":0}}"#
+                        .to_string(),
             },
         );
         bus.publish(cmd_event).unwrap();
