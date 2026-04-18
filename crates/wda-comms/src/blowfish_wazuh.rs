@@ -118,17 +118,20 @@ impl Blowfish {
     }
 }
 
-/// Encrypt `data` with Blowfish-CBC using a zero IV and zero-byte padding.
+/// Wazuh's static Blowfish-CBC IV (from `bf_op.c`).
+const WAZUH_BF_IV: [u8; 8] = [0xfe, 0xdc, 0xba, 0x98, 0x76, 0x54, 0x32, 0x10];
+
+/// Encrypt `data` with Blowfish-CBC using the Wazuh static IV.
 ///
 /// `data` is padded to an 8-byte boundary with zeros before encryption
 /// (matching Wazuh's `OS_BF_Str`).  Returns the ciphertext (no IV prefix,
-/// since Wazuh always uses a static all-zero IV).
+/// since Wazuh always uses a static IV).
 pub fn bf_cbc_encrypt(bf: &Blowfish, plaintext: &[u8]) -> Vec<u8> {
     let padded_len = (plaintext.len() + 7) & !7; // round up to 8
     let mut buf = vec![0u8; padded_len];
     buf[..plaintext.len()].copy_from_slice(plaintext);
 
-    let mut prev = [0u8; 8]; // IV = all zeros
+    let mut prev = WAZUH_BF_IV;
     for chunk in buf.chunks_exact_mut(8) {
         // CBC: XOR with previous ciphertext block
         for (b, p) in chunk.iter_mut().zip(prev.iter()) {
@@ -141,7 +144,7 @@ pub fn bf_cbc_encrypt(bf: &Blowfish, plaintext: &[u8]) -> Vec<u8> {
     buf
 }
 
-/// Decrypt `data` with Blowfish-CBC using a zero IV.
+/// Decrypt `data` with Blowfish-CBC using the Wazuh static IV.
 ///
 /// Returns the decrypted bytes (may contain trailing zero-padding).
 pub fn bf_cbc_decrypt(bf: &Blowfish, ciphertext: &[u8]) -> Vec<u8> {
@@ -150,7 +153,7 @@ pub fn bf_cbc_decrypt(bf: &Blowfish, ciphertext: &[u8]) -> Vec<u8> {
     }
 
     let mut buf = ciphertext.to_vec();
-    let mut prev = [0u8; 8]; // IV = all zeros
+    let mut prev = WAZUH_BF_IV;
 
     for i in (0..buf.len()).step_by(8) {
         let saved: [u8; 8] = buf[i..i + 8].try_into().unwrap();

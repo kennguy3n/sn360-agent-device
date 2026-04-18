@@ -174,8 +174,30 @@ impl ConnectionManager {
     ///
     /// The message body is encrypted and prefixed with the agent ID
     /// (in the clear) so the server can look up the correct key.
-    /// Wire format: `4-byte-length | "{agent_id}:" | encrypted_body`
+    /// Wire format: `4-byte-length | "!{agent_id}!{crypto_token}" | encrypted_body`
+    ///
+    /// On transient failures (broken pipe, connection reset) the method
+    /// reconnects once and retries the send.
     pub async fn send(&mut self, message: &WazuhMessage) -> Result<(), ConnectionError> {
+        let data = self.build_wire_frame(message)?;
+
+        match self.send_raw(&data).await {
+            Ok(()) => Ok(()),
+            Err(e) => {
+                warn!(error = %e, "send failed, reconnecting");
+                // Reconnect and retry once.
+                self.disconnect().await;
+                self.connect_with_retry().await?;
+                // Re-encrypt with fresh frame (counters already advanced, but
+                // the server is tolerant of counter gaps).
+                let data2 = self.build_wire_frame(message)?;
+                self.send_raw(&data2).await
+            }
+        }
+    }
+
+    /// Build the encrypted wire frame for a message.
+    fn build_wire_frame(&self, message: &WazuhMessage) -> Result<Vec<u8>, ConnectionError> {
         let body = message.encode_body();
 
         debug!(
@@ -190,8 +212,12 @@ impl ConnectionManager {
             let encrypted = cipher
                 .encrypt(&body)
                 .map_err(|e| ConnectionError::SendFailed(e.to_string()))?;
-            // Prepend agent_id as a plaintext routing prefix.
-            let mut wire = format!("{}:", message.agent_id).into_bytes();
+
+            debug!(encrypted_len = encrypted.len(), "encrypted payload");
+
+            // Wire format: !{agent_id}!{crypto_token}{encrypted_payload}
+            // crypto_token is ":" for Blowfish, "#AES:" for AES
+            let mut wire = format!("!{}!{}", message.agent_id, cipher.crypto_token()).into_bytes();
             wire.extend_from_slice(&encrypted);
             wire
         } else {
@@ -199,7 +225,7 @@ impl ConnectionManager {
             message.encode()
         };
 
-        self.send_raw(&data).await
+        Ok(data)
     }
 
     /// Send raw bytes over the transport.
@@ -208,8 +234,9 @@ impl ConnectionManager {
             TransportProtocol::Tcp => {
                 let stream = self.stream.as_mut().ok_or(ConnectionError::Closed)?;
 
-                // Wazuh TCP protocol: 4-byte length prefix (big-endian) + data
-                let len = (data.len() as u32).to_be_bytes();
+                // Wazuh TCP protocol: 4-byte length prefix (little-endian / native on x86_64) + data
+                // Wazuh's wnet_order() is a no-op on little-endian, so the header is native byte order.
+                let len = (data.len() as u32).to_le_bytes();
                 stream
                     .write_all(&len)
                     .await
@@ -246,7 +273,7 @@ impl ConnectionManager {
                     .read_exact(&mut len_buf)
                     .await
                     .map_err(|e| ConnectionError::ReceiveFailed(e.to_string()))?;
-                let len = u32::from_be_bytes(len_buf) as usize;
+                let len = u32::from_le_bytes(len_buf) as usize;
 
                 // Sanity check on message size (max 64 KB)
                 if len > 65536 {

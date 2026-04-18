@@ -12,7 +12,10 @@ services:
       - wazuh-data:/var/ossec/data
       - wazuh-logs:/var/ossec/logs
     healthcheck:
-      test: ["/var/ossec/bin/wazuh-control", "status"]
+      # Check only that remoted (agent comms) is running.
+      # wazuh-control status exits non-zero when optional daemons
+      # (clusterd, maild, etc.) are stopped, so we grep instead.
+      test: ["CMD-SHELL", "/var/ossec/bin/wazuh-control status | grep -q 'wazuh-remoted is running'"]
       interval: 10s
       timeout: 5s
       retries: 12

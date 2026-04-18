@@ -132,7 +132,7 @@ impl WazuhMessage {
     /// prefix by `ConnectionManager::send()`.
     pub fn encode_body(&self) -> Vec<u8> {
         let body = match self.msg_type {
-            MessageType::Syscheck => format!("d:{}", self.payload),
+            MessageType::Syscheck => format!("8:syscheck:{}", self.payload),
             MessageType::Log => format!("1:{}", self.payload),
             // Control messages already carry the correct prefix.
             MessageType::Keepalive | MessageType::Startup | MessageType::Shutdown => {
@@ -166,13 +166,33 @@ impl WazuhMessage {
     }
 
     /// Create a keepalive message.
+    ///
+    /// Wazuh's `run_notify()` in `notify.c` sends a multi-line control
+    /// message.  The server's `save_controlmsg` looks for `\n` in the
+    /// body; if none is found it logs "Invalid message from agent".
+    ///
+    /// Minimal format accepted by remoted:
+    ///   `#!-<uname>\n<shared_file_hash>\n`
     pub fn keepalive(agent_id: &str) -> Self {
-        Self::new(agent_id, MessageType::Keepalive, "#!-agent keep_alive")
+        let uname = basic_uname();
+        // Wazuh agent sends: "<md5> merged.mg\n" for the shared files line.
+        // We don't have a merged.mg, so send a placeholder hash.
+        let body = format!("#!-{}\nx merged.mg\n", uname);
+        Self::new(agent_id, MessageType::Keepalive, body)
     }
 
     /// Create an agent startup message.
+    ///
+    /// Wazuh's `agent_handshake_to_server` in `start_agent.c` sends:
+    ///   `CONTROL_HEADER + HC_STARTUP + agent_info_json`
+    /// where `HC_STARTUP` = `"agent startup "` (trailing space) and
+    /// `agent_info_json` = `{"version":"..."}`.  The server parses
+    /// the JSON to extract the version; if missing it responds with
+    /// an error.
     pub fn startup(agent_id: &str) -> Self {
-        Self::new(agent_id, MessageType::Startup, "#!-agent startup")
+        // Match the Wazuh 4.x version string format.
+        let body = "#!-agent startup {\"version\":\"v4.9.2\"}".to_string();
+        Self::new(agent_id, MessageType::Startup, body)
     }
 }
 
@@ -196,6 +216,45 @@ pub fn decompress_payload(data: &[u8]) -> Option<Vec<u8>> {
     let mut result = Vec::new();
     decoder.read_to_end(&mut result).ok()?;
     Some(result)
+}
+
+/// Return a minimal uname-style string for keepalive messages.
+///
+/// Wazuh's `run_notify()` calls `getuname()` which returns something
+/// like `Linux myhost 5.15.0 #1 SMP x86_64 |Linux|x86_64`.  We
+/// build a comparable string from the information available at
+/// runtime.
+fn basic_uname() -> String {
+    #[cfg(target_os = "linux")]
+    {
+        // Try to read from /proc for a richer string.
+        let nodename = std::fs::read_to_string("/etc/hostname")
+            .unwrap_or_else(|_| "unknown".into())
+            .trim()
+            .to_string();
+        let release = std::fs::read_to_string("/proc/sys/kernel/osrelease")
+            .unwrap_or_else(|_| "unknown".into())
+            .trim()
+            .to_string();
+        let machine = std::env::consts::ARCH;
+        format!(
+            "Linux {} {} #1 SMP {} |Linux|{}",
+            nodename, release, machine, machine
+        )
+    }
+    #[cfg(target_os = "macos")]
+    {
+        let machine = std::env::consts::ARCH;
+        format!("Darwin unknown 23.0.0 Darwin Kernel |Darwin|{}", machine)
+    }
+    #[cfg(target_os = "windows")]
+    {
+        "Microsoft Windows 10.0 |Windows|x86_64".to_string()
+    }
+    #[cfg(not(any(target_os = "linux", target_os = "macos", target_os = "windows")))]
+    {
+        "Unknown |Unknown|unknown".to_string()
+    }
 }
 
 #[cfg(test)]
@@ -232,6 +291,22 @@ mod tests {
         let msg = WazuhMessage::keepalive("002");
         assert_eq!(msg.agent_id, "002");
         assert_eq!(msg.msg_type, MessageType::Keepalive);
+        // Body must start with "#!-" and contain a newline (required by
+        // Wazuh remoted's save_controlmsg).
+        assert!(msg.payload.starts_with("#!-"));
+        assert!(msg.payload.contains('\n'));
+        assert!(msg.payload.contains("merged.mg"));
+    }
+
+    #[test]
+    fn test_startup_message() {
+        let msg = WazuhMessage::startup("001");
+        assert_eq!(msg.agent_id, "001");
+        assert_eq!(msg.msg_type, MessageType::Startup);
+        // Must contain the control header, HC_STARTUP ("agent startup "),
+        // and a JSON version object.
+        assert!(msg.payload.starts_with("#!-agent startup "));
+        assert!(msg.payload.contains("version"));
     }
 
     #[test]
