@@ -14,7 +14,7 @@ use tokio::process::Command;
 use tracing::{debug, error, info, warn};
 
 use wda_core::signal::ShutdownSignal;
-use wda_event_bus::{EventBus, EventKind};
+use wda_event_bus::{Event, EventBus, EventKind, Priority};
 
 /// Configuration for a single Windows Event Log channel subscription.
 #[derive(Debug, Clone)]
@@ -106,10 +106,18 @@ async fn subscribe_channel(
                 match line {
                     Ok(Some(line)) => {
                         if line.trim().is_empty() && !event_buf.is_empty() {
-                            bus.publish(EventKind::LogCollected {
-                                source: format!("eventlog:{}", channel),
-                                message: std::mem::take(&mut event_buf),
-                            });
+                            let event = Event::new(
+                                "logcollector",
+                                Priority::Normal,
+                                EventKind::LogCollected {
+                                    source: format!("eventlog:{}", channel),
+                                    message: std::mem::take(&mut event_buf),
+                                    format: "eventlog".to_string(),
+                                },
+                            );
+                            if let Err(e) = bus.publish_to_server(event).await {
+                                warn!(error = %e, "failed to publish event log event");
+                            }
                         } else {
                             if !event_buf.is_empty() {
                                 event_buf.push('\n');
@@ -120,10 +128,18 @@ async fn subscribe_channel(
                     Ok(None) => {
                         // EOF
                         if !event_buf.is_empty() {
-                            bus.publish(EventKind::LogCollected {
-                                source: format!("eventlog:{}", channel),
-                                message: std::mem::take(&mut event_buf),
-                            });
+                            let event = Event::new(
+                                "logcollector",
+                                Priority::Normal,
+                                EventKind::LogCollected {
+                                    source: format!("eventlog:{}", channel),
+                                    message: std::mem::take(&mut event_buf),
+                                    format: "eventlog".to_string(),
+                                },
+                            );
+                            if let Err(e) = bus.publish_to_server(event).await {
+                                warn!(error = %e, "failed to publish event log event");
+                            }
                         }
                         break;
                     }

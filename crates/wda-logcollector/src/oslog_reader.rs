@@ -12,7 +12,7 @@ use tokio::process::Command;
 use tracing::{debug, error, info, warn};
 
 use wda_core::signal::ShutdownSignal;
-use wda_event_bus::{EventBus, EventKind};
+use wda_event_bus::{Event, EventBus, EventKind, Priority};
 
 /// Configuration for the macOS Unified Log reader.
 #[derive(Debug, Clone)]
@@ -83,10 +83,18 @@ impl OsLogReader {
                             if line.is_empty() {
                                 continue;
                             }
-                            self.bus.publish(EventKind::LogCollected {
-                                source: "oslog".to_string(),
-                                message: line,
-                            });
+                            let event = Event::new(
+                                "logcollector",
+                                Priority::Normal,
+                                EventKind::LogCollected {
+                                    source: "oslog".to_string(),
+                                    message: line,
+                                    format: "syslog".to_string(),
+                                },
+                            );
+                            if let Err(e) = self.bus.publish_to_server(event).await {
+                                warn!(error = %e, "failed to publish oslog event");
+                            }
                         }
                         Ok(None) => {
                             warn!("OSLog stream ended unexpectedly");
