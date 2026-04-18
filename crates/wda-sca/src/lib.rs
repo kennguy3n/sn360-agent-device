@@ -443,13 +443,19 @@ checks:
 
     #[test]
     fn test_file_exists_check() {
+        // Use a file that exists on all platforms.
+        #[cfg(unix)]
+        let existing_path = "/etc/passwd";
+        #[cfg(windows)]
+        let existing_path = r"C:\Windows\System32\drivers\etc\hosts";
+
         let check = ScaCheck {
             id: "test_1".to_string(),
-            title: "Check /etc/passwd".to_string(),
+            title: "Check existing file".to_string(),
             description: String::new(),
             check_type: "file".to_string(),
             params: CheckParams {
-                path: Some("/etc/passwd".to_string()),
+                path: Some(existing_path.to_string()),
                 ..Default::default()
             },
         };

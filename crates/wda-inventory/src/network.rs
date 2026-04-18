@@ -171,8 +171,12 @@ mod unix_impl {
             let text = String::from_utf8_lossy(&output.stdout);
             if text.contains("status: active") {
                 Some("up".to_string())
-            } else {
+            } else if text.contains("status: inactive") {
                 Some("down".to_string())
+            } else if text.contains("<UP") || text.contains(",UP") {
+                Some("up".to_string())
+            } else {
+                Some("unknown".to_string())
             }
         }
         #[cfg(not(any(target_os = "linux", target_os = "macos")))]

@@ -41,7 +41,7 @@ impl ResponseAction for DisableAccountAction {
             }
         };
 
-        if user == "root" || user == "Administrator" {
+        if user.eq_ignore_ascii_case("root") || user.eq_ignore_ascii_case("administrator") {
             return ActionResult::err("refusing to disable root/Administrator account");
         }
 
@@ -60,7 +60,7 @@ impl ResponseAction for DisableAccountAction {
             None => return ActionResult::err("missing 'user' parameter for enable_account action"),
         };
 
-        if user == "root" || user == "Administrator" {
+        if user.eq_ignore_ascii_case("root") || user.eq_ignore_ascii_case("administrator") {
             return ActionResult::err("refusing to re-enable root/Administrator account");
         }
 
@@ -107,7 +107,7 @@ async fn platform_enable_account(user: &str, timeout: Duration) -> ActionResult 
 // ── macOS ────────────────────────────────────────────────────────────────────
 
 #[cfg(target_os = "macos")]
-const SHELL_STATE_DIR: &str = "/var/tmp/wda-shell-state";
+const SHELL_STATE_DIR: &str = "/var/lib/wda-shell-state";
 
 #[cfg(target_os = "macos")]
 async fn platform_disable_account(user: &str, timeout: Duration) -> ActionResult {
