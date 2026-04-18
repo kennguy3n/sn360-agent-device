@@ -200,7 +200,7 @@ impl WazuhCipher {
         let mut global = self.global_counter.load(Ordering::Relaxed);
         if local >= 9997 {
             self.local_counter.store(0, Ordering::Relaxed);
-            local = 1;
+            local = 0;
             global = self.global_counter.fetch_add(1, Ordering::Relaxed) + 1;
         }
 
@@ -213,8 +213,6 @@ impl WazuhCipher {
     }
 
     fn decrypt_compressed(&self, data: &[u8]) -> Result<Vec<u8>, CryptoError> {
-        let data = strip_trailing_nulls(data);
-
         let mut start = 0;
         while start < data.len() && data[start] == b'!' {
             start += 1;
