@@ -7,7 +7,11 @@
 pub mod file_reader;
 #[cfg(all(target_os = "linux", feature = "linux-journal"))]
 pub mod journal_reader;
+#[cfg(target_os = "macos")]
+pub mod oslog_reader;
 pub mod state;
+#[cfg(target_os = "windows")]
+pub mod windows_eventlog;
 
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicU8, Ordering};
@@ -106,6 +110,32 @@ async fn run(
                     warn!(
                         source_type = %source.source_type,
                         "journal source requires linux-journal feature, skipping"
+                    );
+                }
+            }
+            "eventlog" | "windows" => {
+                #[cfg(target_os = "windows")]
+                {
+                    info!(source_type = %source.source_type, "Windows Event Log source configured (handled separately)");
+                }
+                #[cfg(not(target_os = "windows"))]
+                {
+                    warn!(
+                        source_type = %source.source_type,
+                        "eventlog source requires Windows, skipping"
+                    );
+                }
+            }
+            "oslog" | "unified" => {
+                #[cfg(target_os = "macos")]
+                {
+                    info!(source_type = %source.source_type, "macOS Unified Log source configured (handled separately)");
+                }
+                #[cfg(not(target_os = "macos"))]
+                {
+                    warn!(
+                        source_type = %source.source_type,
+                        "oslog source requires macOS, skipping"
                     );
                 }
             }

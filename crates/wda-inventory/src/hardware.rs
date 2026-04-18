@@ -1,6 +1,8 @@
 //! Hardware information collection for the inventory module.
 //!
-//! Parses `/proc/cpuinfo` and `/proc/meminfo` on Linux.
+//! - Linux: parses `/proc/cpuinfo` and `/proc/meminfo`.
+//! - macOS: uses `sysctl` for CPU/memory info.
+//! - Windows: uses `wmic` for CPU/memory info.
 
 use serde_json::Value;
 use tracing::{debug, warn};
@@ -9,8 +11,8 @@ use crate::syscollector_format::build_hwinfo;
 
 /// Collect hardware information and return it as a syscollector `dbsync_hwinfo` payload.
 pub fn collect_hardware_info() -> Value {
-    let cpu = parse_cpuinfo();
-    let mem = parse_meminfo();
+    let cpu = collect_cpu_info();
+    let mem = collect_mem_info();
 
     let data = serde_json::json!({
         "cpu_name": cpu.model_name,
@@ -27,6 +29,44 @@ pub fn collect_hardware_info() -> Value {
         "collected hardware info"
     );
     build_hwinfo(data)
+}
+
+fn collect_cpu_info() -> CpuInfo {
+    #[cfg(target_os = "linux")]
+    {
+        parse_cpuinfo()
+    }
+    #[cfg(target_os = "macos")]
+    {
+        macos_cpu_info()
+    }
+    #[cfg(target_os = "windows")]
+    {
+        windows_cpu_info()
+    }
+    #[cfg(not(any(target_os = "linux", target_os = "macos", target_os = "windows")))]
+    {
+        CpuInfo::default()
+    }
+}
+
+fn collect_mem_info() -> MemInfo {
+    #[cfg(target_os = "linux")]
+    {
+        parse_meminfo()
+    }
+    #[cfg(target_os = "macos")]
+    {
+        macos_mem_info()
+    }
+    #[cfg(target_os = "windows")]
+    {
+        windows_mem_info()
+    }
+    #[cfg(not(any(target_os = "linux", target_os = "macos", target_os = "windows")))]
+    {
+        MemInfo::default()
+    }
 }
 
 #[derive(Debug, Default)]
@@ -117,6 +157,100 @@ fn parse_kb_value(s: &str) -> u64 {
         .next()
         .and_then(|v| v.parse().ok())
         .unwrap_or(0)
+}
+
+// ── macOS hardware info via sysctl ───────────────────────────────────────────
+
+#[cfg(target_os = "macos")]
+fn sysctl_string(name: &str) -> Option<String> {
+    let output = std::process::Command::new("sysctl")
+        .arg("-n")
+        .arg(name)
+        .output()
+        .ok()?;
+    if output.status.success() {
+        Some(String::from_utf8_lossy(&output.stdout).trim().to_string())
+    } else {
+        None
+    }
+}
+
+#[cfg(target_os = "macos")]
+fn macos_cpu_info() -> CpuInfo {
+    let model_name = sysctl_string("machdep.cpu.brand_string").unwrap_or_default();
+    let core_count: u32 = sysctl_string("hw.ncpu")
+        .and_then(|s| s.parse().ok())
+        .unwrap_or(0);
+    let mhz: f64 = sysctl_string("hw.cpufrequency")
+        .and_then(|s| s.parse::<f64>().ok())
+        .map(|hz| hz / 1_000_000.0)
+        .unwrap_or(0.0);
+    CpuInfo {
+        model_name,
+        core_count,
+        mhz,
+    }
+}
+
+#[cfg(target_os = "macos")]
+fn macos_mem_info() -> MemInfo {
+    let total_bytes: u64 = sysctl_string("hw.memsize")
+        .and_then(|s| s.parse().ok())
+        .unwrap_or(0);
+    MemInfo {
+        total_kb: total_bytes / 1024,
+        free_kb: 0, // macOS doesn't expose free memory via sysctl easily
+    }
+}
+
+// ── Windows hardware info via wmic ──────────────────────────────────────────
+
+#[cfg(target_os = "windows")]
+fn wmic_value(class: &str, field: &str) -> Option<String> {
+    let output = std::process::Command::new("wmic")
+        .args([class, "get", field, "/value"])
+        .output()
+        .ok()?;
+    let text = String::from_utf8_lossy(&output.stdout);
+    for line in text.lines() {
+        if let Some((_, val)) = line.split_once('=') {
+            let val = val.trim();
+            if !val.is_empty() {
+                return Some(val.to_string());
+            }
+        }
+    }
+    None
+}
+
+#[cfg(target_os = "windows")]
+fn windows_cpu_info() -> CpuInfo {
+    let model_name = wmic_value("cpu", "Name").unwrap_or_default();
+    let core_count: u32 = wmic_value("cpu", "NumberOfCores")
+        .and_then(|s| s.parse().ok())
+        .unwrap_or(0);
+    let mhz: f64 = wmic_value("cpu", "MaxClockSpeed")
+        .and_then(|s| s.parse().ok())
+        .unwrap_or(0.0);
+    CpuInfo {
+        model_name,
+        core_count,
+        mhz,
+    }
+}
+
+#[cfg(target_os = "windows")]
+fn windows_mem_info() -> MemInfo {
+    let total_bytes: u64 = wmic_value("ComputerSystem", "TotalPhysicalMemory")
+        .and_then(|s| s.parse().ok())
+        .unwrap_or(0);
+    let free_bytes: u64 = wmic_value("OS", "FreePhysicalMemory")
+        .and_then(|s| s.parse().ok())
+        .unwrap_or(0);
+    MemInfo {
+        total_kb: total_bytes / 1024,
+        free_kb: free_bytes, // wmic OS FreePhysicalMemory is already in KB
+    }
 }
 
 #[cfg(test)]
