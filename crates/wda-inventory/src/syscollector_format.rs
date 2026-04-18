@@ -17,6 +17,7 @@ pub fn wrap_syscollector(json_payload: &Value) -> String {
 pub fn build_osinfo(data: Value) -> Value {
     serde_json::json!({
         "type": "dbsync_osinfo",
+        "operation": "MODIFIED",
         "data": data,
     })
 }
@@ -25,6 +26,7 @@ pub fn build_osinfo(data: Value) -> Value {
 pub fn build_packages(data: Value) -> Value {
     serde_json::json!({
         "type": "dbsync_packages",
+        "operation": "MODIFIED",
         "data": data,
     })
 }
@@ -33,6 +35,7 @@ pub fn build_packages(data: Value) -> Value {
 pub fn build_netiface(data: Value) -> Value {
     serde_json::json!({
         "type": "dbsync_netiface",
+        "operation": "MODIFIED",
         "data": data,
     })
 }
@@ -41,6 +44,7 @@ pub fn build_netiface(data: Value) -> Value {
 pub fn build_netaddr(data: Value) -> Value {
     serde_json::json!({
         "type": "dbsync_netaddr",
+        "operation": "MODIFIED",
         "data": data,
     })
 }
@@ -49,6 +53,7 @@ pub fn build_netaddr(data: Value) -> Value {
 pub fn build_hwinfo(data: Value) -> Value {
     serde_json::json!({
         "type": "dbsync_hwinfo",
+        "operation": "MODIFIED",
         "data": data,
     })
 }

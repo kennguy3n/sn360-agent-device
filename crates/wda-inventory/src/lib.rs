@@ -145,25 +145,25 @@ async fn collect_and_publish(categories: &[String], bus: &EventBus) {
                         Vec::new()
                     });
 
-                if !payloads.is_empty() {
-                    let batched = serde_json::json!({
-                        "type": "dbsync_network_batch",
-                        "items": payloads,
-                    });
-                    let wire = wrap_syscollector(&batched);
+                for payload in &payloads {
+                    let wire = wrap_syscollector(payload);
                     publish_inventory_event(bus, "network", &wire).await;
+                    tokio::task::yield_now().await;
                 }
             }
             "packages" => {
                 let payloads = packages::collect_packages().await;
 
-                if !payloads.is_empty() {
-                    let batched = serde_json::json!({
-                        "type": "dbsync_packages_batch",
-                        "items": payloads,
-                    });
-                    let wire = wrap_syscollector(&batched);
+                for (i, payload) in payloads.iter().enumerate() {
+                    let wire = wrap_syscollector(payload);
                     publish_inventory_event(bus, "packages", &wire).await;
+                    // Yield every event and sleep every 50 to let the
+                    // forwarding loop drain the event bus.
+                    if (i + 1) % 50 == 0 {
+                        tokio::time::sleep(Duration::from_millis(50)).await;
+                    } else {
+                        tokio::task::yield_now().await;
+                    }
                 }
             }
             other => {
