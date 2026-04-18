@@ -58,6 +58,7 @@ bytes = "1"
 chrono = { version = "0.4", features = ["serde"] }
 uuid = { version = "1", features = ["v4"] }
 sha2 = "0.10"
+md-5 = "0.10"
 flate2 = "1"
 gethostname = "0.5"
 socket2 = { version = "0.5", features = ["all"] }

@@ -23,6 +23,7 @@ bytes = { workspace = true }
 flate2 = { workspace = true }
 chrono = { workspace = true }
 sha2 = { workspace = true }
+md-5 = { workspace = true }
 socket2 = { workspace = true }
 
 [dev-dependencies]

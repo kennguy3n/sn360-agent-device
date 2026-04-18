@@ -130,6 +130,15 @@ fi
 # ── Step 7: Verify agent active after keepalive ─────────────────────
 echo "==> Step 7: Waiting for keepalive cycle (35s)..."
 sleep 35
+
+# Check ossec.log for crypto/decryption errors from remoted.
+REMOTED_ERRORS=$(docker compose -f tests/docker-compose.yml exec -T wazuh-manager \
+  grep -ciE 'Invalid message|Decrypt|error.*remoted' /var/ossec/logs/ossec.log 2>/dev/null || true)
+if [ "${REMOTED_ERRORS:-0}" -gt 0 ]; then
+  echo "    WARNING: ${REMOTED_ERRORS} remoted/decrypt error(s) in ossec.log"
+  docker compose -f tests/docker-compose.yml exec -T wazuh-manager \
+    grep -iE 'Invalid message|Decrypt|error.*remoted' /var/ossec/logs/ossec.log 2>/dev/null | tail -10
+fi
 AGENT_LIST2=$(docker compose -f tests/docker-compose.yml exec -T wazuh-manager \
                 /var/ossec/bin/manage_agents -l 2>/dev/null || true)
 if echo "$AGENT_LIST2" | grep -qi "active"; then
@@ -147,8 +156,8 @@ fi
 # ── Step 8: Trigger FIM event ───────────────────────────────────────
 echo "==> Step 8: Triggering FIM event..."
 touch /tmp/wda-e2e-fim/testfile.txt
-echo "    Waiting 20s for syscheck alert..."
-sleep 20
+echo "    Waiting 30s for syscheck alert..."
+sleep 30
 
 SYSCHECK_ALERTS=$(docker compose -f tests/docker-compose.yml exec -T wazuh-manager \
   cat /var/ossec/logs/alerts/alerts.json 2>/dev/null | grep -c "syscheck" || true)
@@ -157,6 +166,10 @@ if [ "$SYSCHECK_ALERTS" -gt 0 ]; then
   record PASS "FIM syscheck alerts received by server"
 else
   record FAIL "No syscheck alerts found in alerts.json"
+  echo "    --- last 50 lines of ossec.log ---"
+  docker compose -f tests/docker-compose.yml exec -T wazuh-manager \
+    tail -50 /var/ossec/logs/ossec.log 2>/dev/null || true
+  echo "    --- end ossec.log ---"
 fi
 
 # ── Step 9: Trigger log collection event ─────────────────────────────
@@ -173,6 +186,10 @@ if [ "$LOG_ALERTS" -gt 0 ]; then
   record PASS "Log collection alerts received by server"
 else
   record FAIL "No log collection alerts found in alerts.json"
+  echo "    --- last 50 lines of ossec.log ---"
+  docker compose -f tests/docker-compose.yml exec -T wazuh-manager \
+    tail -50 /var/ossec/logs/ossec.log 2>/dev/null || true
+  echo "    --- end ossec.log ---"
 fi
 
 # ── Step 10: Cleanup handled by trap ─────────────────────────────────

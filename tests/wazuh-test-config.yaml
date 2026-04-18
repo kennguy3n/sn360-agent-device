@@ -2,7 +2,7 @@ server:
   address: "127.0.0.1"
   port: 1514
   protocol: "tcp"
-  keepalive_interval: 30
+  keepalive_interval: 10
 enrollment:
   port: 1515
   auto_enroll: true
