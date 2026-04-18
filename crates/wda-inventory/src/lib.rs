@@ -229,8 +229,8 @@ mod tests {
                 assert!(data.is_string(), "data should be a wire-format string");
                 let wire = data.as_str().unwrap();
                 assert!(
-                    wire.starts_with("d:syscollector:"),
-                    "payload should start with d:syscollector:"
+                    wire.starts_with("syscollector:"),
+                    "payload should start with syscollector:"
                 );
             }
             other => panic!("expected InventoryUpdate, got: {other:?}"),

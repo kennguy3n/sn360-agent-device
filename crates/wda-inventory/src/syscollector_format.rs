@@ -1,15 +1,16 @@
 //! Wazuh syscollector wire format helpers.
 //!
-//! Each inventory message is formatted as `d:syscollector:{json_payload}`
-//! following the Wazuh dbsync schema.
+//! Each inventory message is formatted as `syscollector:{json_payload}`
+//! (the `d:` routing prefix is added by `encode_body()` in the protocol layer).
 
 use serde_json::Value;
 
 /// Wrap a JSON payload into the Wazuh syscollector wire format.
 ///
-/// Returns a string like `d:syscollector:{"type":"dbsync_osinfo",...}`.
+/// Returns a string like `syscollector:{"type":"dbsync_osinfo",...}`.
+/// The `d:` routing prefix is added later by `encode_body()` in the protocol layer.
 pub fn wrap_syscollector(json_payload: &Value) -> String {
-    format!("d:syscollector:{}", json_payload)
+    format!("syscollector:{}", json_payload)
 }
 
 /// Build a dbsync osinfo payload.
@@ -60,7 +61,7 @@ mod tests {
     fn test_wrap_syscollector_format() {
         let payload = serde_json::json!({"type": "dbsync_osinfo", "data": {}});
         let wire = wrap_syscollector(&payload);
-        assert!(wire.starts_with("d:syscollector:"));
+        assert!(wire.starts_with("syscollector:"));
         assert!(wire.contains("dbsync_osinfo"));
     }
 
