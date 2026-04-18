@@ -61,6 +61,7 @@ pub enum CryptoMethod {
 pub struct WazuhCipher {
     method: CryptoMethod,
     /// Encryption key string (47 chars, matching Wazuh OS_AddKey output).
+    #[allow(dead_code)]
     encryption_key: Vec<u8>,
     /// AES-256 key (first 32 bytes of encryption_key, zero-padded).
     aes_key: [u8; 32],

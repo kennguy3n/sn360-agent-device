@@ -11,7 +11,7 @@ pub enum ChangeType {
 }
 
 impl ChangeType {
-    #[expect(dead_code)]
+    #[allow(dead_code)]
     fn as_str(self) -> &'static str {
         match self {
             ChangeType::Added => "added",
