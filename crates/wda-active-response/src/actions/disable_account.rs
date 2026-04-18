@@ -237,9 +237,12 @@ async fn platform_enable_account(user: &str, _timeout: Duration) -> ActionResult
 }
 
 /// Basic username validation: alphanumeric, underscore, hyphen, dot.
+/// Rejects `.` and `..` to prevent path traversal in state file paths.
 fn is_valid_username(user: &str) -> bool {
     !user.is_empty()
         && user.len() <= 32
+        && user != "."
+        && user != ".."
         && user
             .chars()
             .all(|c| c.is_alphanumeric() || c == '_' || c == '-' || c == '.')
@@ -259,6 +262,8 @@ mod tests {
         assert!(!is_valid_username(""));
         assert!(!is_valid_username("user;rm -rf /"));
         assert!(!is_valid_username("user name"));
+        assert!(!is_valid_username("."));
+        assert!(!is_valid_username(".."));
     }
 
     #[tokio::test]
