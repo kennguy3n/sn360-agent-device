@@ -1,7 +1,10 @@
 //! Wazuh protocol message formatting.
 //!
-//! Implements the Wazuh wire protocol:
-//! `AgentID : MessageType : Payload`
+//! Implements the Wazuh wire protocol. Messages are encrypted with
+//! Blowfish-CBC or AES-256-CBC. The agent ID is sent in the clear as a
+//! routing prefix; only the message body is encrypted.
+//!
+//! On the wire (TCP): `4-byte-length | agent_id ":" encrypted_body`
 
 use serde::{Deserialize, Serialize};
 
@@ -102,9 +105,12 @@ impl WazuhMessage {
         self
     }
 
-    /// Encode the message into the Wazuh wire format.
+    /// Encode the full wire-format message (legacy — includes agent_id).
     ///
     /// Format: `{agent_id}:{msg_type}:{payload}`
+    ///
+    /// Kept for backward compatibility with tests. Prefer `encode_body()`
+    /// for the real protocol path.
     pub fn encode(&self) -> Vec<u8> {
         let wire = format!(
             "{}:{}:{}",
@@ -117,6 +123,28 @@ impl WazuhMessage {
             compress_payload(wire.as_bytes())
         } else {
             wire.into_bytes()
+        }
+    }
+
+    /// Encode only the message body (the part that gets encrypted).
+    ///
+    /// The agent ID is NOT included — it is sent as a plaintext routing
+    /// prefix by `ConnectionManager::send()`.
+    pub fn encode_body(&self) -> Vec<u8> {
+        let body = match self.msg_type {
+            MessageType::Syscheck => format!("d:{}", self.payload),
+            MessageType::Log => format!("1:{}", self.payload),
+            // Control messages already carry the correct prefix.
+            MessageType::Keepalive
+            | MessageType::Startup
+            | MessageType::Shutdown => self.payload.clone(),
+            _ => self.payload.clone(),
+        };
+
+        if self.compress {
+            compress_payload(body.as_bytes())
+        } else {
+            body.into_bytes()
         }
     }
 

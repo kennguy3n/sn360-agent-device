@@ -337,18 +337,24 @@ async fn run(
                         let path_str = path.to_string_lossy().to_string();
                         let old_entry = db.get_entry(&path_str)?;
 
-                            if old_entry.is_some() {
-                                db.delete_entry(&path_str)?;
-                                let bus_event = Event::new(
-                                    "fim",
-                                    Priority::Normal,
-                                    EventKind::FileDeleted {
-                                        path: path_str.clone(),
-                                        syscheck_payload: None,
-                                    },
-                                );
-                                let _ = bus.publish_to_server(bus_event).await;
-                            }
+                        if let Some(ref old) = old_entry {
+                            let syscheck_json = format_syscheck_event(
+                                ChangeType::Deleted,
+                                &path_str,
+                                Some(old),
+                                None,
+                            );
+                            db.delete_entry(&path_str)?;
+                            let bus_event = Event::new(
+                                "fim",
+                                Priority::Normal,
+                                EventKind::FileDeleted {
+                                    path: path_str.clone(),
+                                    syscheck_payload: Some(syscheck_json),
+                                },
+                            );
+                            let _ = bus.publish_to_server(bus_event).await;
+                        }
 
                         if path.exists() {
                             let path_clone = path.clone();
@@ -357,13 +363,19 @@ async fn run(
                             })
                             .await?
                             {
+                                let syscheck_json = format_syscheck_event(
+                                    ChangeType::Added,
+                                    &new_entry.path,
+                                    None,
+                                    Some(&new_entry),
+                                );
                                 db.upsert_entry(&new_entry)?;
                                 let bus_event = Event::new(
                                     "fim",
                                     Priority::Normal,
                                     EventKind::FileCreated {
                                         path: path_str,
-                                        syscheck_payload: None,
+                                        syscheck_payload: Some(syscheck_json),
                                     },
                                 );
                                 let _ = bus.publish_to_server(bus_event).await;

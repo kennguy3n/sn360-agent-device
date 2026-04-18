@@ -94,7 +94,13 @@ async fn main() -> Result<()> {
         ..ConnectionConfig::default()
     };
 
-    let cipher = WazuhCipher::new(&agent_key.key);
+    let cipher = WazuhCipher::new(
+        &agent_key.id,
+        &agent_key.name,
+        &agent_key.ip,
+        &agent_key.key,
+        wda_comms::crypto::CryptoMethod::default(),
+    );
     let mut conn = ConnectionManager::new(conn_config);
     conn.set_cipher(cipher);
 

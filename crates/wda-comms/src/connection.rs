@@ -171,16 +171,32 @@ impl ConnectionManager {
     }
 
     /// Send a message to the server.
+    ///
+    /// The message body is encrypted and prefixed with the agent ID
+    /// (in the clear) so the server can look up the correct key.
+    /// Wire format: `4-byte-length | "{agent_id}:" | encrypted_body`
     pub async fn send(&mut self, message: &WazuhMessage) -> Result<(), ConnectionError> {
-        let raw = message.encode();
+        let body = message.encode_body();
 
-        // Encrypt if cipher is available
+        debug!(
+            agent_id = %message.agent_id,
+            msg_type = ?message.msg_type,
+            body_len = body.len(),
+            body_preview = %String::from_utf8_lossy(&body[..body.len().min(120)]),
+            "raw plaintext before encryption"
+        );
+
         let data = if let Some(cipher) = &self.cipher {
-            cipher
-                .encrypt(&raw)
-                .map_err(|e| ConnectionError::SendFailed(e.to_string()))?
+            let encrypted = cipher
+                .encrypt(&body)
+                .map_err(|e| ConnectionError::SendFailed(e.to_string()))?;
+            // Prepend agent_id as a plaintext routing prefix.
+            let mut wire = format!("{}:", message.agent_id).into_bytes();
+            wire.extend_from_slice(&encrypted);
+            wire
         } else {
-            raw
+            // No cipher — fall back to legacy full-message encoding.
+            message.encode()
         };
 
         self.send_raw(&data).await
