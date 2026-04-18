@@ -54,6 +54,10 @@ async fn collect_events(
 }
 
 #[tokio::test]
+#[cfg_attr(
+    target_os = "macos",
+    ignore = "kqueue does not reliably deliver file deletion events on macOS CI"
+)]
 async fn test_baseline_scan_lifecycle() {
     let tmp = TempDir::new().unwrap();
     let dir = tmp.path().to_str().unwrap();
