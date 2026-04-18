@@ -122,7 +122,7 @@ async fn platform_disable_account(user: &str, timeout: Duration) -> ActionResult
     )
     .await;
     if read_result.success {
-        let output = read_result.combined_output();
+        let output = read_result.stdout.trim().to_string();
         // Output format: "UserShell: /bin/zsh"
         if let Some(shell) = output.split_whitespace().last() {
             let _ = std::fs::create_dir_all(SHELL_STATE_DIR);
