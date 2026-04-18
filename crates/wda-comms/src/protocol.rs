@@ -228,7 +228,6 @@ pub fn decompress_payload(data: &[u8]) -> Option<Vec<u8>> {
 fn basic_uname() -> String {
     #[cfg(target_os = "linux")]
     {
-        // Try to read from /proc for a richer string.
         let nodename = std::fs::read_to_string("/etc/hostname")
             .unwrap_or_else(|_| "unknown".into())
             .trim()
@@ -246,16 +245,46 @@ fn basic_uname() -> String {
     #[cfg(target_os = "macos")]
     {
         let machine = std::env::consts::ARCH;
-        format!("Darwin unknown 23.0.0 Darwin Kernel |Darwin|{}", machine)
+        let nodename = run_cmd("hostname", &[]);
+        let release = run_cmd("uname", &["-r"]);
+        let version = run_cmd("uname", &["-v"]);
+        format!(
+            "Darwin {} {} {} |Darwin|{}",
+            nodename, release, version, machine
+        )
     }
     #[cfg(target_os = "windows")]
     {
-        "Microsoft Windows 10.0 |Windows|x86_64".to_string()
+        let machine = std::env::consts::ARCH;
+        let nodename = run_cmd("hostname", &[]);
+        let ver_output = run_cmd("cmd", &["/C", "ver"]);
+        let version = ver_output
+            .split("Version ")
+            .nth(1)
+            .unwrap_or("10.0")
+            .trim_end_matches(']')
+            .trim();
+        format!(
+            "Microsoft Windows {} {} |Windows|{}",
+            version, nodename, machine
+        )
     }
     #[cfg(not(any(target_os = "linux", target_os = "macos", target_os = "windows")))]
     {
         "Unknown |Unknown|unknown".to_string()
     }
+}
+
+/// Run a command synchronously and return trimmed stdout, or a fallback.
+#[cfg(any(target_os = "macos", target_os = "windows"))]
+fn run_cmd(program: &str, args: &[&str]) -> String {
+    std::process::Command::new(program)
+        .args(args)
+        .output()
+        .ok()
+        .and_then(|o| String::from_utf8(o.stdout).ok())
+        .map(|s| s.trim().to_string())
+        .unwrap_or_else(|| "unknown".to_string())
 }
 
 #[cfg(test)]

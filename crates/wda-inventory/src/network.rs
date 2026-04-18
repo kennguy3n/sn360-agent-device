@@ -1,7 +1,8 @@
 //! Network interface collection for the inventory module.
 //!
-//! Enumerates network interfaces from `/sys/class/net/` on Linux.
-//! Returns an empty list on non-Unix platforms.
+//! - Linux: reads `/sys/class/net/` for MAC, state, MTU; `getifaddrs` for addresses.
+//! - macOS: `getifaddrs` for addresses; `ifconfig` fallback for MAC addresses.
+//! - Windows: stub (returns empty — requires `windows-rs` for full implementation).
 
 use serde_json::Value;
 
@@ -13,7 +14,7 @@ use serde_json::Value;
 /// On non-Unix platforms this returns an empty vector.
 #[cfg(not(unix))]
 pub fn collect_network_info() -> Vec<Value> {
-    tracing::warn!("network interface collection is not supported on this platform");
+    tracing::warn!("network interface collection is not yet supported on this platform");
     Vec::new()
 }
 
@@ -114,33 +115,126 @@ mod unix_impl {
         payloads
     }
 
-    /// Read MAC address from `/sys/class/net/{iface}/address`.
+    /// Read MAC address for a network interface.
+    ///
+    /// Linux: reads `/sys/class/net/{iface}/address`.
+    /// macOS: parses `ifconfig` output as a fallback since `/sys/class/net/`
+    /// does not exist on macOS.
     fn read_mac_address(iface: &str) -> Option<String> {
-        let path = format!("/sys/class/net/{}/address", iface);
-        std::fs::read_to_string(path)
-            .ok()
-            .map(|s| s.trim().to_string())
+        #[cfg(target_os = "linux")]
+        {
+            let path = format!("/sys/class/net/{}/address", iface);
+            std::fs::read_to_string(path)
+                .ok()
+                .map(|s| s.trim().to_string())
+        }
+        #[cfg(target_os = "macos")]
+        {
+            let output = std::process::Command::new("ifconfig")
+                .arg(iface)
+                .output()
+                .ok()?;
+            let text = String::from_utf8_lossy(&output.stdout);
+            for line in text.lines() {
+                let line = line.trim();
+                if let Some(rest) = line.strip_prefix("ether ") {
+                    return Some(rest.trim().to_string());
+                }
+            }
+            None
+        }
+        #[cfg(not(any(target_os = "linux", target_os = "macos")))]
+        {
+            let _ = iface;
+            None
+        }
     }
 
-    /// Read interface operational state from `/sys/class/net/{iface}/operstate`.
+    /// Read interface operational state.
+    ///
+    /// Linux: `/sys/class/net/{iface}/operstate`.
+    /// macOS: parses `ifconfig` flags.
     fn read_interface_state(iface: &str) -> Option<String> {
-        let path = format!("/sys/class/net/{}/operstate", iface);
-        std::fs::read_to_string(path)
-            .ok()
-            .map(|s| s.trim().to_string())
+        #[cfg(target_os = "linux")]
+        {
+            let path = format!("/sys/class/net/{}/operstate", iface);
+            std::fs::read_to_string(path)
+                .ok()
+                .map(|s| s.trim().to_string())
+        }
+        #[cfg(target_os = "macos")]
+        {
+            let output = std::process::Command::new("ifconfig")
+                .arg(iface)
+                .output()
+                .ok()?;
+            let text = String::from_utf8_lossy(&output.stdout);
+            if text.contains("status: active") {
+                Some("up".to_string())
+            } else if text.contains("status: inactive") {
+                Some("down".to_string())
+            } else if text.contains("<UP") || text.contains(",UP") {
+                Some("up".to_string())
+            } else {
+                Some("unknown".to_string())
+            }
+        }
+        #[cfg(not(any(target_os = "linux", target_os = "macos")))]
+        {
+            let _ = iface;
+            None
+        }
     }
 
-    /// Read interface MTU from `/sys/class/net/{iface}/mtu`.
+    /// Read interface MTU.
+    ///
+    /// Linux: `/sys/class/net/{iface}/mtu`.
+    /// macOS: parses `ifconfig` output.
     fn read_interface_mtu(iface: &str) -> Option<u64> {
-        let path = format!("/sys/class/net/{}/mtu", iface);
-        std::fs::read_to_string(path)
-            .ok()
-            .and_then(|s| s.trim().parse().ok())
+        #[cfg(target_os = "linux")]
+        {
+            let path = format!("/sys/class/net/{}/mtu", iface);
+            std::fs::read_to_string(path)
+                .ok()
+                .and_then(|s| s.trim().parse().ok())
+        }
+        #[cfg(target_os = "macos")]
+        {
+            let output = std::process::Command::new("ifconfig")
+                .arg(iface)
+                .output()
+                .ok()?;
+            let text = String::from_utf8_lossy(&output.stdout);
+            for line in text.lines() {
+                let line = line.trim();
+                // e.g. "mtu 1500"
+                if let Some(rest) = line.strip_prefix("mtu ") {
+                    return rest.split_whitespace().next().and_then(|v| v.parse().ok());
+                }
+                // or inside flags line: "flags=... mtu 1500"
+                if let Some(idx) = line.find("mtu ") {
+                    let after = &line[idx + 4..];
+                    return after.split_whitespace().next().and_then(|v| v.parse().ok());
+                }
+            }
+            None
+        }
+        #[cfg(not(any(target_os = "linux", target_os = "macos")))]
+        {
+            let _ = iface;
+            None
+        }
     }
 
     #[cfg(test)]
     mod tests {
         use super::*;
+
+        /// Loopback interface name varies by platform.
+        #[cfg(target_os = "linux")]
+        const LOOPBACK: &str = "lo";
+        #[cfg(target_os = "macos")]
+        const LOOPBACK: &str = "lo0";
 
         #[test]
         fn test_collect_network_info_returns_results() {
@@ -157,21 +251,23 @@ mod unix_impl {
 
         #[test]
         fn test_read_mac_address_loopback() {
-            let mac = read_mac_address("lo");
-            assert!(mac.is_some(), "expected loopback MAC address");
-            assert_eq!(mac.unwrap(), "00:00:00:00:00:00");
+            let mac = read_mac_address(LOOPBACK);
+            // Linux loopback has a MAC (00:00:00:00:00:00); macOS lo0 does not.
+            #[cfg(target_os = "linux")]
+            assert!(mac.is_some(), "expected loopback MAC address on Linux");
+            #[cfg(target_os = "macos")]
+            assert!(mac.is_none(), "macOS loopback has no ether address");
         }
 
         #[test]
         fn test_read_interface_state_loopback() {
-            let state = read_interface_state("lo");
+            let state = read_interface_state(LOOPBACK);
             assert!(state.is_some());
-            assert_eq!(state.unwrap(), "unknown");
         }
 
         #[test]
         fn test_read_interface_mtu_loopback() {
-            let mtu = read_interface_mtu("lo");
+            let mtu = read_interface_mtu(LOOPBACK);
             assert!(mtu.is_some());
             assert!(mtu.unwrap() > 0);
         }

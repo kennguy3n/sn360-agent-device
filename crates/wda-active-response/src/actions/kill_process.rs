@@ -1,4 +1,7 @@
 //! Kill process action — terminates a process by PID.
+//!
+//! - Linux / macOS: `kill -9 <pid>`
+//! - Windows: `taskkill /PID <pid> /F`
 
 use std::time::Duration;
 
@@ -8,7 +11,7 @@ use tracing::info;
 use super::{ActionParams, ActionResult, ResponseAction};
 use crate::executor;
 
-/// Terminates a process by PID using `kill -9`.
+/// Terminates a process by PID.
 pub struct KillProcessAction;
 
 impl Default for KillProcessAction {
@@ -41,29 +44,55 @@ impl ResponseAction for KillProcessAction {
 
         info!(pid, "killing process");
 
-        let pid_str = pid.to_string();
-        let result = executor::execute_command("kill", &["-9", &pid_str], timeout, false).await;
-
-        if result.success {
-            ActionResult::ok(format!("killed process {}", pid))
-        } else {
-            // kill returns non-zero if process doesn't exist, which is fine
-            if result.stderr.contains("No such process") {
-                ActionResult::ok(format!("process {} already terminated", pid))
-            } else {
-                ActionResult::err(format!(
-                    "failed to kill process {}: {}",
-                    pid,
-                    result.combined_output()
-                ))
-            }
-        }
+        platform_kill(pid, timeout).await
     }
 
     async fn undo(&self, _params: &ActionParams, _timeout: Duration) -> ActionResult {
-        // Cannot undo a kill
         ActionResult::err("cannot undo process termination")
     }
+}
+
+#[cfg(unix)]
+async fn platform_kill(pid: u32, timeout: Duration) -> ActionResult {
+    let pid_str = pid.to_string();
+    let result = executor::execute_command("kill", &["-9", &pid_str], timeout, false).await;
+
+    if result.success {
+        ActionResult::ok(format!("killed process {}", pid))
+    } else if result.stderr.contains("No such process") {
+        ActionResult::ok(format!("process {} already terminated", pid))
+    } else {
+        ActionResult::err(format!(
+            "failed to kill process {}: {}",
+            pid,
+            result.combined_output()
+        ))
+    }
+}
+
+#[cfg(target_os = "windows")]
+async fn platform_kill(pid: u32, timeout: Duration) -> ActionResult {
+    let pid_str = pid.to_string();
+    let result =
+        executor::execute_command("taskkill", &["/PID", &pid_str, "/F"], timeout, false).await;
+
+    if result.success {
+        ActionResult::ok(format!("killed process {}", pid))
+    } else {
+        ActionResult::err(format!(
+            "failed to kill process {}: {}",
+            pid,
+            result.combined_output()
+        ))
+    }
+}
+
+#[cfg(not(any(unix, target_os = "windows")))]
+async fn platform_kill(pid: u32, _timeout: Duration) -> ActionResult {
+    ActionResult::err(format!(
+        "kill_process not supported on this platform for PID {}",
+        pid
+    ))
 }
 
 #[cfg(test)]

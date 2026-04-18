@@ -1,6 +1,8 @@
 //! OS information collection for the inventory module.
 //!
-//! Parses `/etc/os-release` and `uname` data on Linux.
+//! - Linux: parses `/etc/os-release` and `uname` data.
+//! - macOS: uses `sw_vers` and `uname`.
+//! - Windows: uses `wmic` / `ver`.
 
 use serde_json::Value;
 use tracing::{debug, warn};
@@ -9,6 +11,38 @@ use crate::syscollector_format::build_osinfo;
 
 /// Collect OS information and return it as a syscollector dbsync_osinfo payload.
 pub fn collect_os_info() -> Value {
+    #[cfg(target_os = "linux")]
+    {
+        collect_linux_os_info()
+    }
+    #[cfg(target_os = "macos")]
+    {
+        collect_macos_os_info()
+    }
+    #[cfg(target_os = "windows")]
+    {
+        collect_windows_os_info()
+    }
+    #[cfg(not(any(target_os = "linux", target_os = "macos", target_os = "windows")))]
+    {
+        let data = serde_json::json!({
+            "hostname": "unknown",
+            "architecture": std::env::consts::ARCH,
+            "os_name": std::env::consts::OS,
+            "os_version": "",
+            "os_codename": "",
+            "os_major": "",
+            "os_minor": "",
+            "os_platform": "unknown",
+            "sysname": "unknown",
+            "release": "",
+        });
+        build_osinfo(data)
+    }
+}
+
+#[cfg(target_os = "linux")]
+fn collect_linux_os_info() -> Value {
     let os_release = parse_os_release();
 
     let hostname = read_file_trimmed("/etc/hostname").unwrap_or_else(gethostname_fallback);
@@ -36,6 +70,79 @@ pub fn collect_os_info() -> Value {
 
     debug!(os_name = %os_release.name, version = %os_release.version, "collected OS info");
     build_osinfo(data)
+}
+
+#[cfg(target_os = "macos")]
+fn collect_macos_os_info() -> Value {
+    let hostname = run_cmd_trimmed("hostname", &[]);
+    let product_name = run_cmd_trimmed("sw_vers", &["-productName"]);
+    let product_version = run_cmd_trimmed("sw_vers", &["-productVersion"]);
+    let build_version = run_cmd_trimmed("sw_vers", &["-buildVersion"]);
+    let kernel_release = run_cmd_trimmed("uname", &["-r"]);
+    let architecture = std::env::consts::ARCH.to_string();
+
+    let major = product_version.split('.').next().unwrap_or("").to_string();
+    let minor = product_version.split('.').nth(1).unwrap_or("").to_string();
+
+    let data = serde_json::json!({
+        "hostname": hostname,
+        "architecture": architecture,
+        "os_name": product_name,
+        "os_version": product_version,
+        "os_codename": build_version,
+        "os_major": major,
+        "os_minor": minor,
+        "os_platform": "darwin",
+        "sysname": "Darwin",
+        "release": kernel_release,
+    });
+
+    debug!(os_name = %product_name, version = %product_version, "collected OS info");
+    build_osinfo(data)
+}
+
+#[cfg(target_os = "windows")]
+fn collect_windows_os_info() -> Value {
+    let hostname = run_cmd_trimmed("hostname", &[]);
+    let ver_output = run_cmd_trimmed("cmd", &["/C", "ver"]);
+    let architecture = std::env::consts::ARCH.to_string();
+
+    let version = ver_output
+        .split("Version ")
+        .nth(1)
+        .unwrap_or("")
+        .trim_end_matches(']')
+        .trim()
+        .to_string();
+    let major = version.split('.').next().unwrap_or("").to_string();
+    let minor = version.split('.').nth(1).unwrap_or("").to_string();
+
+    let data = serde_json::json!({
+        "hostname": hostname,
+        "architecture": architecture,
+        "os_name": "Microsoft Windows",
+        "os_version": version,
+        "os_codename": "",
+        "os_major": major,
+        "os_minor": minor,
+        "os_platform": "windows",
+        "sysname": "Windows_NT",
+        "release": version,
+    });
+
+    debug!(os_name = "Microsoft Windows", version = %version, "collected OS info");
+    build_osinfo(data)
+}
+
+#[cfg(any(target_os = "macos", target_os = "windows"))]
+fn run_cmd_trimmed(program: &str, args: &[&str]) -> String {
+    std::process::Command::new(program)
+        .args(args)
+        .output()
+        .ok()
+        .and_then(|o| String::from_utf8(o.stdout).ok())
+        .map(|s| s.trim().to_string())
+        .unwrap_or_else(|| "unknown".to_string())
 }
 
 /// Parsed fields from `/etc/os-release`.

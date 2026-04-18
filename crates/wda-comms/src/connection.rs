@@ -6,11 +6,24 @@
 use std::time::Duration;
 
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
-use tokio::net::TcpStream;
+use tokio::net::{TcpStream, UdpSocket};
 use tracing::{debug, info, warn};
 
 use crate::crypto::WazuhCipher;
 use crate::protocol::WazuhMessage;
+
+/// Format a host and port into a socket address string.
+///
+/// IPv6 addresses are wrapped in brackets so that the result is a valid
+/// socket address (e.g. `[::1]:1514`).  IPv4 addresses and hostnames are
+/// returned as-is (`10.0.0.1:1514`).
+pub fn format_socket_addr(host: &str, port: u16) -> String {
+    if host.contains(':') && !host.starts_with('[') {
+        format!("[{}]:{}", host, port)
+    } else {
+        format!("{}:{}", host, port)
+    }
+}
 
 /// Connection errors.
 #[derive(Debug, thiserror::Error)]
@@ -82,6 +95,7 @@ pub struct ConnectionManager {
     config: ConnectionConfig,
     cipher: Option<WazuhCipher>,
     stream: Option<TcpStream>,
+    udp_socket: Option<UdpSocket>,
     connected: bool,
     consecutive_failures: u32,
 }
@@ -93,6 +107,7 @@ impl ConnectionManager {
             config,
             cipher: None,
             stream: None,
+            udp_socket: None,
             connected: false,
             consecutive_failures: 0,
         }
@@ -110,7 +125,7 @@ impl ConnectionManager {
 
     /// Connect to the Wazuh server.
     pub async fn connect(&mut self) -> Result<(), ConnectionError> {
-        let addr = format!("{}:{}", self.config.server_address, self.config.server_port);
+        let addr = format_socket_addr(&self.config.server_address, self.config.server_port);
         info!(address = %addr, "connecting to server");
 
         match &self.config.protocol {
@@ -133,10 +148,22 @@ impl ConnectionManager {
                 Ok(())
             }
             TransportProtocol::Udp => {
-                // UDP is connectionless; we just validate the address
-                info!(address = %addr, "configured UDP endpoint");
+                let bind_addr = if self.config.server_address.contains(':') {
+                    "[::]:0"
+                } else {
+                    "0.0.0.0:0"
+                };
+                let socket = UdpSocket::bind(bind_addr)
+                    .await
+                    .map_err(|e| ConnectionError::ConnectFailed(e.to_string()))?;
+                socket
+                    .connect(&addr)
+                    .await
+                    .map_err(|e| ConnectionError::ConnectFailed(e.to_string()))?;
+                self.udp_socket = Some(socket);
                 self.connected = true;
                 self.consecutive_failures = 0;
+                info!(address = %addr, "connected UDP socket to server");
                 Ok(())
             }
         }
@@ -254,7 +281,11 @@ impl ConnectionManager {
                 Ok(())
             }
             TransportProtocol::Udp => {
-                // UDP send would go here
+                let socket = self.udp_socket.as_ref().ok_or(ConnectionError::Closed)?;
+                socket
+                    .send(data)
+                    .await
+                    .map_err(|e| ConnectionError::SendFailed(e.to_string()))?;
                 debug!(bytes = data.len(), "sent UDP message");
                 Ok(())
             }
@@ -300,9 +331,24 @@ impl ConnectionManager {
                     Ok(buf)
                 }
             }
-            TransportProtocol::Udp => Err(ConnectionError::ReceiveFailed(
-                "UDP receive not yet implemented".to_string(),
-            )),
+            TransportProtocol::Udp => {
+                let socket = self.udp_socket.as_ref().ok_or(ConnectionError::Closed)?;
+                let mut buf = vec![0u8; 65536];
+                let n = socket
+                    .recv(&mut buf)
+                    .await
+                    .map_err(|e| ConnectionError::ReceiveFailed(e.to_string()))?;
+                buf.truncate(n);
+
+                if let Some(cipher) = &self.cipher {
+                    let plaintext = cipher
+                        .decrypt(&buf)
+                        .map_err(|e| ConnectionError::ReceiveFailed(e.to_string()))?;
+                    Ok(plaintext)
+                } else {
+                    Ok(buf)
+                }
+            }
         }
     }
 
@@ -311,6 +357,7 @@ impl ConnectionManager {
         if let Some(stream) = self.stream.take() {
             let _ = stream.into_std();
         }
+        self.udp_socket.take();
         self.connected = false;
         info!("disconnected from server");
     }

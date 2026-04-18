@@ -108,7 +108,7 @@ impl EnrollmentClient {
     /// Connects to the Wazuh authd service over TLS (port 1515).
     /// Accepts self-signed certificates since Wazuh uses its own CA.
     pub async fn enroll(&self) -> Result<AgentKey, EnrollmentError> {
-        let addr = format!("{}:{}", self.server, self.port);
+        let addr = crate::connection::format_socket_addr(&self.server, self.port);
         info!(address = %addr, agent = %self.agent_name, "starting enrollment");
 
         // Connect to enrollment server over TLS

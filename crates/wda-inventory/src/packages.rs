@@ -10,36 +10,73 @@ use crate::syscollector_format::build_packages;
 
 /// Collect installed packages asynchronously.
 ///
-/// Tries dpkg first, then rpm. Returns a vector of `dbsync_packages` payloads.
+/// Tries platform-appropriate package managers. Returns a vector of
+/// `dbsync_packages` payloads.
 pub async fn collect_packages() -> Vec<Value> {
     let mut payloads = Vec::new();
 
-    // Try dpkg-query (Debian/Ubuntu).
-    match collect_dpkg_packages().await {
-        Ok(pkgs) if !pkgs.is_empty() => {
-            debug!(count = pkgs.len(), "collected packages via dpkg-query");
-            payloads.extend(pkgs);
-        }
-        Ok(_) => {
-            debug!("dpkg-query returned no packages, trying rpm");
-        }
-        Err(e) => {
-            debug!(error = %e, "dpkg-query not available or failed, trying rpm");
-        }
-    }
-
-    // Try rpm if dpkg found nothing.
-    if payloads.is_empty() {
-        match collect_rpm_packages().await {
+    // ── Linux: dpkg then rpm ─────────────────────────────────────────────
+    #[cfg(target_os = "linux")]
+    {
+        match collect_dpkg_packages().await {
             Ok(pkgs) if !pkgs.is_empty() => {
-                debug!(count = pkgs.len(), "collected packages via rpm");
+                debug!(count = pkgs.len(), "collected packages via dpkg-query");
                 payloads.extend(pkgs);
             }
             Ok(_) => {
-                warn!("rpm returned no packages");
+                debug!("dpkg-query returned no packages, trying rpm");
             }
             Err(e) => {
-                debug!(error = %e, "rpm not available or failed");
+                debug!(error = %e, "dpkg-query not available or failed, trying rpm");
+            }
+        }
+
+        if payloads.is_empty() {
+            match collect_rpm_packages().await {
+                Ok(pkgs) if !pkgs.is_empty() => {
+                    debug!(count = pkgs.len(), "collected packages via rpm");
+                    payloads.extend(pkgs);
+                }
+                Ok(_) => {
+                    warn!("rpm returned no packages");
+                }
+                Err(e) => {
+                    debug!(error = %e, "rpm not available or failed");
+                }
+            }
+        }
+    }
+
+    // ── macOS: Homebrew ──────────────────────────────────────────────────
+    #[cfg(target_os = "macos")]
+    {
+        match collect_brew_packages().await {
+            Ok(pkgs) if !pkgs.is_empty() => {
+                debug!(count = pkgs.len(), "collected packages via brew");
+                payloads.extend(pkgs);
+            }
+            Ok(_) => {
+                debug!("brew returned no packages");
+            }
+            Err(e) => {
+                debug!(error = %e, "brew not available or failed");
+            }
+        }
+    }
+
+    // ── Windows: wmic ────────────────────────────────────────────────────
+    #[cfg(target_os = "windows")]
+    {
+        match collect_windows_packages().await {
+            Ok(pkgs) if !pkgs.is_empty() => {
+                debug!(count = pkgs.len(), "collected packages via wmic");
+                payloads.extend(pkgs);
+            }
+            Ok(_) => {
+                debug!("wmic returned no packages");
+            }
+            Err(e) => {
+                debug!(error = %e, "wmic not available or failed");
             }
         }
     }
@@ -146,6 +183,100 @@ pub(crate) fn parse_rpm_output(output: &str) -> Vec<Value> {
         payloads.push(build_packages(data));
     }
 
+    payloads
+}
+
+// ── macOS: Homebrew packages ─────────────────────────────────────────────────
+
+#[cfg(target_os = "macos")]
+async fn collect_brew_packages() -> anyhow::Result<Vec<Value>> {
+    let output = tokio::process::Command::new("brew")
+        .args(["list", "--versions"])
+        .output()
+        .await?;
+
+    if !output.status.success() {
+        anyhow::bail!("brew list exited with status {}", output.status);
+    }
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    Ok(parse_brew_output(&stdout))
+}
+
+#[cfg(target_os = "macos")]
+pub(crate) fn parse_brew_output(output: &str) -> Vec<Value> {
+    let mut payloads = Vec::new();
+    for line in output.lines() {
+        let line = line.trim();
+        if line.is_empty() {
+            continue;
+        }
+        // Format: "package_name version1 version2 ..."
+        let mut parts = line.splitn(2, ' ');
+        let name = match parts.next() {
+            Some(n) => n,
+            None => continue,
+        };
+        let version = parts.next().unwrap_or("").split(' ').last().unwrap_or("");
+        let data = serde_json::json!({
+            "name": name,
+            "version": version,
+            "architecture": std::env::consts::ARCH,
+            "vendor": "homebrew",
+            "format": "brew",
+        });
+        payloads.push(build_packages(data));
+    }
+    payloads
+}
+
+// ── Windows: wmic packages ──────────────────────────────────────────────────
+
+#[cfg(target_os = "windows")]
+async fn collect_windows_packages() -> anyhow::Result<Vec<Value>> {
+    let output = tokio::process::Command::new("wmic")
+        .args(["product", "get", "Name,Version", "/format:csv"])
+        .output()
+        .await?;
+
+    if !output.status.success() {
+        anyhow::bail!("wmic exited with status {}", output.status);
+    }
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    Ok(parse_wmic_output(&stdout))
+}
+
+#[cfg(target_os = "windows")]
+pub(crate) fn parse_wmic_output(output: &str) -> Vec<Value> {
+    let mut payloads = Vec::new();
+    let mut lines = output.lines();
+    // Skip header line(s)
+    let _header = lines.next();
+    for line in lines {
+        let line = line.trim();
+        if line.is_empty() {
+            continue;
+        }
+        // CSV format: Node,Name,Version
+        let fields: Vec<&str> = line.split(',').collect();
+        if fields.len() < 3 {
+            continue;
+        }
+        let name = fields[1].trim();
+        let version = fields[2].trim();
+        if name.is_empty() {
+            continue;
+        }
+        let data = serde_json::json!({
+            "name": name,
+            "version": version,
+            "architecture": std::env::consts::ARCH,
+            "vendor": "",
+            "format": "msi",
+        });
+        payloads.push(build_packages(data));
+    }
     payloads
 }
 
