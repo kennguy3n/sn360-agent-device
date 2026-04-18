@@ -134,8 +134,8 @@ fn parse_ar_command(payload: &str) -> Option<(String, ActionParams)> {
     }
 
     // Try legacy format: "action_name - user - ip timeout"
-    // Split by whitespace, filter out lone `-` separators
-    let tokens: Vec<&str> = payload.split_whitespace().collect();
+    // Use json_str which has the #!-execd prefix already stripped
+    let tokens: Vec<&str> = json_str.split_whitespace().collect();
     if !tokens.is_empty() {
         let raw_action = tokens[0];
         let action = extract_action_name(raw_action);
