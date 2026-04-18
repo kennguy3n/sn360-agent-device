@@ -150,6 +150,9 @@ pub struct LogSource {
     /// Log format: "syslog", "json", or "plain".
     #[serde(default = "default_log_source_format")]
     pub format: String,
+    /// Systemd unit filters (for journald sources).
+    #[serde(default)]
+    pub units: Vec<String>,
 }
 
 /// Inventory module configuration.

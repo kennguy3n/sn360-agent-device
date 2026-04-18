@@ -1725,6 +1725,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "gethostname",
+ "libc",
  "serde_json",
  "tokio",
  "tracing",
@@ -1874,6 +1875,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "chrono",
+ "libc",
  "notify",
  "serde",
  "serde_json",
