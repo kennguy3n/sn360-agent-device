@@ -100,6 +100,7 @@ echo "==> Step 2: Setting enrollment password..."
 docker compose -f tests/docker-compose.yml exec -T wazuh-manager bash -c \
   "echo '${E2E_ENROLL_PASS}' > /var/ossec/etc/authd.pass && \
    sed -i 's|<use_password>no</use_password>|<use_password>yes</use_password>|' /var/ossec/etc/ossec.conf && \
+   sed -i 's|<logall>no</logall>|<logall>yes</logall>|;s|<logall_json>no</logall_json>|<logall_json>yes</logall_json>|' /var/ossec/etc/ossec.conf && \
    /var/ossec/bin/wazuh-control restart"
 # Wait for restart.
 sleep 15
@@ -272,6 +273,23 @@ else
   docker compose -f tests/docker-compose.yml exec -T wazuh-manager \
     tail -50 /var/ossec/logs/ossec.log 2>/dev/null || true
   echo "    --- end ossec.log ---"
+fi
+
+# ── Step 9c: Verify journal log collection ──────────────────────────
+echo "==> Step 9c: Triggering journal log event..."
+logger -t wda-e2e-test "E2E journal test: Failed password for root from 10.0.0.99 port 22 ssh2"
+echo "    Waiting 15s for journal log alert..."
+sleep 15
+
+JOURNAL_ALERTS=$(docker compose -f tests/docker-compose.yml exec -T wazuh-manager \
+  cat /var/ossec/logs/archives/archives.json 2>/dev/null | grep -c "wda-e2e-test" || true)
+echo "    Journal log events found in archives: $JOURNAL_ALERTS"
+if [ "$JOURNAL_ALERTS" -gt 0 ]; then
+  record PASS "Journal log collection events received by server"
+else
+  record FAIL "No journal log collection events found in archives"
+  docker compose -f tests/docker-compose.yml exec -T wazuh-manager \
+    tail -30 /var/ossec/logs/ossec.log 2>/dev/null || true
 fi
 
 # ── Step 10: Cleanup handled by trap ─────────────────────────────────

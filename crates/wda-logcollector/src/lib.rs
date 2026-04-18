@@ -5,6 +5,8 @@
 //! to the event bus for server delivery.
 
 pub mod file_reader;
+#[cfg(all(target_os = "linux", feature = "linux-journal"))]
+pub mod journal_reader;
 pub mod state;
 
 use std::path::PathBuf;
@@ -19,6 +21,8 @@ use wda_core::signal::ShutdownSignal;
 use wda_event_bus::EventBus;
 
 use crate::file_reader::FileReader;
+#[cfg(all(target_os = "linux", feature = "linux-journal"))]
+use crate::journal_reader::JournalReader;
 use crate::state::SeekState;
 
 const STATUS_INITIALIZED: u8 = 0;
@@ -72,24 +76,45 @@ async fn run(
 ) -> anyhow::Result<()> {
     info!("logcollector module starting");
 
-    // Collect file-based sources.
+    // Collect file-based sources and journal sources.
     let mut paths = Vec::new();
     let mut formats = Vec::new();
+    #[cfg(all(target_os = "linux", feature = "linux-journal"))]
+    let mut journal_sources = Vec::new();
 
     for source in &lc_config.sources {
-        if source.source_type == "file" {
-            if let Some(ref path) = source.path {
-                let p = PathBuf::from(path);
-                if !p.exists() {
-                    warn!(path = %path, "log source file does not exist yet, will watch for creation");
+        match source.source_type.as_str() {
+            "file" => {
+                if let Some(ref path) = source.path {
+                    let p = PathBuf::from(path);
+                    if !p.exists() {
+                        warn!(path = %path, "log source file does not exist yet, will watch for creation");
+                    }
+                    paths.push(p);
+                    formats.push(source.format.clone());
+                } else {
+                    warn!("file log source missing path, skipping");
                 }
-                paths.push(p);
-                formats.push(source.format.clone());
-            } else {
-                warn!("file log source missing path, skipping");
             }
-        } else {
-            info!(source_type = %source.source_type, "non-file source type not yet implemented, skipping");
+            "journald" | "journal" => {
+                #[cfg(all(target_os = "linux", feature = "linux-journal"))]
+                {
+                    journal_sources.push(source.clone());
+                }
+                #[cfg(not(all(target_os = "linux", feature = "linux-journal")))]
+                {
+                    warn!(
+                        source_type = %source.source_type,
+                        "journal source requires linux-journal feature, skipping"
+                    );
+                }
+            }
+            _ => {
+                info!(
+                    source_type = %source.source_type,
+                    "unknown source type, skipping"
+                );
+            }
         }
     }
 
@@ -97,12 +122,34 @@ async fn run(
     let state_path = SeekState::default_path();
     let state = SeekState::load(state_path);
 
-    let reader = FileReader::new(paths, formats, state, bus);
+    let file_reader = FileReader::new(paths, formats, state, bus.clone());
 
     status.store(_STATUS_RUNNING, Ordering::Relaxed);
     info!("logcollector module running");
 
-    reader.run(shutdown).await?;
+    // Spawn journal readers as separate tasks alongside the file reader.
+    #[cfg(all(target_os = "linux", feature = "linux-journal"))]
+    let mut journal_handles = Vec::new();
+    #[cfg(all(target_os = "linux", feature = "linux-journal"))]
+    for source in journal_sources {
+        let journal_bus = bus.clone();
+        let journal_shutdown = shutdown.clone();
+        let reader = JournalReader::new(source, journal_bus);
+        let handle = tokio::spawn(async move {
+            if let Err(e) = reader.run(journal_shutdown).await {
+                error!(error = %e, "journal reader failed");
+            }
+        });
+        journal_handles.push(handle);
+    }
+
+    file_reader.run(shutdown).await?;
+
+    // Wait for journal readers to finish.
+    #[cfg(all(target_os = "linux", feature = "linux-journal"))]
+    for handle in journal_handles {
+        let _ = handle.await;
+    }
 
     status.store(STATUS_STOPPED, Ordering::Relaxed);
     info!("logcollector module stopped");

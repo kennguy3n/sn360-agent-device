@@ -15,7 +15,7 @@ wda-comms = { workspace = true }
 wda-event-bus = { workspace = true }
 wda-pal = { workspace = true }
 wda-fim = { workspace = true }
-wda-logcollector = { workspace = true }
+wda-logcollector = { workspace = true, features = ["linux-journal"] }
 wda-inventory = { workspace = true }
 tokio = { workspace = true, features = ["rt-multi-thread"] }
 tracing = { workspace = true }
@@ -23,3 +23,6 @@ tracing-subscriber = { workspace = true }
 anyhow = { workspace = true }
 serde_json = { workspace = true }
 gethostname = { workspace = true }
+
+[target.'cfg(target_os = "linux")'.dependencies]
+libc = "0.2"

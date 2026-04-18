@@ -21,6 +21,8 @@ modules:
       - source_type: "file"
         path: "/tmp/wda-e2e-logs/test.log"
         format: "syslog"
+      - source_type: "journald"
+        format: "syslog"
   inventory:
     enabled: true
     interval: 15
