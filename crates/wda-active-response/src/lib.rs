@@ -87,7 +87,7 @@ impl wda_core::module::AgentModule for ActiveResponseModule {
 /// 1. `#!-execd <json>` — JSON-encoded command
 /// 2. Plain JSON with "command" and "parameters" fields
 /// 3. Legacy format: `<action_name> - <arg1> - <arg2> - <timeout>`
-fn parse_ar_command(payload: &str) -> Option<(String, ActionParams)> {
+fn parse_ar_command(payload: &str) -> Option<(String, ActionParams, bool)> {
     let payload = payload.trim();
 
     // Try stripping #!-execd prefix
@@ -100,7 +100,7 @@ fn parse_ar_command(payload: &str) -> Option<(String, ActionParams)> {
     // Try JSON parsing first
     if let Ok(value) = serde_json::from_str::<serde_json::Value>(json_str) {
         if let Some(command) = value.get("command").and_then(|v| v.as_str()) {
-            let action = extract_action_name(command);
+            let (action, is_undo) = extract_action_name(command);
             let params = if let Some(p) = value.get("parameters") {
                 let ip = p
                     .get("alert")
@@ -129,7 +129,7 @@ fn parse_ar_command(payload: &str) -> Option<(String, ActionParams)> {
                     extra: std::collections::HashMap::new(),
                 }
             };
-            return Some((action, params));
+            return Some((action, params, is_undo));
         }
     }
 
@@ -138,7 +138,7 @@ fn parse_ar_command(payload: &str) -> Option<(String, ActionParams)> {
     let tokens: Vec<&str> = json_str.split_whitespace().collect();
     if !tokens.is_empty() {
         let raw_action = tokens[0];
-        let action = extract_action_name(raw_action);
+        let (action, is_undo) = extract_action_name(raw_action);
 
         // Collect non-separator tokens after the action name
         let args: Vec<&str> = tokens[1..].iter().filter(|t| **t != "-").copied().collect();
@@ -165,25 +165,32 @@ fn parse_ar_command(payload: &str) -> Option<(String, ActionParams)> {
             timeout,
             extra: std::collections::HashMap::new(),
         };
-        return Some((action, params));
+        return Some((action, params, is_undo));
     }
 
     None
 }
 
-/// Extract the base action name, stripping trailing '0' or '1' (Wazuh convention).
-fn extract_action_name(raw: &str) -> String {
+/// Extract the base action name and whether this is an undo command.
+///
+/// In Wazuh protocol, suffix '0' means "execute" and suffix '1' means "undo".
+/// Returns `(canonical_action_name, is_undo)`.
+fn extract_action_name(raw: &str) -> (String, bool) {
     let name = raw.trim();
-    let name = name
-        .strip_suffix('0')
-        .or_else(|| name.strip_suffix('1'))
-        .unwrap_or(name);
-    match name {
+    let (name, is_undo) = if let Some(stripped) = name.strip_suffix('1') {
+        (stripped, true)
+    } else if let Some(stripped) = name.strip_suffix('0') {
+        (stripped, false)
+    } else {
+        (name, false)
+    };
+    let canonical = match name {
         "firewall-drop" => "block_ip".to_string(),
         "disable-account" => "disable_account".to_string(),
         "host-deny" => "block_ip".to_string(),
         _ => name.replace('-', "_"),
-    }
+    };
+    (canonical, is_undo)
 }
 
 /// The main active response run loop.
@@ -268,10 +275,14 @@ async fn run(
                     EventKind::ServerCommand { command, payload }
                         if command == "execd" || command == "active-response" || payload.contains("#!-execd") =>
                     {
-                        if let Some((action, params)) = parse_ar_command(payload) {
-                            debug!(action, "parsed AR command from server");
+                        if let Some((action, params, is_undo)) = parse_ar_command(payload) {
+                            debug!(action, is_undo, "parsed AR command from server");
 
-                            let result = registry.dispatch(&action, &params, timeout).await;
+                            let result = if is_undo {
+                                registry.dispatch_undo(&action, &params, timeout).await
+                            } else {
+                                registry.dispatch(&action, &params, timeout).await
+                            };
 
                             let result_event = Event::new(
                                 "active_response",
@@ -286,7 +297,8 @@ async fn run(
                                 warn!(error = %e, "failed to publish AR result");
                             }
 
-                            if result.success && params.timeout > 0 {
+                            // Only schedule auto-undo for execute commands with a timeout
+                            if !is_undo && result.success && params.timeout > 0 {
                                 schedule_undo(
                                     action,
                                     params,
@@ -344,45 +356,59 @@ mod tests {
     #[test]
     fn test_parse_ar_json_command() {
         let payload = r#"{"version":1,"command":"firewall-drop0","parameters":{"alert":{"data":{"srcip":"10.0.0.1"}},"timeout":300}}"#;
-        let (action, params) = parse_ar_command(payload).unwrap();
+        let (action, params, is_undo) = parse_ar_command(payload).unwrap();
         assert_eq!(action, "block_ip");
         assert_eq!(params.ip.as_deref(), Some("10.0.0.1"));
+        assert!(!is_undo);
     }
 
     #[test]
     fn test_parse_ar_execd_prefix() {
         let payload = r#"#!-execd {"command":"firewall-drop0","parameters":{"ip":"192.168.1.100","timeout":60}}"#;
-        let (action, params) = parse_ar_command(payload).unwrap();
+        let (action, params, is_undo) = parse_ar_command(payload).unwrap();
         assert_eq!(action, "block_ip");
         assert_eq!(params.ip.as_deref(), Some("192.168.1.100"));
         assert_eq!(params.timeout, 60);
+        assert!(!is_undo);
     }
 
     #[test]
     fn test_parse_ar_legacy_format() {
         let payload = "firewall-drop0 - - 10.99.99.99 600";
-        let (action, params) = parse_ar_command(payload).unwrap();
+        let (action, params, is_undo) = parse_ar_command(payload).unwrap();
         assert_eq!(action, "block_ip");
         assert_eq!(params.ip.as_deref(), Some("10.99.99.99"));
         assert_eq!(params.timeout, 600);
+        assert!(!is_undo);
     }
 
     #[test]
     fn test_parse_ar_legacy_disable_account() {
         let payload = "disable-account0 - jdoe - - 300";
-        let (action, params) = parse_ar_command(payload).unwrap();
+        let (action, params, is_undo) = parse_ar_command(payload).unwrap();
         assert_eq!(action, "disable_account");
         assert_eq!(params.user.as_deref(), Some("jdoe"));
         assert_eq!(params.timeout, 300);
+        assert!(!is_undo);
     }
 
     #[test]
     fn test_extract_action_name() {
-        assert_eq!(extract_action_name("firewall-drop0"), "block_ip");
-        assert_eq!(extract_action_name("firewall-drop1"), "block_ip");
-        assert_eq!(extract_action_name("firewall-drop"), "block_ip");
-        assert_eq!(extract_action_name("disable-account0"), "disable_account");
-        assert_eq!(extract_action_name("custom-action0"), "custom_action");
+        assert_eq!(extract_action_name("firewall-drop0"), ("block_ip".to_string(), false));
+        assert_eq!(extract_action_name("firewall-drop1"), ("block_ip".to_string(), true));
+        assert_eq!(extract_action_name("firewall-drop"), ("block_ip".to_string(), false));
+        assert_eq!(extract_action_name("disable-account0"), ("disable_account".to_string(), false));
+        assert_eq!(extract_action_name("disable-account1"), ("disable_account".to_string(), true));
+        assert_eq!(extract_action_name("custom-action0"), ("custom_action".to_string(), false));
+    }
+
+    #[test]
+    fn test_parse_ar_undo_command() {
+        let payload = r#"{"command":"firewall-drop1","parameters":{"ip":"10.0.0.1","timeout":0}}"#;
+        let (action, params, is_undo) = parse_ar_command(payload).unwrap();
+        assert_eq!(action, "block_ip");
+        assert_eq!(params.ip.as_deref(), Some("10.0.0.1"));
+        assert!(is_undo);
     }
 
     #[tokio::test]
