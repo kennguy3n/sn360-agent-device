@@ -12,7 +12,7 @@ services:
       - wazuh-data:/var/ossec/data
       - wazuh-logs:/var/ossec/logs
     healthcheck:
-      test: ["/var/ossec/bin/wazuh-control", "status"]
+      test: ["CMD", "/var/ossec/bin/wazuh-control", "status"]
       interval: 10s
       timeout: 5s
       retries: 12
