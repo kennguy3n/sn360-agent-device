@@ -11,6 +11,8 @@ members = [
     "crates/wda-active-response",
     "crates/wda-rootcheck",
     "crates/wda-agent",
+    "crates/wda-local-detection",
+    "crates/wda-enhanced-inventory",
 ]
 resolver = "2"
 
@@ -77,6 +79,13 @@ wda-inventory = { path = "crates/wda-inventory" }
 wda-sca = { path = "crates/wda-sca" }
 wda-active-response = { path = "crates/wda-active-response" }
 wda-rootcheck = { path = "crates/wda-rootcheck" }
+wda-local-detection = { path = "crates/wda-local-detection" }
+wda-enhanced-inventory = { path = "crates/wda-enhanced-inventory" }
+
+# Detection & inventory
+aho-corasick = "1"
+bloomfilter = "1"
+cyclonedx-bom = "0.7"
 
 [profile.release]
 opt-level = 3
