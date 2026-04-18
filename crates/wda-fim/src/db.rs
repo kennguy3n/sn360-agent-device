@@ -42,6 +42,7 @@ impl StateDb {
         let conn = Connection::open(path)?;
         conn.pragma_update(None, "journal_mode", "WAL")?;
         conn.pragma_update(None, "synchronous", "NORMAL")?;
+        conn.pragma_update(None, "busy_timeout", "5000")?;
 
         conn.execute_batch(
             "CREATE TABLE IF NOT EXISTS fim_state (

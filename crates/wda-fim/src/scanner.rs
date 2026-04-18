@@ -167,7 +167,9 @@ pub fn run_baseline_scan(
     let stale_entries = db.get_entries_with_old_scan(&scan_timestamp)?;
     for stale in &stale_entries {
         // Only consider entries under a configured directory.
-        let under_config = directories.iter().any(|d| stale.path.starts_with(&d.path));
+        let under_config = directories
+            .iter()
+            .any(|d| Path::new(&stale.path).starts_with(Path::new(&d.path)));
         if !under_config {
             continue;
         }
