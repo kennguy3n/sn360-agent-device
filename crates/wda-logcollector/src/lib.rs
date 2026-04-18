@@ -27,7 +27,11 @@ use wda_event_bus::EventBus;
 use crate::file_reader::FileReader;
 #[cfg(all(target_os = "linux", feature = "linux-journal"))]
 use crate::journal_reader::JournalReader;
+#[cfg(target_os = "macos")]
+use crate::oslog_reader::{OsLogConfig, OsLogReader};
 use crate::state::SeekState;
+#[cfg(target_os = "windows")]
+use crate::windows_eventlog::{EventLogChannelConfig, WindowsEventLogReader};
 
 const STATUS_INITIALIZED: u8 = 0;
 const _STATUS_RUNNING: u8 = 1;
@@ -85,6 +89,10 @@ async fn run(
     let mut formats = Vec::new();
     #[cfg(all(target_os = "linux", feature = "linux-journal"))]
     let mut journal_sources = Vec::new();
+    #[cfg(target_os = "windows")]
+    let mut eventlog_channels: Vec<EventLogChannelConfig> = Vec::new();
+    #[cfg(target_os = "macos")]
+    let mut oslog_configs: Vec<OsLogConfig> = Vec::new();
 
     for source in &lc_config.sources {
         match source.source_type.as_str() {
@@ -116,7 +124,14 @@ async fn run(
             "eventlog" | "windows" => {
                 #[cfg(target_os = "windows")]
                 {
-                    info!(source_type = %source.source_type, "Windows Event Log source configured (handled separately)");
+                    let channel = source
+                        .path
+                        .clone()
+                        .unwrap_or_else(|| "Security".to_string());
+                    eventlog_channels.push(EventLogChannelConfig {
+                        channel,
+                        query: None,
+                    });
                 }
                 #[cfg(not(target_os = "windows"))]
                 {
@@ -129,7 +144,10 @@ async fn run(
             "oslog" | "unified" => {
                 #[cfg(target_os = "macos")]
                 {
-                    info!(source_type = %source.source_type, "macOS Unified Log source configured (handled separately)");
+                    oslog_configs.push(OsLogConfig {
+                        predicate: source.path.clone(),
+                        level: None,
+                    });
                 }
                 #[cfg(not(target_os = "macos"))]
                 {
@@ -173,11 +191,54 @@ async fn run(
         journal_handles.push(handle);
     }
 
+    // Spawn Windows Event Log reader.
+    #[cfg(target_os = "windows")]
+    let eventlog_handle = if !eventlog_channels.is_empty() {
+        let el_bus = bus.clone();
+        let el_shutdown = shutdown.clone();
+        let reader = WindowsEventLogReader::new(eventlog_channels, el_bus);
+        Some(tokio::spawn(async move {
+            if let Err(e) = reader.run(el_shutdown).await {
+                error!(error = %e, "Windows Event Log reader failed");
+            }
+        }))
+    } else {
+        None
+    };
+
+    // Spawn macOS Unified Log readers.
+    #[cfg(target_os = "macos")]
+    let mut oslog_handles = Vec::new();
+    #[cfg(target_os = "macos")]
+    for config in oslog_configs {
+        let ol_bus = bus.clone();
+        let ol_shutdown = shutdown.clone();
+        let reader = OsLogReader::new(config, ol_bus);
+        let handle = tokio::spawn(async move {
+            if let Err(e) = reader.run(ol_shutdown).await {
+                error!(error = %e, "macOS Unified Log reader failed");
+            }
+        });
+        oslog_handles.push(handle);
+    }
+
     file_reader.run(shutdown).await?;
 
     // Wait for journal readers to finish.
     #[cfg(all(target_os = "linux", feature = "linux-journal"))]
     for handle in journal_handles {
+        let _ = handle.await;
+    }
+
+    // Wait for Windows Event Log reader to finish.
+    #[cfg(target_os = "windows")]
+    if let Some(handle) = eventlog_handle {
+        let _ = handle.await;
+    }
+
+    // Wait for macOS Unified Log readers to finish.
+    #[cfg(target_os = "macos")]
+    for handle in oslog_handles {
         let _ = handle.await;
     }
 

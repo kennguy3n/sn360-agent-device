@@ -252,7 +252,11 @@ mod unix_impl {
         #[test]
         fn test_read_mac_address_loopback() {
             let mac = read_mac_address(LOOPBACK);
-            assert!(mac.is_some(), "expected loopback MAC address");
+            // Linux loopback has a MAC (00:00:00:00:00:00); macOS lo0 does not.
+            #[cfg(target_os = "linux")]
+            assert!(mac.is_some(), "expected loopback MAC address on Linux");
+            #[cfg(target_os = "macos")]
+            assert!(mac.is_none(), "macOS loopback has no ether address");
         }
 
         #[test]
