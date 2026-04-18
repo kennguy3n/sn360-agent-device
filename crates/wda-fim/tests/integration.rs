@@ -112,6 +112,10 @@ async fn test_fim_detects_file_modification() {
 }
 
 #[tokio::test]
+#[cfg_attr(
+    target_os = "macos",
+    ignore = "kqueue does not reliably deliver file deletion events on macOS CI"
+)]
 async fn test_fim_detects_file_deletion() {
     let dir = TempDir::new().unwrap();
     let config = test_config(&dir);
