@@ -11,7 +11,7 @@
 
 use std::path::Path;
 
-use regex::Regex;
+use regex::RegexBuilder;
 use serde::{Deserialize, Serialize};
 use tracing::{debug, info};
 
@@ -214,7 +214,7 @@ fn evaluate_file_check(check: &ScaCheck) -> CheckResult {
 
     // If a pattern is specified, check file content via regex.
     if let Some(ref pattern) = check.params.pattern {
-        let re = match Regex::new(pattern) {
+        let re = match RegexBuilder::new(pattern).multi_line(true).build() {
             Ok(r) => r,
             Err(e) => {
                 return CheckResult {
@@ -336,21 +336,37 @@ async fn evaluate_command_check(check: &ScaCheck) -> CheckResult {
 
     let expected_exit = check.params.expected_exit_code.unwrap_or(0);
 
+    let timeout = std::time::Duration::from_secs(30);
+
     #[cfg(unix)]
-    let output = tokio::process::Command::new("sh")
+    let cmd_future = tokio::process::Command::new("sh")
         .args(["-c", command])
-        .output()
-        .await;
+        .output();
     #[cfg(target_os = "windows")]
-    let output = tokio::process::Command::new("cmd")
+    let cmd_future = tokio::process::Command::new("cmd")
         .args(["/C", command])
-        .output()
-        .await;
+        .output();
     #[cfg(not(any(unix, target_os = "windows")))]
-    let output: Result<std::process::Output, std::io::Error> = Err(std::io::Error::new(
+    let cmd_future = futures::future::err::<std::process::Output, _>(std::io::Error::new(
         std::io::ErrorKind::Unsupported,
         "unsupported platform",
     ));
+
+    let output = match tokio::time::timeout(timeout, cmd_future).await {
+        Ok(result) => result,
+        Err(_) => {
+            return CheckResult {
+                check_id: check.id.clone(),
+                title: check.title.clone(),
+                result: CheckStatus::Error,
+                reason: format!(
+                    "command timed out after {}s: {}",
+                    timeout.as_secs(),
+                    command
+                ),
+            };
+        }
+    };
 
     match output {
         Ok(out) => {
@@ -372,7 +388,7 @@ async fn evaluate_command_check(check: &ScaCheck) -> CheckResult {
 
             // If a pattern is specified, check stdout via regex.
             if let Some(ref pattern) = check.params.pattern {
-                let re = match Regex::new(pattern) {
+                let re = match RegexBuilder::new(pattern).multi_line(true).build() {
                     Ok(r) => r,
                     Err(e) => {
                         return CheckResult {
