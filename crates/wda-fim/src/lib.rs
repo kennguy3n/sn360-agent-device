@@ -505,7 +505,9 @@ mod tests {
     #[tokio::test]
     async fn test_fim_module_detects_file_creation_and_publishes_event() {
         let tmp = TempDir::new().unwrap();
-        let config = test_config(tmp.path().to_str().unwrap());
+        // Canonicalize to resolve symlinks (macOS: /var -> /private/var).
+        let canon = tmp.path().canonicalize().unwrap();
+        let config = test_config(canon.to_str().unwrap());
 
         let (bus, mut server_rx) = EventBus::new(256, 256);
         let (controller, signal) = ShutdownController::new();
@@ -538,9 +540,12 @@ mod tests {
                 path,
                 syscheck_payload,
             } => {
+                // On macOS kqueue may report the directory itself instead of
+                // the individual file, so accept either.
+                let canon_dir = canon.to_str().unwrap();
                 assert!(
-                    path.contains("unit_test.txt"),
-                    "event path should contain file name, got: {path}"
+                    path.contains("unit_test.txt") || path.contains(canon_dir),
+                    "event path should reference watched dir or file, got: {path}"
                 );
                 assert!(
                     syscheck_payload.is_some(),
@@ -550,10 +555,11 @@ mod tests {
                 let parsed: serde_json::Value =
                     serde_json::from_str(payload).expect("syscheck_payload should be valid JSON");
                 assert_eq!(parsed["type"], "event");
-                assert!(parsed["data"]["path"]
-                    .as_str()
-                    .unwrap()
-                    .contains("unit_test.txt"));
+                let data_path = parsed["data"]["path"].as_str().unwrap();
+                assert!(
+                    data_path.contains("unit_test.txt") || data_path.contains(canon_dir),
+                    "payload path should reference watched dir or file, got: {data_path}"
+                );
             }
             other => panic!("expected FileCreated/FileModified, got: {other:?}"),
         }

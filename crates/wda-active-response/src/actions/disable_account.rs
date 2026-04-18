@@ -127,7 +127,11 @@ async fn platform_disable_account(user: &str, timeout: Duration) -> ActionResult
         if let Some(shell) = output.split_whitespace().last() {
             let _ = std::fs::create_dir_all(SHELL_STATE_DIR);
             let state_file = format!("{}/{}", SHELL_STATE_DIR, user);
-            let _ = std::fs::write(&state_file, shell);
+            // Only save if no state file exists yet, to avoid overwriting
+            // the original shell if disable_account is called twice.
+            if !std::path::Path::new(&state_file).exists() {
+                let _ = std::fs::write(&state_file, shell);
+            }
         }
     }
 
