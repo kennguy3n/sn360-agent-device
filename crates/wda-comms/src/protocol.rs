@@ -132,7 +132,7 @@ impl WazuhMessage {
     /// prefix by `ConnectionManager::send()`.
     pub fn encode_body(&self) -> Vec<u8> {
         let body = match self.msg_type {
-            MessageType::Syscheck => format!("d:{}", self.payload),
+            MessageType::Syscheck => format!("8:syscheck:{}", self.payload),
             MessageType::Log => format!("1:{}", self.payload),
             // Control messages already carry the correct prefix.
             MessageType::Keepalive | MessageType::Startup | MessageType::Shutdown => {

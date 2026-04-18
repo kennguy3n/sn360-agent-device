@@ -54,14 +54,35 @@ cleanup() {
 }
 trap cleanup EXIT
 
+# ── Step 0: Clean up stale state from previous runs ────────────────
+echo "==> Step 0: Cleaning stale state..."
+rm -rf /tmp/wda-e2e-fim /tmp/wda-e2e-logs
+sudo rm -f /var/lib/wazuh-desktop-agent/fim.db
+sudo rm -f /etc/wazuh-desktop-agent/client.keys
+# Remove ALL previously-enrolled agents from the running Wazuh container
+# so re-enrollment succeeds.  List agent IDs and remove each one.
+for STALE_ID in $(docker compose -f tests/docker-compose.yml exec -T wazuh-manager \
+  /var/ossec/bin/manage_agents -l 2>/dev/null \
+  | grep -oP 'ID:\s*\K[0-9]+' || true); do
+  docker compose -f tests/docker-compose.yml exec -T wazuh-manager \
+    /var/ossec/bin/manage_agents -r "$STALE_ID" 2>/dev/null <<< "y" || true
+done
+# Clear stale alerts and debug config from previous runs.
+docker compose -f tests/docker-compose.yml exec -T wazuh-manager \
+  bash -c 'rm -f /var/ossec/logs/alerts/alerts.json /var/ossec/etc/local_internal_options.conf' 2>/dev/null || true
+echo "    Stale state removed."
+
 # ── Step 1: Start Wazuh manager ─────────────────────────────────────
 echo "==> Step 1: Starting Wazuh manager..."
 docker compose -f tests/docker-compose.yml up -d
 
 WAZUH_READY=false
 for i in $(seq 1 90); do
-  if docker compose -f tests/docker-compose.yml exec -T wazuh-manager \
-       /var/ossec/bin/wazuh-control status 2>/dev/null | grep -q "running"; then
+  # wazuh-control status exits non-zero when optional daemons are stopped,
+  # so capture its output and grep separately to avoid pipefail issues.
+  WAZUH_STATUS=$(docker compose -f tests/docker-compose.yml exec -T wazuh-manager \
+       /var/ossec/bin/wazuh-control status 2>/dev/null || true)
+  if echo "$WAZUH_STATUS" | grep -q "wazuh-remoted is running"; then
     WAZUH_READY=true
     break
   fi
@@ -77,13 +98,16 @@ echo "    Wazuh manager is ready."
 # ── Step 2: Set enrollment password ─────────────────────────────────
 echo "==> Step 2: Setting enrollment password..."
 docker compose -f tests/docker-compose.yml exec -T wazuh-manager bash -c \
-  "echo '${E2E_ENROLL_PASS}' > /var/ossec/etc/authd.pass && /var/ossec/bin/wazuh-control restart"
+  "echo '${E2E_ENROLL_PASS}' > /var/ossec/etc/authd.pass && \
+   sed -i 's|<use_password>no</use_password>|<use_password>yes</use_password>|' /var/ossec/etc/ossec.conf && \
+   /var/ossec/bin/wazuh-control restart"
 # Wait for restart.
 sleep 15
 AUTHD_READY=false
 for i in $(seq 1 30); do
-  if docker compose -f tests/docker-compose.yml exec -T wazuh-manager \
-       /var/ossec/bin/wazuh-control status 2>/dev/null | grep -q "running"; then
+  AUTHD_STATUS=$(docker compose -f tests/docker-compose.yml exec -T wazuh-manager \
+       /var/ossec/bin/wazuh-control status 2>/dev/null || true)
+  if echo "$AUTHD_STATUS" | grep -q "wazuh-remoted is running"; then
     AUTHD_READY=true
     break
   fi

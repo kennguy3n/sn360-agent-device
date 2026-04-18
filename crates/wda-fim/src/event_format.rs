@@ -22,10 +22,17 @@ impl ChangeType {
 
 /// Format a FIM change as a Wazuh syscheck-compatible JSON string.
 ///
-/// Produces JSON matching the Wazuh syscheck event format:
+/// Produces JSON matching the format consumed by Wazuh 4.x `analysisd`
+/// (`fim_process_alert` in `syscheck.c`).  Key field names:
+///   - `attributes`   – current (new) file metadata (or old for deletes)
+///   - `old_attributes` – previous metadata (modified events only)
+///   - `hash_sha256`  – SHA-256 field inside attributes
+///
 /// ```json
-/// {"type":"event","data":{"path":"/etc/passwd","mode":"realtime","type":"modified",
-///  "changed_attributes":["sha256","size"],"old_attributes":{...},"new_attributes":{...}}}
+/// {"type":"event","data":{"path":"/etc/passwd","mode":"realtime",
+///  "type":"modified","timestamp":1700000000,
+///  "changed_attributes":["hash_sha256","size"],
+///  "attributes":{...},"old_attributes":{...}}}
 /// ```
 pub fn format_syscheck_event(
     change_type: ChangeType,
@@ -38,7 +45,7 @@ pub fn format_syscheck_event(
     // Determine which attributes changed.
     if let (Some(old), Some(new)) = (old_entry, new_entry) {
         if old.sha256 != new.sha256 {
-            changed_attributes.push("sha256");
+            changed_attributes.push("hash_sha256");
         }
         if old.size != new.size {
             changed_attributes.push("size");
@@ -60,32 +67,64 @@ pub fn format_syscheck_event(
         }
     }
 
-    let old_attrs = old_entry.map(format_attributes).unwrap_or_default();
-    let new_attrs = new_entry.map(format_attributes).unwrap_or_default();
+    let timestamp = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_secs())
+        .unwrap_or(0);
 
     let changed_json: Vec<String> = changed_attributes
         .iter()
         .map(|a| format!("\"{}\"", a))
         .collect();
 
-    format!(
-        "{{\"type\":\"event\",\"data\":{{\"path\":\"{}\",\"mode\":\"realtime\",\"type\":\"{}\",\"changed_attributes\":[{}],\"old_attributes\":{{{}}},\"new_attributes\":{{{}}}}}}}",
-        escape_json_string(path),
-        change_type.as_str(),
-        changed_json.join(","),
-        old_attrs,
-        new_attrs,
-    )
+    // Wazuh analysisd expects:
+    //   - "attributes"     = current/new file metadata (or old for deletes)
+    //   - "old_attributes" = previous metadata for modified events
+    match change_type {
+        ChangeType::Added => {
+            let attrs = new_entry.map(format_attributes).unwrap_or_default();
+            format!(
+                "{{\"type\":\"event\",\"data\":{{\"path\":\"{}\",\"mode\":\"realtime\",\"type\":\"added\",\"timestamp\":{},\"attributes\":{{{}}}}}}}",
+                escape_json_string(path),
+                timestamp,
+                attrs,
+            )
+        }
+        ChangeType::Modified => {
+            let attrs = new_entry.map(format_attributes).unwrap_or_default();
+            let old_attrs = old_entry.map(format_attributes).unwrap_or_default();
+            format!(
+                "{{\"type\":\"event\",\"data\":{{\"path\":\"{}\",\"mode\":\"realtime\",\"type\":\"modified\",\"timestamp\":{},\"changed_attributes\":[{}],\"attributes\":{{{}}},\"old_attributes\":{{{}}}}}}}",
+                escape_json_string(path),
+                timestamp,
+                changed_json.join(","),
+                attrs,
+                old_attrs,
+            )
+        }
+        ChangeType::Deleted => {
+            // For deletions, "attributes" carries the last-known file metadata.
+            let attrs = old_entry.map(format_attributes).unwrap_or_default();
+            format!(
+                "{{\"type\":\"event\",\"data\":{{\"path\":\"{}\",\"mode\":\"realtime\",\"type\":\"deleted\",\"timestamp\":{},\"attributes\":{{{}}}}}}}",
+                escape_json_string(path),
+                timestamp,
+                attrs,
+            )
+        }
+    }
 }
 
 fn format_attributes(entry: &FimEntry) -> String {
     let mut parts: Vec<String> = Vec::new();
 
+    // Wazuh attribute field names (see syscheckd src/create_db.c).
+    parts.push("\"type\":\"file\"".to_string());
     if let Some(ref h) = entry.sha256 {
-        parts.push(format!("\"sha256\":\"{}\"", h));
+        parts.push(format!("\"hash_sha256\":\"{}\"", h));
     }
     parts.push(format!("\"size\":{}", entry.size));
-    parts.push(format!("\"perm\":\"0{:o}\"", entry.permissions));
+    parts.push(format!("\"perm\":\"{:o}\"", entry.permissions));
     parts.push(format!("\"uid\":\"{}\"", entry.uid));
     parts.push(format!("\"gid\":\"{}\"", entry.gid));
     parts.push(format!("\"mtime\":{}", entry.mtime));
@@ -137,14 +176,17 @@ mod tests {
         assert_eq!(parsed["data"]["path"], "/etc/passwd");
         assert_eq!(parsed["data"]["type"], "modified");
         assert_eq!(parsed["data"]["mode"], "realtime");
+        assert!(parsed["data"]["timestamp"].as_u64().unwrap() > 0);
 
         let changed = parsed["data"]["changed_attributes"].as_array().unwrap();
-        assert!(changed.contains(&serde_json::Value::String("sha256".into())));
+        assert!(changed.contains(&serde_json::Value::String("hash_sha256".into())));
         assert!(changed.contains(&serde_json::Value::String("size".into())));
 
-        assert_eq!(parsed["data"]["old_attributes"]["sha256"], "old_hash");
-        assert_eq!(parsed["data"]["new_attributes"]["sha256"], "new_hash");
-        assert_eq!(parsed["data"]["new_attributes"]["size"], 200);
+        // Wazuh uses "attributes" for current and "old_attributes" for previous.
+        assert_eq!(parsed["data"]["old_attributes"]["hash_sha256"], "old_hash");
+        assert_eq!(parsed["data"]["attributes"]["hash_sha256"], "new_hash");
+        assert_eq!(parsed["data"]["attributes"]["size"], 200);
+        assert_eq!(parsed["data"]["attributes"]["type"], "file");
     }
 
     #[test]
@@ -155,10 +197,9 @@ mod tests {
 
         let parsed: serde_json::Value = serde_json::from_str(&json).unwrap();
         assert_eq!(parsed["data"]["type"], "added");
-        assert!(parsed["data"]["changed_attributes"]
-            .as_array()
-            .unwrap()
-            .is_empty());
+        assert_eq!(parsed["data"]["attributes"]["hash_sha256"], "abc123");
+        assert_eq!(parsed["data"]["attributes"]["type"], "file");
+        assert!(parsed["data"]["timestamp"].as_u64().unwrap() > 0);
     }
 
     #[test]
@@ -169,7 +210,9 @@ mod tests {
 
         let parsed: serde_json::Value = serde_json::from_str(&json).unwrap();
         assert_eq!(parsed["data"]["type"], "deleted");
-        assert_eq!(parsed["data"]["old_attributes"]["sha256"], "abc123");
+        // For deletions, old file metadata goes into "attributes".
+        assert_eq!(parsed["data"]["attributes"]["hash_sha256"], "abc123");
+        assert_eq!(parsed["data"]["attributes"]["type"], "file");
     }
 
     #[test]
@@ -191,7 +234,7 @@ mod tests {
         let entry = sample_entry("hash", 100);
         let json = format_syscheck_event(ChangeType::Added, "/etc/test", None, Some(&entry));
         let parsed: serde_json::Value = serde_json::from_str(&json).unwrap();
-        // 0o644 decimal = 420, formatted as octal "0644"
-        assert_eq!(parsed["data"]["new_attributes"]["perm"], "0644");
+        // 0o644 decimal = 420, formatted as octal "644"
+        assert_eq!(parsed["data"]["attributes"]["perm"], "644");
     }
 }

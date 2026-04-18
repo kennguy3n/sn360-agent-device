@@ -174,8 +174,30 @@ impl ConnectionManager {
     ///
     /// The message body is encrypted and prefixed with the agent ID
     /// (in the clear) so the server can look up the correct key.
-    /// Wire format: `4-byte-length | "{agent_id}:" | encrypted_body`
+    /// Wire format: `4-byte-length | "!{agent_id}!{crypto_token}" | encrypted_body`
+    ///
+    /// On transient failures (broken pipe, connection reset) the method
+    /// reconnects once and retries the send.
     pub async fn send(&mut self, message: &WazuhMessage) -> Result<(), ConnectionError> {
+        let data = self.build_wire_frame(message)?;
+
+        match self.send_raw(&data).await {
+            Ok(()) => Ok(()),
+            Err(e) => {
+                warn!(error = %e, "send failed, reconnecting");
+                // Reconnect and retry once.
+                self.disconnect().await;
+                self.connect_with_retry().await?;
+                // Re-encrypt with fresh frame (counters already advanced, but
+                // the server is tolerant of counter gaps).
+                let data2 = self.build_wire_frame(message)?;
+                self.send_raw(&data2).await
+            }
+        }
+    }
+
+    /// Build the encrypted wire frame for a message.
+    fn build_wire_frame(&self, message: &WazuhMessage) -> Result<Vec<u8>, ConnectionError> {
         let body = message.encode_body();
 
         debug!(
@@ -204,7 +226,7 @@ impl ConnectionManager {
             message.encode()
         };
 
-        self.send_raw(&data).await
+        Ok(data)
     }
 
     /// Send raw bytes over the transport.

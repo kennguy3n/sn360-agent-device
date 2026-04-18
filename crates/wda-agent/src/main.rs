@@ -42,6 +42,7 @@ async fn main() -> Result<()> {
     let mut agent = Agent::new(config.clone());
 
     // 4. Check for existing agent key; enroll if missing
+    let mut fresh_enrollment = false;
     let agent_key = match load_agent_key() {
         Some(key) => {
             info!(agent_id = %key.id, "loaded existing agent key");
@@ -73,12 +74,22 @@ async fn main() -> Result<()> {
             // 5. Save the key
             save_agent_key(&key).context("failed to save agent key")?;
             info!(agent_id = %key.id, "enrollment complete, key saved");
+            fresh_enrollment = true;
             key
         }
     };
 
     agent.set_agent_id(agent_key.id.clone());
     agent.set_agent_key(agent_key.key.clone());
+
+    // 5b. After fresh enrollment, wait for Wazuh remoted to reload
+    //     client.keys.  Remoted detects the file change every ~10 s; if we
+    //     connect before it reloads, our startup message is rejected with
+    //     "Invalid ID" and the TCP connection is reset.
+    if fresh_enrollment {
+        info!("waiting 15 s for remoted to load new agent key");
+        tokio::time::sleep(Duration::from_secs(15)).await;
+    }
 
     // 6. Create ConnectionManager and WazuhCipher from the agent key
     let protocol = match config.server.protocol.as_str() {
