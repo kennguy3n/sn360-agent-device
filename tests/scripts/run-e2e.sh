@@ -232,6 +232,28 @@ else
   record FAIL "Baseline scan did not detect file deletion"
 fi
 
+# ── Step 9b: Verify inventory data ──────────────────────────────────
+echo "==> Step 9b: Verifying inventory data..."
+sleep 20  # Give agent time to send initial inventory
+
+INVENTORY_DATA=$(docker compose -f tests/docker-compose.yml exec -T wazuh-manager \
+  cat /var/ossec/logs/archives/archives.json 2>/dev/null | grep -c "syscollector" || true)
+echo "    Inventory events found: $INVENTORY_DATA"
+if [ "$INVENTORY_DATA" -gt 0 ]; then
+  record PASS "Inventory data received by server"
+else
+  # Also check ossec.log for syscollector messages
+  SYSCOLLECTOR_LOG=$(docker compose -f tests/docker-compose.yml exec -T wazuh-manager \
+    grep -c "syscollector" /var/ossec/logs/ossec.log 2>/dev/null || true)
+  if [ "${SYSCOLLECTOR_LOG:-0}" -gt 0 ]; then
+    record PASS "Inventory syscollector messages seen in ossec.log"
+  else
+    record FAIL "No inventory data found"
+    docker compose -f tests/docker-compose.yml exec -T wazuh-manager \
+      tail -30 /var/ossec/logs/ossec.log 2>/dev/null || true
+  fi
+fi
+
 # ── Step 9: Trigger log collection event ─────────────────────────────
 echo "==> Step 9: Triggering log collection event..."
 echo 'Apr 18 12:00:00 localhost sshd[9999]: Failed password for root from 10.0.0.1 port 22 ssh2' \

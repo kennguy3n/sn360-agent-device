@@ -82,7 +82,7 @@ pub struct ModulesConfig {
     #[serde(default)]
     pub logcollector: LogCollectorConfig,
     #[serde(default)]
-    pub inventory: ModuleToggle,
+    pub inventory: InventoryConfig,
     #[serde(default)]
     pub sca: ModuleToggle,
     #[serde(default)]
@@ -150,6 +150,20 @@ pub struct LogSource {
     /// Log format: "syslog", "json", or "plain".
     #[serde(default = "default_log_source_format")]
     pub format: String,
+}
+
+/// Inventory module configuration.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct InventoryConfig {
+    /// Whether the inventory module is enabled.
+    #[serde(default = "default_true")]
+    pub enabled: bool,
+    /// Collection interval in seconds (default 3600).
+    #[serde(default = "default_inventory_interval")]
+    pub interval: u64,
+    /// Categories to collect: "os", "network", "packages", "hardware".
+    #[serde(default = "default_inventory_collect")]
+    pub collect: Vec<String>,
 }
 
 /// Simple module enable/disable toggle.
@@ -241,6 +255,17 @@ fn default_source_type() -> String {
 fn default_log_source_format() -> String {
     "syslog".to_string()
 }
+fn default_inventory_interval() -> u64 {
+    3600
+}
+fn default_inventory_collect() -> Vec<String> {
+    vec![
+        "os".to_string(),
+        "network".to_string(),
+        "packages".to_string(),
+        "hardware".to_string(),
+    ]
+}
 
 // --- Trait implementations ---
 
@@ -264,6 +289,16 @@ impl Default for EnrollmentConfig {
             key: None,
             agent_name: None,
             groups: None,
+        }
+    }
+}
+
+impl Default for InventoryConfig {
+    fn default() -> Self {
+        Self {
+            enabled: true,
+            interval: default_inventory_interval(),
+            collect: default_inventory_collect(),
         }
     }
 }
