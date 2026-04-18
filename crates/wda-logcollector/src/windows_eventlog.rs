@@ -7,8 +7,6 @@
 
 #![cfg(target_os = "windows")]
 
-use std::sync::Arc;
-
 use tokio::io::{AsyncBufReadExt, BufReader};
 use tokio::process::Command;
 use tracing::{debug, error, info, warn};
@@ -74,15 +72,16 @@ async fn subscribe_channel(
     channel: &str,
     query: &str,
     bus: EventBus,
-    shutdown: ShutdownSignal,
+    mut shutdown: ShutdownSignal,
 ) -> anyhow::Result<()> {
-    info!(channel = %channel, "subscribing to event log channel");
+    info!(channel = %channel, query = %query, "subscribing to event log channel");
 
     // Use wevtutil to query events. In a production implementation this would
     // use the Windows `EvtSubscribe` API via `windows-rs`, but for now we use
     // the CLI tool as a portable starting point.
+    let query_arg = format!("/q:{}", query);
     let mut child = Command::new("wevtutil")
-        .args(["qe", channel, "/q:*", "/f:text", "/rd:true", "/c:100"])
+        .args(["qe", channel, &query_arg, "/f:text", "/rd:true", "/c:100"])
         .stdout(std::process::Stdio::piped())
         .stderr(std::process::Stdio::null())
         .spawn()?;

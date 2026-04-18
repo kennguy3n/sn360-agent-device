@@ -324,10 +324,21 @@ async fn evaluate_command_check(check: &ScaCheck) -> CheckResult {
 
     let expected_exit = check.params.expected_exit_code.unwrap_or(0);
 
+    #[cfg(unix)]
     let output = tokio::process::Command::new("sh")
         .args(["-c", command])
         .output()
         .await;
+    #[cfg(target_os = "windows")]
+    let output = tokio::process::Command::new("cmd")
+        .args(["/C", command])
+        .output()
+        .await;
+    #[cfg(not(any(unix, target_os = "windows")))]
+    let output: Result<std::process::Output, std::io::Error> = Err(std::io::Error::new(
+        std::io::ErrorKind::Unsupported,
+        "unsupported platform",
+    ));
 
     match output {
         Ok(out) => {

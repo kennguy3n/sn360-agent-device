@@ -107,8 +107,30 @@ async fn platform_enable_account(user: &str, timeout: Duration) -> ActionResult 
 // ── macOS ────────────────────────────────────────────────────────────────────
 
 #[cfg(target_os = "macos")]
+const SHELL_STATE_DIR: &str = "/var/tmp/wda-shell-state";
+
+#[cfg(target_os = "macos")]
 async fn platform_disable_account(user: &str, timeout: Duration) -> ActionResult {
     let user_path = format!("/Users/{}", user);
+
+    // Save the user's current shell before disabling, so we can restore it.
+    let read_result = executor::execute_command(
+        "dscl",
+        &[".", "-read", &user_path, "UserShell"],
+        timeout,
+        false,
+    )
+    .await;
+    if read_result.success {
+        let output = read_result.combined_output();
+        // Output format: "UserShell: /bin/zsh"
+        if let Some(shell) = output.split_whitespace().last() {
+            let _ = std::fs::create_dir_all(SHELL_STATE_DIR);
+            let state_file = format!("{}/{}", SHELL_STATE_DIR, user);
+            let _ = std::fs::write(&state_file, shell);
+        }
+    }
+
     let result = executor::execute_command(
         "dscl",
         &[".", "-create", &user_path, "UserShell", "/usr/bin/false"],
@@ -130,15 +152,27 @@ async fn platform_disable_account(user: &str, timeout: Duration) -> ActionResult
 #[cfg(target_os = "macos")]
 async fn platform_enable_account(user: &str, timeout: Duration) -> ActionResult {
     let user_path = format!("/Users/{}", user);
+
+    // Restore the saved shell, falling back to /bin/zsh if none was saved.
+    let state_file = format!("{}/{}", SHELL_STATE_DIR, user);
+    let shell = std::fs::read_to_string(&state_file)
+        .ok()
+        .map(|s| s.trim().to_string())
+        .filter(|s| !s.is_empty())
+        .unwrap_or_else(|| "/bin/zsh".to_string());
+
     let result = executor::execute_command(
         "dscl",
-        &[".", "-create", &user_path, "UserShell", "/bin/zsh"],
+        &[".", "-create", &user_path, "UserShell", &shell],
         timeout,
         false,
     )
     .await;
+
     if result.success {
-        ActionResult::ok(format!("re-enabled account {}", user))
+        // Clean up state file on successful restore.
+        let _ = std::fs::remove_file(&state_file);
+        ActionResult::ok(format!("re-enabled account {} (shell: {})", user, shell))
     } else {
         ActionResult::err(format!(
             "failed to re-enable account {}: {}",

@@ -35,7 +35,7 @@ impl OsLogReader {
     }
 
     /// Run the OSLog reader until shutdown.
-    pub async fn run(self, shutdown: ShutdownSignal) -> anyhow::Result<()> {
+    pub async fn run(self, mut shutdown: ShutdownSignal) -> anyhow::Result<()> {
         info!("starting macOS Unified Log reader");
 
         let mut args = vec!["stream", "--style", "syslog"];
