@@ -213,8 +213,9 @@ impl ConnectionManager {
             TransportProtocol::Tcp => {
                 let stream = self.stream.as_mut().ok_or(ConnectionError::Closed)?;
 
-                // Wazuh TCP protocol: 4-byte length prefix (big-endian) + data
-                let len = (data.len() as u32).to_be_bytes();
+                // Wazuh TCP protocol: 4-byte length prefix (little-endian / native on x86_64) + data
+                // Wazuh's wnet_order() is a no-op on little-endian, so the header is native byte order.
+                let len = (data.len() as u32).to_le_bytes();
                 stream
                     .write_all(&len)
                     .await
@@ -251,7 +252,7 @@ impl ConnectionManager {
                     .read_exact(&mut len_buf)
                     .await
                     .map_err(|e| ConnectionError::ReceiveFailed(e.to_string()))?;
-                let len = u32::from_be_bytes(len_buf) as usize;
+                let len = u32::from_le_bytes(len_buf) as usize;
 
                 // Sanity check on message size (max 64 KB)
                 if len > 65536 {
