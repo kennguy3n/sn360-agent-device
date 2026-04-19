@@ -297,9 +297,8 @@ mod windows_impl {
         IP_ADAPTER_UNICAST_ADDRESS_LH,
     };
     use windows::Win32::NetworkManagement::Ndis::{
-        IfOperStatusDormant, IfOperStatusDown, IfOperStatusLowerLayerDown,
-        IfOperStatusNotPresent, IfOperStatusTesting, IfOperStatusUnknown, IfOperStatusUp,
-        IF_OPER_STATUS,
+        IfOperStatusDormant, IfOperStatusDown, IfOperStatusLowerLayerDown, IfOperStatusNotPresent,
+        IfOperStatusTesting, IfOperStatusUnknown, IfOperStatusUp, IF_OPER_STATUS,
     };
     use windows::Win32::Networking::WinSock::{
         ADDRESS_FAMILY, AF_INET, AF_INET6, AF_UNSPEC, SOCKADDR_IN, SOCKADDR_IN6,
