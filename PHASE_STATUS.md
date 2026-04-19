@@ -29,7 +29,7 @@ comparison against the official Wazuh agent 4.9.2.
 | 2.6 | Inventory (syscollector-compatible) | Complete | os, hardware, packages, network |
 | 2.7 | Active response | Complete | block_ip, kill_process, script execution |
 | 2.8 | SCA (policy evaluation) | Complete | YAML policies, regex / command / file checks |
-| 2.9 | Rootcheck | Placeholder | struct skeleton only — no detection logic implemented yet |
+| 2.9 | Rootcheck | Complete | signature sweep (Wazuh rootkit_files.txt curated subset), Linux `/proc` vs `kill(pid, 0)` hidden-process detection (no-op on macOS/Windows), SHA-256 binary-integrity drift tracking against a JSON baseline, wired into agent main loop with `EventKind::RootcheckAlert` + `MessageType::Rootcheck` forwarding |
 
 ## Phase 3 (this session) — gap-fill work
 
@@ -37,6 +37,7 @@ comparison against the official Wazuh agent 4.9.2.
 |---|---|---|
 | 3.R | **Server message receive loop** (`crates/wda-agent/src/main.rs`) | **Complete** — `receive_handle` task added that reads frames from the server, parses the leading `#!-execd` / `#!-req` / `#!-up_file` tag, and publishes `EventKind::ServerCommand` on the event bus so the active_response module can consume them |
 | 3.S | **Wire SCA module into agent main loop** (`crates/wda-agent/src/main.rs`) | **Complete** — `ScaModule::start()` added with periodic policy evaluation, wired into agent startup alongside FIM/logcollector/inventory/AR |
+| 3.RC | **Implement rootcheck detection logic** (`crates/wda-rootcheck/`) | **Complete** — `signatures`, `hidden_process`, and `binary_integrity` submodules plus `RootcheckModule::start()` following the FIM/SCA pattern. Blocking filesystem I/O is routed through `tokio::task::spawn_blocking`, hidden-process detection is gated to Linux, and the binary-integrity baseline is persisted atomically as JSON. Alerts flow through `EventKind::RootcheckAlert` → `MessageType::Rootcheck` to the Wazuh manager |
 
 Unit tests for `parse_server_command` were added inline to lock the
 parsing of each tag variant, including trailing-null stripping, and are
@@ -46,7 +47,7 @@ run as part of `cargo test --all`.
 
 Command: `cargo test --all 2>&1 | tee unit-test-results.txt`
 
-**Result: all 178 tests passed, 0 failed.**
+**Result: all 186 tests passed, 0 failed.**
 
 | Crate | Passed |
 |---|---|
@@ -61,9 +62,9 @@ Command: `cargo test --all 2>&1 | tee unit-test-results.txt`
 | `wda-local-detection` | 4 |
 | `wda-logcollector` | 1 (24 s) |
 | `wda-pal` | 5 |
-| `wda-rootcheck` | 0 |
+| `wda-rootcheck` | 20 |
 | `wda-sca` | 30 |
-| **Total** | **166** |
+| **Total** | **186** |
 
 Full log: [`unit-test-results.txt`](./unit-test-results.txt).
 
@@ -172,9 +173,10 @@ Short list, ordered by impact:
    release binary under the 5 MB target.
 2. **Wire PAL `PowerMonitor` on macOS and Windows** so adaptive
    battery-vs-AC scheduling works outside Linux.
-3. **Implement rootcheck detection logic** (rootkit signatures,
-   hidden-process detection, suspicious-port checks) in
-   `wda-rootcheck` — the crate is currently a struct skeleton only.
+3. ~~**Implement rootcheck detection logic**~~ **Done (Phase 3).**
+   The `wda-rootcheck` crate now ships signature, hidden-process,
+   and binary-integrity checks wired into the agent main loop —
+   see task `3.RC` above.
 4. **Re-run the FIM burst benchmark after the lazy-hashing merge**
    to verify the < 3 % CPU target end-to-end.
 5. **Tune FIM defaults for burst-heavy environments.** The

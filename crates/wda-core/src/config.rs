@@ -93,7 +93,7 @@ pub struct ModulesConfig {
     #[serde(default)]
     pub active_response: ActiveResponseConfig,
     #[serde(default)]
-    pub rootcheck: ModuleToggle,
+    pub rootcheck: RootcheckConfig,
 }
 
 /// FIM-specific configuration.
@@ -194,6 +194,49 @@ pub struct InventoryConfig {
 pub struct ModuleToggle {
     #[serde(default = "default_true")]
     pub enabled: bool,
+}
+
+/// Rootcheck (rootkit detection) module configuration.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RootcheckConfig {
+    /// Whether the rootcheck module is enabled.
+    ///
+    /// Rootcheck is off by default — it runs privileged filesystem
+    /// sweeps and PID scans, so operators opt in explicitly.
+    #[serde(default)]
+    pub enabled: bool,
+    /// Interval in seconds between rootcheck sweeps (default 1h).
+    #[serde(default = "default_rootcheck_scan_interval")]
+    pub scan_interval_secs: u64,
+    /// Additional file paths that should be flagged as rootkit
+    /// indicators if present. The built-in signature list is always
+    /// checked first; these are appended to it.
+    #[serde(default)]
+    pub signature_paths: Vec<String>,
+    /// System binary paths whose SHA-256 is tracked for drift.
+    ///
+    /// When empty the platform-specific defaults from
+    /// [`default_rootcheck_binary_paths`] are used.
+    #[serde(default)]
+    pub binary_paths: Vec<String>,
+    /// Path to the on-disk baseline file that stores the initial
+    /// SHA-256 hashes of each tracked binary. The file is created on
+    /// first run and subsequent runs compare current hashes against
+    /// the stored baseline.
+    #[serde(default = "default_rootcheck_baseline_path")]
+    pub baseline_path: PathBuf,
+    /// Whether to run the hidden-process check.
+    ///
+    /// Only meaningful on Linux; no-op on other platforms.
+    #[serde(default = "default_true")]
+    pub hidden_process_check: bool,
+    /// Whether to run the binary-integrity check.
+    #[serde(default = "default_true")]
+    pub binary_integrity_check: bool,
+    /// Upper bound for PIDs to probe with `kill(pid, 0)` during the
+    /// hidden-process sweep. Keep this conservative to cap CPU cost.
+    #[serde(default = "default_rootcheck_max_pid")]
+    pub max_pid: u32,
 }
 
 /// SCA (Security Configuration Assessment) module configuration.
@@ -343,6 +386,56 @@ fn default_sca_policy_dir() -> PathBuf {
 fn default_sca_scan_interval() -> u64 {
     43200 // 12 hours
 }
+fn default_rootcheck_scan_interval() -> u64 {
+    3600 // 1 hour
+}
+fn default_rootcheck_max_pid() -> u32 {
+    32768
+}
+fn default_rootcheck_baseline_path() -> PathBuf {
+    #[cfg(unix)]
+    {
+        PathBuf::from("/var/lib/wazuh-desktop-agent/rootcheck-baseline.json")
+    }
+    #[cfg(windows)]
+    {
+        PathBuf::from(r"C:\ProgramData\WazuhDesktopAgent\rootcheck-baseline.json")
+    }
+    #[cfg(not(any(unix, windows)))]
+    {
+        PathBuf::new()
+    }
+}
+/// Platform-default list of critical system binary paths monitored for
+/// SHA-256 drift by the rootcheck module.
+pub fn default_rootcheck_binary_paths() -> Vec<String> {
+    #[cfg(unix)]
+    {
+        vec![
+            "/bin/ls".to_string(),
+            "/bin/ps".to_string(),
+            "/bin/login".to_string(),
+            "/usr/bin/ssh".to_string(),
+            "/usr/bin/sudo".to_string(),
+            "/usr/bin/passwd".to_string(),
+            "/usr/bin/su".to_string(),
+            "/usr/sbin/sshd".to_string(),
+        ]
+    }
+    #[cfg(windows)]
+    {
+        vec![
+            r"C:\Windows\System32\cmd.exe".to_string(),
+            r"C:\Windows\System32\svchost.exe".to_string(),
+            r"C:\Windows\System32\lsass.exe".to_string(),
+            r"C:\Windows\explorer.exe".to_string(),
+        ]
+    }
+    #[cfg(not(any(unix, windows)))]
+    {
+        Vec::new()
+    }
+}
 fn default_ar_timeout() -> u64 {
     30
 }
@@ -403,6 +496,21 @@ impl Default for ScaConfig {
             enabled: true,
             policy_dir: default_sca_policy_dir(),
             scan_interval: default_sca_scan_interval(),
+        }
+    }
+}
+
+impl Default for RootcheckConfig {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            scan_interval_secs: default_rootcheck_scan_interval(),
+            signature_paths: Vec::new(),
+            binary_paths: Vec::new(),
+            baseline_path: default_rootcheck_baseline_path(),
+            hidden_process_check: true,
+            binary_integrity_check: true,
+            max_pid: default_rootcheck_max_pid(),
         }
     }
 }
