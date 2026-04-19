@@ -131,11 +131,22 @@ impl WazuhMessage {
     /// The agent ID is NOT included — it is sent as a plaintext routing
     /// prefix by `ConnectionManager::send()`.
     pub fn encode_body(&self) -> Vec<u8> {
+        // Queue byte prefixes match Wazuh's internal MQ types
+        // (`src/headers/defs.h`): SYSCHECK_MQ='8', LOCALFILE_MQ='1',
+        // SYSCOLLECTOR_MQ='d', ROOTCHECK_MQ='9', SCA_MQ='p'.  The
+        // manager's `remoted` / `analysisd` route decrypted messages
+        // on the leading byte; missing prefixes get silently dropped.
         let body = match self.msg_type {
             MessageType::Syscheck => format!("8:syscheck:{}", self.payload),
             MessageType::Log => format!("1:{}", self.payload),
             MessageType::Syscollector => format!("d:{}", self.payload),
             MessageType::Rootcheck => format!("9:{}", self.payload),
+            MessageType::Sca => format!("p:{}", self.payload),
+            // Active-response feedback from the agent is reported
+            // through the logcollector queue with an "active-response"
+            // source tag, mirroring Wazuh execd's
+            // `SendMSG(..., "active-response", LOCALFILE_MQ)`.
+            MessageType::ActiveResponse => format!("1:active-response:{}", self.payload),
             // Control messages already carry the correct prefix.
             MessageType::Keepalive | MessageType::Startup | MessageType::Shutdown => {
                 self.payload.clone()
@@ -338,6 +349,71 @@ mod tests {
         // and a JSON version object.
         assert!(msg.payload.starts_with("#!-agent startup "));
         assert!(msg.payload.contains("version"));
+    }
+
+    #[test]
+    fn test_encode_body_syscheck_prefix() {
+        let msg = WazuhMessage::new("001", MessageType::Syscheck, "{\"path\":\"/etc/passwd\"}");
+        let body = String::from_utf8(msg.encode_body()).unwrap();
+        assert!(
+            body.starts_with("8:syscheck:"),
+            "syscheck body missing queue prefix: {body}"
+        );
+    }
+
+    #[test]
+    fn test_encode_body_log_prefix() {
+        let msg = WazuhMessage::new("001", MessageType::Log, "hello");
+        let body = String::from_utf8(msg.encode_body()).unwrap();
+        assert_eq!(body, "1:hello");
+    }
+
+    #[test]
+    fn test_encode_body_syscollector_prefix() {
+        let msg = WazuhMessage::new("001", MessageType::Syscollector, "{}");
+        let body = String::from_utf8(msg.encode_body()).unwrap();
+        assert_eq!(body, "d:{}");
+    }
+
+    #[test]
+    fn test_encode_body_rootcheck_prefix() {
+        let msg = WazuhMessage::new("001", MessageType::Rootcheck, "{}");
+        let body = String::from_utf8(msg.encode_body()).unwrap();
+        assert_eq!(body, "9:{}");
+    }
+
+    #[test]
+    fn test_encode_body_sca_prefix() {
+        // SCA_MQ = 'p' in Wazuh's internal queue table; analysisd will
+        // silently drop messages without this byte.
+        let msg = WazuhMessage::new("001", MessageType::Sca, "{\"check_id\":1}");
+        let body = String::from_utf8(msg.encode_body()).unwrap();
+        assert_eq!(body, "p:{\"check_id\":1}");
+    }
+
+    #[test]
+    fn test_encode_body_active_response_prefix() {
+        // Agent-originated active-response feedback goes through the
+        // logcollector queue ('1') with an "active-response" source tag.
+        let msg = WazuhMessage::new("001", MessageType::ActiveResponse, "{\"ok\":true}");
+        let body = String::from_utf8(msg.encode_body()).unwrap();
+        assert_eq!(body, "1:active-response:{\"ok\":true}");
+    }
+
+    #[test]
+    fn test_encode_body_control_messages_pass_through() {
+        // Keepalive / Startup / Shutdown already embed their own
+        // Wazuh control header; encode_body must not prepend a queue
+        // byte or the manager rejects them.
+        for mt in [
+            MessageType::Keepalive,
+            MessageType::Startup,
+            MessageType::Shutdown,
+        ] {
+            let msg = WazuhMessage::new("001", mt, "#!-agent payload");
+            let body = String::from_utf8(msg.encode_body()).unwrap();
+            assert_eq!(body, "#!-agent payload");
+        }
     }
 
     #[test]
