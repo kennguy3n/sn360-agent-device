@@ -2,7 +2,7 @@
 //!
 //! - Linux: reads `/sys/class/net/` for MAC, state, MTU; `getifaddrs` for addresses.
 //! - macOS: `getifaddrs` for addresses; `ifconfig` fallback for MAC addresses.
-//! - Windows: stub (returns empty — requires `windows-rs` for full implementation).
+//! - Windows: enumerates adapters via `GetAdaptersAddresses` (IP Helper API).
 
 use serde_json::Value;
 
@@ -10,17 +10,20 @@ use serde_json::Value;
 ///
 /// Returns a vector of syscollector payloads: one `dbsync_netiface` per
 /// interface plus one `dbsync_netaddr` per address.
-///
-/// On non-Unix platforms this returns an empty vector.
-#[cfg(not(unix))]
-pub fn collect_network_info() -> Vec<Value> {
-    tracing::warn!("network interface collection is not yet supported on this platform");
-    Vec::new()
-}
-
 #[cfg(unix)]
 pub fn collect_network_info() -> Vec<Value> {
     unix_impl::collect_network_info()
+}
+
+#[cfg(target_os = "windows")]
+pub fn collect_network_info() -> Vec<Value> {
+    windows_impl::collect_network_info()
+}
+
+#[cfg(not(any(unix, target_os = "windows")))]
+pub fn collect_network_info() -> Vec<Value> {
+    tracing::warn!("network interface collection is not yet supported on this platform");
+    Vec::new()
 }
 
 #[cfg(unix)]
@@ -276,6 +279,244 @@ mod unix_impl {
         fn test_read_mac_address_nonexistent() {
             let mac = read_mac_address("nonexistent_iface_xyz");
             assert!(mac.is_none());
+        }
+    }
+}
+
+#[cfg(target_os = "windows")]
+mod windows_impl {
+    use std::net::{Ipv4Addr, Ipv6Addr};
+    use std::slice;
+
+    use serde_json::Value;
+    use tracing::{debug, warn};
+
+    use windows::Win32::NetworkManagement::IpHelper::{
+        GetAdaptersAddresses, GAA_FLAG_INCLUDE_PREFIX, GAA_FLAG_SKIP_ANYCAST,
+        GAA_FLAG_SKIP_DNS_SERVER, GAA_FLAG_SKIP_MULTICAST, IP_ADAPTER_ADDRESSES_LH,
+        IP_ADAPTER_UNICAST_ADDRESS_LH,
+    };
+    use windows::Win32::NetworkManagement::Ndis::{
+        IfOperStatusDormant, IfOperStatusDown, IfOperStatusLowerLayerDown,
+        IfOperStatusNotPresent, IfOperStatusTesting, IfOperStatusUnknown, IfOperStatusUp,
+        IF_OPER_STATUS,
+    };
+    use windows::Win32::Networking::WinSock::{
+        ADDRESS_FAMILY, AF_INET, AF_INET6, AF_UNSPEC, SOCKADDR_IN, SOCKADDR_IN6,
+    };
+
+    use crate::syscollector_format::{build_netaddr, build_netiface};
+
+    const ERROR_BUFFER_OVERFLOW: u32 = 111;
+    const NO_ERROR: u32 = 0;
+
+    pub fn collect_network_info() -> Vec<Value> {
+        let mut payloads = Vec::new();
+
+        let buffer = match query_adapters() {
+            Some(b) => b,
+            None => return payloads,
+        };
+
+        // Safety: `buffer` outlives this loop and its contents form a
+        // linked list of `IP_ADAPTER_ADDRESSES_LH` nodes laid out by
+        // the kernel.
+        let mut adapter: *const IP_ADAPTER_ADDRESSES_LH =
+            buffer.as_ptr() as *const IP_ADAPTER_ADDRESSES_LH;
+
+        while !adapter.is_null() {
+            let a = unsafe { &*adapter };
+
+            let name = unsafe { wide_ptr_to_string(a.FriendlyName.0) };
+            let mac = format_mac(&a.PhysicalAddress, a.PhysicalAddressLength as usize);
+            let state = oper_status_str(a.OperStatus);
+            let mtu = a.Mtu as u64;
+
+            let iface_data = serde_json::json!({
+                "name": name,
+                "mac": mac,
+                "state": state,
+                "mtu": mtu,
+            });
+            payloads.push(build_netiface(iface_data));
+            debug!(interface = %name, mac = %mac, state = %state, "collected network interface");
+
+            let mut unicast: *const IP_ADAPTER_UNICAST_ADDRESS_LH = a.FirstUnicastAddress;
+            while !unicast.is_null() {
+                let u = unsafe { &*unicast };
+                if let Some(entry) = render_unicast(&name, u) {
+                    payloads.push(build_netaddr(entry));
+                }
+                unicast = u.Next;
+            }
+
+            adapter = a.Next;
+        }
+
+        payloads
+    }
+
+    /// Call `GetAdaptersAddresses` with the grow-on-overflow pattern
+    /// recommended by MSDN. Returns `None` if the API fails.
+    fn query_adapters() -> Option<Vec<u8>> {
+        let flags = GAA_FLAG_INCLUDE_PREFIX
+            | GAA_FLAG_SKIP_ANYCAST
+            | GAA_FLAG_SKIP_MULTICAST
+            | GAA_FLAG_SKIP_DNS_SERVER;
+        let family: u32 = AF_UNSPEC.0 as u32;
+
+        let mut size: u32 = 15_000;
+        let mut buffer: Vec<u8> = vec![0u8; size as usize];
+
+        for _ in 0..3 {
+            let result = unsafe {
+                GetAdaptersAddresses(
+                    family,
+                    flags,
+                    None,
+                    Some(buffer.as_mut_ptr() as *mut IP_ADAPTER_ADDRESSES_LH),
+                    &mut size,
+                )
+            };
+
+            match result {
+                NO_ERROR => return Some(buffer),
+                ERROR_BUFFER_OVERFLOW => {
+                    buffer.resize(size as usize, 0);
+                }
+                other => {
+                    warn!(code = other, "GetAdaptersAddresses failed");
+                    return None;
+                }
+            }
+        }
+
+        warn!("GetAdaptersAddresses kept overflowing; giving up");
+        None
+    }
+
+    /// Convert a null-terminated wide string pointer into a Rust
+    /// `String`. Returns an empty string if the pointer is null.
+    ///
+    /// # Safety
+    /// `ptr` must be null or a valid pointer to a null-terminated
+    /// UTF-16 sequence for the duration of this call.
+    unsafe fn wide_ptr_to_string(ptr: *const u16) -> String {
+        if ptr.is_null() {
+            return String::new();
+        }
+        let mut len = 0usize;
+        while *ptr.add(len) != 0 {
+            len += 1;
+        }
+        let slice = slice::from_raw_parts(ptr, len);
+        String::from_utf16_lossy(slice)
+    }
+
+    fn format_mac(bytes: &[u8], len: usize) -> String {
+        if len == 0 {
+            return String::new();
+        }
+        let end = len.min(bytes.len());
+        bytes[..end]
+            .iter()
+            .map(|b| format!("{:02x}", b))
+            .collect::<Vec<_>>()
+            .join(":")
+    }
+
+    fn oper_status_str(status: IF_OPER_STATUS) -> String {
+        match status {
+            s if s == IfOperStatusUp => "up".to_string(),
+            s if s == IfOperStatusDown => "down".to_string(),
+            s if s == IfOperStatusDormant => "dormant".to_string(),
+            s if s == IfOperStatusNotPresent => "notpresent".to_string(),
+            s if s == IfOperStatusLowerLayerDown => "lowerlayerdown".to_string(),
+            s if s == IfOperStatusTesting => "testing".to_string(),
+            s if s == IfOperStatusUnknown => "unknown".to_string(),
+            _ => "unknown".to_string(),
+        }
+    }
+
+    /// Build a `dbsync_netaddr` payload for a single unicast address.
+    fn render_unicast(iface_name: &str, u: &IP_ADAPTER_UNICAST_ADDRESS_LH) -> Option<Value> {
+        let sockaddr = u.Address.lpSockaddr;
+        if sockaddr.is_null() {
+            return None;
+        }
+
+        let family: ADDRESS_FAMILY = unsafe { (*sockaddr).sa_family };
+        let prefix_len = u.OnLinkPrefixLength;
+
+        if family == AF_INET {
+            let sin = sockaddr as *const SOCKADDR_IN;
+            let raw = unsafe { (*sin).sin_addr.S_un.S_addr };
+            // `S_addr` is stored in network byte order.
+            let ip = Ipv4Addr::from(u32::from_be(raw));
+            let netmask = prefix_to_ipv4_netmask(prefix_len);
+            Some(serde_json::json!({
+                "iface": iface_name,
+                "proto": 0,
+                "address": ip.to_string(),
+                "netmask": netmask,
+                "broadcast": "",
+            }))
+        } else if family == AF_INET6 {
+            let sin6 = sockaddr as *const SOCKADDR_IN6;
+            let bytes = unsafe { (*sin6).sin6_addr.u.Byte };
+            let ip = Ipv6Addr::from(bytes);
+            Some(serde_json::json!({
+                "iface": iface_name,
+                "proto": 1,
+                "address": ip.to_string(),
+                "netmask": prefix_len.to_string(),
+                "broadcast": "",
+            }))
+        } else {
+            None
+        }
+    }
+
+    /// Convert a CIDR prefix length into a dotted IPv4 netmask string.
+    fn prefix_to_ipv4_netmask(prefix: u8) -> String {
+        if prefix == 0 {
+            return "0.0.0.0".to_string();
+        }
+        let prefix = prefix.min(32);
+        let mask: u32 = (!0u32) << (32 - prefix);
+        Ipv4Addr::from(mask).to_string()
+    }
+
+    #[cfg(test)]
+    mod tests {
+        use super::*;
+
+        #[test]
+        fn prefix_to_ipv4_netmask_common_values() {
+            assert_eq!(prefix_to_ipv4_netmask(0), "0.0.0.0");
+            assert_eq!(prefix_to_ipv4_netmask(8), "255.0.0.0");
+            assert_eq!(prefix_to_ipv4_netmask(16), "255.255.0.0");
+            assert_eq!(prefix_to_ipv4_netmask(24), "255.255.255.0");
+            assert_eq!(prefix_to_ipv4_netmask(32), "255.255.255.255");
+        }
+
+        #[test]
+        fn format_mac_six_bytes() {
+            let bytes = [0xDE, 0xAD, 0xBE, 0xEF, 0x00, 0x11, 0, 0];
+            assert_eq!(format_mac(&bytes, 6), "de:ad:be:ef:00:11");
+        }
+
+        #[test]
+        fn format_mac_zero_length_returns_empty() {
+            let bytes = [0u8; 8];
+            assert_eq!(format_mac(&bytes, 0), "");
+        }
+
+        #[test]
+        fn collect_network_info_returns_results() {
+            let payloads = collect_network_info();
+            assert!(!payloads.is_empty(), "expected at least one adapter");
+            assert!(payloads.iter().any(|p| p["type"] == "dbsync_netiface"));
         }
     }
 }

@@ -24,7 +24,7 @@ comparison against the official Wazuh agent 4.9.2.
 | 2.1 | FIM (file integrity monitoring), realtime + scheduled baseline | Complete | inotify / ReadDirectoryChangesW / FSEvents, SHA-256 hashing, deletion detection |
 | 2.2 | Log collection — file tailing | Complete | syslog format, position tracking |
 | 2.3 | Log collection — journald (Linux) | Complete | event-driven via journal fd |
-| 2.4 | Log collection — Windows EventLog | Complete | wevtutil-based reader; upgrade to EvtSubscribe via windows-rs planned |
+| 2.4 | Log collection — Windows EventLog | Complete | native `EvtSubscribe` + `EvtRender` via `windows-rs`, push-based |
 | 2.5 | Log collection — macOS OSLog / unified logging | Complete | /usr/bin/log stream reader with predicate + level filtering |
 | 2.6 | Inventory (syscollector-compatible) | Complete | os, hardware, packages, network |
 | 2.7 | Active response | Complete | block_ip, kill_process, script execution |
@@ -137,14 +137,17 @@ raw numbers. Summary vs. proposal targets:
    rows) without drops. The `wda-inventory` collector still yields
    every row and sleeps 50 ms every 50 rows, so the forwarder has
    time to drain the channel before it fills.
-5. **Windows EventLog uses `wevtutil` CLI** instead of the native
-   `EvtSubscribe` API. Works end-to-end but spawns a subprocess per
-   poll; upgrading to `windows-rs` `EvtSubscribe` would be
-   push-based and lower overhead.
-6. **Windows network inventory returns empty.** The `wda-inventory`
-   Linux/macOS paths enumerate interfaces natively, but the Windows
-   path still returns an empty list pending `windows-rs`
-   `GetAdaptersAddresses` wiring.
+5. ~~**Windows EventLog uses `wevtutil` CLI**~~ **Fixed.** The
+   collector now subscribes via the native `EvtSubscribe` +
+   `EvtRender` APIs through `windows-rs`. Events are delivered
+   push-based to an `EVT_SUBSCRIBE_CALLBACK`, rendered to XML with
+   `EvtRenderEventXml`, parsed into a text summary, and published on
+   the event bus. No subprocess per poll.
+6. ~~**Windows network inventory returns empty.**~~ **Fixed.** A new
+   `windows_impl` module in `wda-inventory/src/network.rs`
+   enumerates adapters via `GetAdaptersAddresses` (`AF_UNSPEC`) and
+   emits `dbsync_netiface` + `dbsync_netaddr` payloads for every
+   adapter and unicast address, matching the Unix output format.
 7. **PAL `PowerMonitor` returns `Unknown`/`None` on macOS and
    Windows.** Non-blocking for core telemetry — `wda-inventory` has
    real hardware/OS implementations — but adaptive power-aware
@@ -155,21 +158,14 @@ raw numbers. Summary vs. proposal targets:
 
 Short list, ordered by impact:
 
-1. **Upgrade Windows EventLog to native `EvtSubscribe` API** via
-   `windows-rs` (currently uses `wevtutil` CLI), and add Windows
-   network inventory collection (currently returns empty) via
-   `GetAdaptersAddresses`.
+1. **FIM throttling / lazy hashing** to get FIM scan peak CPU under
+   3 %.
 2. **Enable release-profile size optimizations** in `Cargo.toml`
    (LTO, `opt-level=z`, `strip`, `panic=abort`) to get under the
    5 MB binary-size target.
-3. **FIM throttling / lazy hashing** to get FIM scan peak CPU under
-   3 %.
-4. **Demote `receive loop` idle warnings** to `debug!`, or change
-   `ConnectionManager::receive` to return `Ok(None)` instead of an
-   `Err` when the peer sends a keep-open but empty frame.
-5. **Increase default event-bus capacity** (or batch inventory rows)
-   so the first-time `syscollector` snapshot never drops events.
-6. **Wire `ServerCommand` events into `wda-active-response`** — the
-   new receive loop now publishes them, but the active_response
+3. **Wire `ServerCommand` events into `wda-active-response`** — the
+   receive loop publishes them, but the active_response
    module still reads only locally-triggered commands. Minor patch
    inside `wda-active-response` to subscribe to `EventKind::ServerCommand`.
+4. **Wire PAL `PowerMonitor` on macOS and Windows** so adaptive
+   battery-vs-AC scheduling works outside Linux.
