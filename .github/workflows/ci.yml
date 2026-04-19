@@ -14,6 +14,7 @@ jobs:
   check:
     name: Format & Lint
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
@@ -30,6 +31,7 @@ jobs:
   test:
     name: Test (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
@@ -47,10 +49,30 @@ jobs:
   build:
     name: Build (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
+        include:
+          - os: ubuntu-latest
+            profile: release
+            profile_dir: release
+            binary: wda-agent
+            artifact: wda-agent-linux
+          - os: macos-latest
+            # macOS GitHub runners are extremely slow under fat LTO; use the
+            # `ci` profile (thin LTO, 4 codegen units) to keep wall-clock time
+            # reasonable. The final release binary is built by the dedicated
+            # release workflow with `--release`.
+            profile: ci
+            profile_dir: ci
+            binary: wda-agent
+            artifact: wda-agent-macos
+          - os: windows-latest
+            profile: release
+            profile_dir: release
+            binary: wda-agent.exe
+            artifact: wda-agent-windows
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
@@ -59,13 +81,21 @@ jobs:
         if: runner.os == 'Linux'
         run: sudo apt-get update && sudo apt-get install -y libsystemd-dev
       - name: Build
-        run: cargo build --release
+        run: cargo build --profile ${{ matrix.profile }} -p wda-agent
+      - name: Upload agent binary
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact }}
+          path: target/${{ matrix.profile_dir }}/${{ matrix.binary }}
+          if-no-files-found: error
+          retention-days: 7
 
   e2e:
     name: E2E Tests (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
     needs: [build]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
@@ -73,20 +103,32 @@ jobs:
           - os: ubuntu-latest
             script: bash tests/scripts/run-e2e.sh
             deps: sudo apt-get update && sudo apt-get install -y libsystemd-dev
-          - os: macos-latest
-            script: bash tests/scripts/run-e2e-macos.sh
-            deps: echo "No extra deps needed"
+            artifact: wda-agent-linux
+            binary: wda-agent
+            profile_dir: release
           - os: windows-latest
             script: pwsh tests/scripts/run-e2e-windows.ps1
             deps: echo "No extra deps needed"
+            artifact: wda-agent-windows
+            binary: wda-agent.exe
+            profile_dir: release
+          # macos-latest is intentionally excluded: GitHub-hosted macOS runners
+          # do not have Docker, which `run-e2e-macos.sh` requires to bring up
+          # a Wazuh manager. The script itself also short-circuits when Docker
+          # is unavailable, but skipping the job entirely avoids burning runner
+          # minutes on a guaranteed no-op.
     steps:
       - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
-      - uses: Swatinem/rust-cache@v2
       - name: Install system dependencies
         run: ${{ matrix.deps }}
-      - name: Build release
-        run: cargo build --release
+      - name: Download prebuilt agent binary
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ matrix.artifact }}
+          path: target/${{ matrix.profile_dir }}
+      - name: Restore executable bit (Unix)
+        if: runner.os != 'Windows'
+        run: chmod +x target/${{ matrix.profile_dir }}/${{ matrix.binary }}
       - name: Run E2E tests
         run: ${{ matrix.script }}
         timeout-minutes: 15

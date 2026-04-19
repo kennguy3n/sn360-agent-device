@@ -120,10 +120,14 @@ if [ "$AUTHD_READY" = false ]; then
 fi
 echo "    Enrollment password configured."
 
-# ── Step 3: Build the agent ──────────────────────────────────────────
+# ── Step 3: Build the agent (skipped if a prebuilt binary is present) ─
 echo "==> Step 3: Building agent..."
-cargo build --release
-echo "    Build complete."
+if [ -x "./target/release/wda-agent" ]; then
+  echo "    Found existing ./target/release/wda-agent; skipping cargo build."
+else
+  cargo build --release
+  echo "    Build complete."
+fi
 
 # ── Step 4: Create test directories ─────────────────────────────────
 echo "==> Step 4: Creating test directories..."

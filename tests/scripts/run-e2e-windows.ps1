@@ -148,14 +148,19 @@ sed -i 's|<logall>no</logall>|<logall>yes</logall>|;s|<logall_json>no</logall_js
     }
     Write-Host '    Enrollment password configured.'
 
-    # ── Step 3: Build the agent ──────────────────────────────────────────
+    # ── Step 3: Build the agent (skipped if a prebuilt binary is present) ─
     Write-Host '==> Step 3: Building agent...'
-    & cargo build --release
-    if ($LASTEXITCODE -ne 0) {
-        Record -Status FAIL -Description 'cargo build --release failed'
-        exit 1
+    $PrebuiltAgent = Join-Path $RepoRoot 'target\release\wda-agent.exe'
+    if (Test-Path $PrebuiltAgent) {
+        Write-Host "    Found existing $PrebuiltAgent; skipping cargo build."
+    } else {
+        & cargo build --release
+        if ($LASTEXITCODE -ne 0) {
+            Record -Status FAIL -Description 'cargo build --release failed'
+            exit 1
+        }
+        Write-Host '    Build complete.'
     }
-    Write-Host '    Build complete.'
 
     # ── Step 4: Create test directories ─────────────────────────────────
     Write-Host '==> Step 4: Creating test directories...'

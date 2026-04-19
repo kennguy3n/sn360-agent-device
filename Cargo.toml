@@ -38,8 +38,11 @@ aes = "0.8"
 cbc = "0.1"
 
 # TLS
-rustls = "0.23"
-tokio-rustls = "0.26"
+# Use `ring` as the crypto backend instead of the default `aws_lc_rs` to avoid
+# pulling in the large/slow-to-compile aws-lc-sys crate. `ring` is already a
+# workspace dependency used elsewhere in the project.
+rustls = { version = "0.23", default-features = false, features = ["ring", "logging", "std", "tls12"] }
+tokio-rustls = { version = "0.26", default-features = false, features = ["ring", "logging", "tls12"] }
 
 # Logging
 tracing = "0.1"
@@ -49,7 +52,9 @@ tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
 notify = "7"
 
 # Database
-rusqlite = { version = "0.32", features = ["bundled"] }
+# Disable default features (which pull in `modern_sqlite` and various extension
+# shims) and only enable `bundled` for a minimal, statically-linked SQLite.
+rusqlite = { version = "0.32", default-features = false, features = ["bundled"] }
 
 # Error handling
 thiserror = "2"
@@ -94,7 +99,6 @@ wda-enhanced-inventory = { path = "crates/wda-enhanced-inventory" }
 # Detection & inventory
 aho-corasick = "1"
 bloomfilter = "1"
-cyclonedx-bom = "0.7"
 
 [profile.release]
 lto = "fat"
@@ -102,6 +106,17 @@ codegen-units = 1
 panic = "abort"
 opt-level = "z"
 strip = true
+
+# CI-oriented release profile: same optimizations as `release` but with
+# thin LTO and multiple codegen units for dramatically faster compile
+# times. Used by the CI `build` and `e2e` jobs where wall-clock time
+# matters more than the last few percent of binary size. The final
+# release binary (fat LTO, 1 codegen unit) is built by the dedicated
+# release/tag workflow using `--release`.
+[profile.ci]
+inherits = "release"
+lto = "thin"
+codegen-units = 4
 
 [profile.release-small]
 inherits = "release"
