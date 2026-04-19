@@ -67,11 +67,18 @@ mod linux_impl {
     /// stronger `Ok` signal means that when the check does fire
     /// ("exists according to kill, absent from /proc") it is a real
     /// rootkit indicator and not permission noise.
+    ///
+    /// PIDs that don't fit in `i32` are skipped: a negative value
+    /// passed to `kill(2)` addresses a process group, which would
+    /// change the probe's meaning entirely.
     fn pid_exists(pid: u32) -> bool {
         use nix::sys::signal::kill;
         use nix::unistd::Pid;
 
-        matches!(kill(Pid::from_raw(pid as i32), None), Ok(()))
+        let Ok(raw_pid) = i32::try_from(pid) else {
+            return false;
+        };
+        matches!(kill(Pid::from_raw(raw_pid), None), Ok(()))
     }
 
     pub fn scan(max_pid: u32) -> Vec<HiddenPid> {
