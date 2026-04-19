@@ -64,6 +64,19 @@ pub enum EventKind {
         result: String,
     },
 
+    // --- Rootcheck events ---
+    /// A rootkit indicator or integrity violation was detected.
+    RootcheckAlert {
+        /// Category of the alert: "signature", "hidden_process", or "binary_integrity".
+        category: String,
+        /// Human-readable title of the alert.
+        title: String,
+        /// Path or subject of the alert (file path, PID, binary path).
+        subject: String,
+        /// Free-form description of what triggered the alert.
+        description: String,
+    },
+
     // --- Active Response events ---
     /// Request to execute an active response action.
     ActiveResponseRequest {

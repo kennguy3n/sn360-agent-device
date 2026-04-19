@@ -309,6 +309,17 @@ async fn main() -> Result<()> {
         agent.register_module(sca_handle);
     }
 
+    // 12e. Start Rootcheck module if enabled
+    if config.modules.rootcheck.enabled {
+        info!("starting rootcheck module");
+        let rc_handle = wda_rootcheck::RootcheckModule::start(
+            &config,
+            agent.event_bus(),
+            agent.shutdown_signal(),
+        );
+        agent.register_module(rc_handle);
+    }
+
     // 13. Start agent and wait for shutdown signal
     agent.start().await;
     agent.wait_for_shutdown().await;
@@ -385,6 +396,11 @@ fn map_event_to_message(agent_id: &str, kind: &EventKind) -> Option<WazuhMessage
             let json =
                 serde_json::to_string(kind).unwrap_or_else(|e| format!("{{\"error\":\"{}\"}}", e));
             (MessageType::ActiveResponse, json)
+        }
+        EventKind::RootcheckAlert { .. } => {
+            let json =
+                serde_json::to_string(kind).unwrap_or_else(|e| format!("{{\"error\":\"{}\"}}", e));
+            (MessageType::Rootcheck, json)
         }
         EventKind::ServerMessage { payload } => (MessageType::Generic, payload.clone()),
         // Lifecycle / internal events are not forwarded.
