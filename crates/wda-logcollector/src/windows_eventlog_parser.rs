@@ -218,8 +218,14 @@ fn decode_entities(input: &str) -> String {
     let mut i = 0;
     while i < bytes.len() {
         if bytes[i] != b'&' {
-            out.push(bytes[i] as char);
-            i += 1;
+            // Copy the run of non-'&' bytes as a str slice so multi-byte
+            // UTF-8 sequences are preserved. Widening bytes individually
+            // to `char` would produce mojibake (e.g. 'é' -> 'Ã©').
+            let start = i;
+            while i < bytes.len() && bytes[i] != b'&' {
+                i += 1;
+            }
+            out.push_str(&input[start..i]);
             continue;
         }
         // Find the terminating ';' within a reasonable window so we
@@ -440,6 +446,21 @@ mod tests {
         </System></Event>"#;
         let msg = parse_event_message(xml);
         assert!(msg.contains("Channel: Application"), "got: {}", msg);
+    }
+
+    #[test]
+    fn decode_entities_preserves_multibyte_utf8() {
+        // An event that mixes non-ASCII text (café, 日本語, emoji) with an
+        // XML entity must not get its multi-byte codepoints mangled.
+        let xml = r#"<Event><EventData>
+            <Data Name='User'>café &amp; 日本語 🎉</Data>
+        </EventData></Event>"#;
+        let msg = parse_event_message(xml);
+        assert!(
+            msg.contains("Data [User]: café & 日本語 🎉"),
+            "got: {}",
+            msg
+        );
     }
 
     #[test]
