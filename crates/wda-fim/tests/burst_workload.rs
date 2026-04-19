@@ -60,6 +60,10 @@ fn create_files_burst(dir: &std::path::Path, count: usize) -> Duration {
 /// progress on a 100 ms cadence even while the FIM module is busy
 /// processing the burst. If the FIM run loop were still computing
 /// hashes inline, those ticks would slip by hundreds of ms.
+#[cfg_attr(
+    target_os = "macos",
+    ignore = "kqueue may drop events under burst load on macOS CI; see docs/known-issues/fim-burst-workload-macos-ci.md"
+)]
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn test_burst_does_not_block_event_loop() {
     let tmp = TempDir::new().unwrap();

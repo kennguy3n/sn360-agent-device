@@ -1,6 +1,6 @@
 # FIM burst workload test hangs on macOS CI
 
-- **Status:** resolved
+- **Status:** mitigated
 - **Affected test:** `wda_fim::tests::burst_workload::test_burst_does_not_block_event_loop`
 - **Source:** `crates/wda-fim/tests/burst_workload.rs`
 - **Environments:** GitHub-hosted `macos-latest` (Apple Silicon, macOS 15). Passes on `ubuntu-latest` and `windows-latest`.
@@ -45,7 +45,7 @@ by `#[tokio::test]`, starving the async executor and therefore the FIM module's 
 loop and the in-test keepalive task. On Linux/Windows CI the bridge caught up in time;
 on macOS CI it did not, and the test hung until the job timeout killed it.
 
-Fixed in `crates/wda-fim/tests/burst_workload.rs` by:
+Mitigated in `crates/wda-fim/tests/burst_workload.rs` by:
 
 1. Switching the attribute on `test_burst_does_not_block_event_loop` from
    `#[tokio::test]` to `#[tokio::test(flavor = "multi_thread", worker_threads = 2)]`
@@ -54,9 +54,17 @@ Fixed in `crates/wda-fim/tests/burst_workload.rs` by:
 2. Moving `create_files_burst(...)` into `tokio::task::spawn_blocking(...)` so the
    synchronous `std::fs::write` loop runs on the blocking pool instead of on a tokio
    worker thread.
-
-With these two changes the test is no longer sensitive to runtime starvation and does
-not need the macOS `#[ignore]` fallback described in the suggested next steps.
+3. Adding a `#[cfg_attr(target_os = "macos", ignore = "...")]` fallback because even
+   with the runtime-starvation bug fixed the test still hung on GitHub-hosted
+   `macos-latest` runners. A re-run with only changes (1) and (2) applied produced
+   `test_burst_does_not_block_event_loop has been running for over 60 seconds` and
+   then ran out to the 30-minute job timeout without emitting any test result,
+   matching the original symptom. This is consistent with suspected cause **#1**
+   (kqueue / `notify` dropping or coalescing events under a 1000-file burst on these
+   runners), which is independent of the runtime-starvation bug the first two changes
+   fix. Following the existing convention in `baseline_scan_integration.rs`, the test
+   is now skipped on macOS. It can still be forced locally with
+   `cargo test -p wda-fim --test burst_workload -- --include-ignored`.
 
 ## Related PR
 
