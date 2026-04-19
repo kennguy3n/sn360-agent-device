@@ -29,13 +29,14 @@ comparison against the official Wazuh agent 4.9.2.
 | 2.6 | Inventory (syscollector-compatible) | Complete | os, hardware, packages, network |
 | 2.7 | Active response | Complete | block_ip, kill_process, script execution |
 | 2.8 | SCA (policy evaluation) | Complete | YAML policies, regex / command / file checks |
-| 2.9 | Rootcheck | Complete | rootkit, hidden-process, suspicious-port checks |
+| 2.9 | Rootcheck | Placeholder | struct skeleton only — no detection logic implemented yet |
 
 ## Phase 3 (this session) — gap-fill work
 
 | # | Task | Status |
 |---|---|---|
 | 3.R | **Server message receive loop** (`crates/wda-agent/src/main.rs`) | **Complete** — `receive_handle` task added that reads frames from the server, parses the leading `#!-execd` / `#!-req` / `#!-up_file` tag, and publishes `EventKind::ServerCommand` on the event bus so the active_response module can consume them |
+| 3.S | **Wire SCA module into agent main loop** (`crates/wda-agent/src/main.rs`) | **Complete** — `ScaModule::start()` added with periodic policy evaluation, wired into agent startup alongside FIM/logcollector/inventory/AR |
 
 Unit tests for `parse_server_command` were added inline to lock the
 parsing of each tag variant, including trailing-null stripping, and are
@@ -60,9 +61,9 @@ Command: `cargo test --all 2>&1 | tee unit-test-results.txt`
 | `wda-local-detection` | 4 |
 | `wda-logcollector` | 1 (24 s) |
 | `wda-pal` | 5 |
-| `wda-rootcheck` | 12 |
+| `wda-rootcheck` | 0 |
 | `wda-sca` | 30 |
-| **Total** | **178** |
+| **Total** | **166** |
 
 Full log: [`unit-test-results.txt`](./unit-test-results.txt).
 
@@ -113,23 +114,21 @@ raw numbers. Summary vs. proposal targets:
    `strip = true`. The remaining ~0.5 MB to hit the < 5 MB target is
    dominated by `rusqlite` (bundled SQLite) and `rustls`; trimming
    unused features there is the next lever to pull.
-2. ~~**FIM scan CPU > 3 % target.**~~ **Substantially fixed.** The FIM
-   real-time pipeline was reworked (see PR #24) to:
-   - emit metadata-only events immediately with `hash_sha256: None`,
-   - compute SHA-256 on the blocking pool behind a `RateLimiter`
-     (`max_hashes_per_sec`, default 100) with `yield_now` between
-     dispatches so keepalive / forwarding keep making progress,
-   - batch bus publications through an `EventBatcher` with
+2. **FIM scan CPU vs. < 3 % target — optimizations merged, benchmark
+   pending.** PR #24 reworked the FIM real-time pipeline with:
+   - lazy hashing — events are emitted immediately with
+     `hash_sha256: None`, and the SHA-256 digest is computed
+     asynchronously on the blocking pool,
+   - a `RateLimiter` (`max_hashes_per_sec`, default 100) with
+     `yield_now` between dispatches so keepalive / forwarding keep
+     making progress,
+   - batched bus publications through an `EventBatcher` with
      configurable `batch_size` / `batch_timeout_ms`.
 
-   On the 1 000-file burst, peak %CPU (1 s pidstat sample) dropped
-   from ~8 % to ~4 % and the 15-s average from 3.40 % to 1.33 %. The
-   remaining gap versus the strict <3 % peak target is within the
-   sampling-window smoothing — the burst itself completes in ~540 ms
-   so a 1 s bucket always captures idle time alongside the active
-   burst. Tuning `max_hashes_per_sec` downward (or widening the
-   batch) is the next lever if the sampled peak needs to drop
-   further. Reproduce with
+   The previous benchmark (pre-merge, captured above: peak ~4 %,
+   15-s avg 1.33 %) still needs to be re-run against the merged
+   pipeline to confirm whether the strict < 3 % peak target is now
+   met end-to-end. Reproduce with
    `bash tests/scripts/fim-burst-bench.sh` (requires `pidstat` from
    `sysstat`).
 3. ~~**Noisy `receive` warnings.**~~ **Fixed.**
@@ -169,11 +168,16 @@ raw numbers. Summary vs. proposal targets:
 
 Short list, ordered by impact:
 
-1. **Trim `rusqlite` / `rustls` feature flags** to claw back the last
-   ~0.5 MB and get the release binary under the 5 MB target.
+1. **Trim unused features from `rusqlite` and `rustls`** to get the
+   release binary under the 5 MB target.
 2. **Wire PAL `PowerMonitor` on macOS and Windows** so adaptive
    battery-vs-AC scheduling works outside Linux.
-3. **Tune FIM defaults for burst-heavy environments.** The
+3. **Implement rootcheck detection logic** (rootkit signatures,
+   hidden-process detection, suspicious-port checks) in
+   `wda-rootcheck` — the crate is currently a struct skeleton only.
+4. **Re-run the FIM burst benchmark after the lazy-hashing merge**
+   to verify the < 3 % CPU target end-to-end.
+5. **Tune FIM defaults for burst-heavy environments.** The
    `max_hashes_per_sec` / `batch_size` / `batch_timeout_ms` knobs
    landed in this phase; the next step is to sweep them against
    representative workloads and pick config-file defaults that keep

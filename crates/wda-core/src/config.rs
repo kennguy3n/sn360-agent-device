@@ -89,7 +89,7 @@ pub struct ModulesConfig {
     #[serde(default)]
     pub inventory: InventoryConfig,
     #[serde(default)]
-    pub sca: ModuleToggle,
+    pub sca: ScaConfig,
     #[serde(default)]
     pub active_response: ActiveResponseConfig,
     #[serde(default)]
@@ -194,6 +194,20 @@ pub struct InventoryConfig {
 pub struct ModuleToggle {
     #[serde(default = "default_true")]
     pub enabled: bool,
+}
+
+/// SCA (Security Configuration Assessment) module configuration.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ScaConfig {
+    /// Whether the SCA module is enabled.
+    #[serde(default = "default_true")]
+    pub enabled: bool,
+    /// Directory containing YAML policy files to load at startup.
+    #[serde(default = "default_sca_policy_dir")]
+    pub policy_dir: PathBuf,
+    /// Interval in seconds between policy re-evaluations (default 12h).
+    #[serde(default = "default_sca_scan_interval")]
+    pub scan_interval: u64,
 }
 
 /// Active response module configuration.
@@ -312,6 +326,23 @@ fn default_inventory_collect() -> Vec<String> {
         "hardware".to_string(),
     ]
 }
+fn default_sca_policy_dir() -> PathBuf {
+    #[cfg(unix)]
+    {
+        PathBuf::from("/etc/wazuh-desktop-agent/sca")
+    }
+    #[cfg(windows)]
+    {
+        PathBuf::from(r"C:\Program Files\WazuhDesktopAgent\sca")
+    }
+    #[cfg(not(any(unix, windows)))]
+    {
+        PathBuf::new()
+    }
+}
+fn default_sca_scan_interval() -> u64 {
+    43200 // 12 hours
+}
 fn default_ar_timeout() -> u64 {
     30
 }
@@ -363,6 +394,16 @@ impl Default for InventoryConfig {
 impl Default for ModuleToggle {
     fn default() -> Self {
         Self { enabled: true }
+    }
+}
+
+impl Default for ScaConfig {
+    fn default() -> Self {
+        Self {
+            enabled: true,
+            policy_dir: default_sca_policy_dir(),
+            scan_interval: default_sca_scan_interval(),
+        }
     }
 }
 

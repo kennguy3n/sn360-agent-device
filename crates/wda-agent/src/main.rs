@@ -301,6 +301,14 @@ async fn main() -> Result<()> {
         agent.register_module(ar_handle);
     }
 
+    // 12d. Start SCA module if enabled
+    if config.modules.sca.enabled {
+        info!("starting SCA module");
+        let sca_handle =
+            wda_sca::ScaModule::start(&config, agent.event_bus(), agent.shutdown_signal());
+        agent.register_module(sca_handle);
+    }
+
     // 13. Start agent and wait for shutdown signal
     agent.start().await;
     agent.wait_for_shutdown().await;
