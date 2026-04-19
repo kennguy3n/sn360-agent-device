@@ -7,7 +7,7 @@
 # Differences from run-e2e.sh (Linux):
 #   - no journald source (macOS has no systemd journal)
 #   - no apt-get based package install test
-#   - FIM database cleanup uses the macOS path under /Library
+#   - FIM db path is the same as Linux (wda-fim uses #[cfg(unix)])
 
 set -euo pipefail
 
@@ -62,9 +62,8 @@ trap cleanup EXIT
 # ── Step 0: Clean up stale state from previous runs ────────────────
 echo "==> Step 0: Cleaning stale state..."
 rm -rf /tmp/wda-e2e-fim /tmp/wda-e2e-logs
-# macOS FIM database lives under /Library (Unix-style path used by wda-fim on macOS).
-sudo rm -f /Library/Application\ Support/wazuh-desktop-agent/fim.db \
-           /var/lib/wazuh-desktop-agent/fim.db
+# wda-fim uses /var/lib/wazuh-desktop-agent/fim.db on all Unix platforms.
+sudo rm -f /var/lib/wazuh-desktop-agent/fim.db
 sudo rm -f /etc/wazuh-desktop-agent/client.keys
 # Remove ALL previously-enrolled agents from the running Wazuh container
 # so re-enrollment succeeds.  List agent IDs and remove each one.

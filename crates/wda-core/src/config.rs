@@ -72,6 +72,11 @@ pub struct EnrollmentConfig {
 
     /// Agent group assignment.
     pub groups: Option<Vec<String>>,
+
+    /// Override for the `client.keys` file location. When unset the
+    /// platform default is used (`/etc/wazuh-desktop-agent/client.keys`
+    /// on Unix, `C:\Program Files\WazuhDesktopAgent\client.keys` on Windows).
+    pub keys_file: Option<PathBuf>,
 }
 
 /// Module enable/disable configuration.
@@ -316,6 +321,7 @@ impl Default for EnrollmentConfig {
             key: None,
             agent_name: None,
             groups: None,
+            keys_file: None,
         }
     }
 }
