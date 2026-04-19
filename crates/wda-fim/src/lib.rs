@@ -407,6 +407,25 @@ fn process_fs_event(
 
     debug!(path = %path.display(), kind = ?kind, "processing FIM event");
 
+    // File Integrity Monitoring targets files, not directories. Some
+    // notify backends (notably macOS FSEvents/kqueue) emit a parent-
+    // directory event alongside or instead of the child file event
+    // when a file is created, modified, or removed inside a watched
+    // directory. Forwarding those as `FileCreated` / `FileModified`
+    // pollutes syscheck with alerts keyed on a directory path that
+    // downstream consumers can't act on.
+    if matches!(
+        kind,
+        FsEventKind::Created | FsEventKind::Modified | FsEventKind::MetadataChanged
+    ) {
+        if let Ok(meta) = std::fs::metadata(&path) {
+            if meta.is_dir() {
+                debug!(path = %path.display(), "skipping FIM event for directory");
+                return pending;
+            }
+        }
+    }
+
     match kind {
         FsEventKind::Created => {
             let path_str = path.to_string_lossy().to_string();
