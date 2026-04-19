@@ -47,7 +47,10 @@ impl Agent {
     pub fn new(config: AgentConfig) -> Self {
         let (event_bus, server_rx) = EventBus::new(
             1024, // broadcast capacity
-            256,  // server queue size
+            1024, // server queue size — large enough to absorb the
+                  // initial syscollector burst (packages, network, etc.)
+                  // without dropping events before the forward loop
+                  // drains them.
         );
 
         let (shutdown_controller, shutdown_signal) = ShutdownController::new();

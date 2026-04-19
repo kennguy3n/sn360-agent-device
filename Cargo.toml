@@ -88,13 +88,11 @@ bloomfilter = "1"
 cyclonedx-bom = "0.7"
 
 [profile.release]
-opt-level = 3
-lto = "thin"
-strip = true
-panic = "abort"
+lto = "fat"
 codegen-units = 1
+panic = "abort"
+opt-level = "z"
+strip = true
 
 [profile.release-small]
 inherits = "release"
-opt-level = "z"
-lto = "fat"

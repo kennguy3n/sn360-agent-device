@@ -102,7 +102,7 @@ raw numbers. Summary vs. proposal targets:
 |---|---|---|---|---|
 | Idle RAM (single process) | < 15 MB | ~56 MB across 5 daemons | 12 MB | **Met** |
 | Idle CPU | < 0.1 % | 0.45 % (`wazuh-agentd` only) | 0.03 % | **Met** |
-| Shipped binary size | < 5 MB | 3.8 MB (5 daemons combined) | 8.0 MB | **Not met** |
+| Shipped binary size | < 5 MB | 3.8 MB (5 daemons combined) | 5.5 MB | **Not met** (down from 8.0 MB after release-profile size flags) |
 | FIM scan peak CPU (1 000 files) | < 3 % | 9 % | 8 % | **Not met** |
 
 ## Known Gaps
@@ -112,15 +112,12 @@ raw numbers. Summary vs. proposal targets:
 2. **macOS OSLog collector** (Phase 2.5) — not started. Same crate,
    same gap. The live-log test was previously disabled on macOS for
    this reason.
-3. **Binary size > 5 MB target.** Current release build is 8.0 MB.
-   `Cargo.toml` does not yet enable:
-   - `lto = "fat"`
-   - `codegen-units = 1`
-   - `panic = "abort"`
-   - `opt-level = "z"`
-   - `strip = true`
-   Turning these on and dropping `reqwest`'s unused features is
-   expected to bring the binary into the target.
+3. **Binary size > 5 MB target.** Release build is now 5.5 MB (down
+   from 8.0 MB) with `[profile.release]` using `lto = "fat"`,
+   `codegen-units = 1`, `panic = "abort"`, `opt-level = "z"`, and
+   `strip = true`. The remaining ~0.5 MB to hit the < 5 MB target is
+   dominated by `rusqlite` (bundled SQLite) and `rustls`; trimming
+   unused features there is the next lever to pull.
 4. **FIM scan CPU > 3 % target.** The current FIM path hashes every
    new file inline in the same task that dispatches the event. Under
    the "create 1 000 files" stress pattern this pushes the peak to
@@ -129,19 +126,22 @@ raw numbers. Summary vs. proposal targets:
    - batching of change events into a single bus message
    - optional lazy/background SHA-256 after the metadata event
    None of these are wired in yet.
-5. **Noisy `receive` warnings.** With the new receive loop, when the
-   manager keeps the connection open but has no data to push, our
-   blocking `receive()` returns `decryption failed: empty decrypted data`
-   every ~500 ms. This is a correctness non-issue (we simply retry),
-   but it floods the log at `WARN`. Should be demoted to `DEBUG` or
-   the read path should distinguish "zero-length frame" from a real
-   decryption failure.
-6. **Event bus back-pressure during first-time inventory.** The E2E
-   log shows bursts of `server event queue full, dropping event` for
-   the `packages` category at startup — the initial syscollector
-   snapshot produces events faster than the comms forwarder can send
-   them. Raising the server-event channel capacity, or batching
-   inventory rows into a single message, would eliminate this.
+5. ~~**Noisy `receive` warnings.**~~ **Fixed.**
+   `ConnectionManager::receive()` now returns
+   `Result<Option<Vec<u8>>, ConnectionError>` and a new
+   `CryptoError::EmptyPayload` variant lets the read path distinguish
+   a legitimate zero-length keep-open frame from a real decryption
+   failure. The agent main loop logs these at `debug!` instead of
+   `warn!`, eliminating the ~2 Hz `failed to receive from server`
+   spam that appeared every time the manager kept the connection
+   idle.
+6. ~~**Event bus back-pressure during first-time inventory.**~~
+   **Fixed.** The default server-event channel capacity was raised
+   from 256 to 1024 in `crates/wda-core/src/agent.rs`, which is
+   enough to absorb the initial syscollector package burst (~900
+   rows) without drops. The `wda-inventory` collector still yields
+   every row and sleeps 50 ms every 50 rows, so the forwarder has
+   time to drain the channel before it fills.
 
 ## Recommended Next Steps
 

@@ -9,8 +9,31 @@ use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::{TcpStream, UdpSocket};
 use tracing::{debug, info, warn};
 
-use crate::crypto::WazuhCipher;
+use crate::crypto::{CryptoError, WazuhCipher};
 use crate::protocol::WazuhMessage;
+
+/// Decrypt a received frame, translating an empty decrypted payload
+/// into `Ok(None)` so the caller can distinguish a legitimate
+/// keep-open frame from a real decryption failure.
+fn decrypt_frame(
+    cipher: Option<&WazuhCipher>,
+    buf: Vec<u8>,
+) -> Result<Option<Vec<u8>>, ConnectionError> {
+    match cipher {
+        Some(cipher) => match cipher.decrypt(&buf) {
+            Ok(plaintext) => Ok(Some(plaintext)),
+            Err(CryptoError::EmptyPayload) => Ok(None),
+            Err(e) => Err(ConnectionError::ReceiveFailed(e.to_string())),
+        },
+        None => {
+            if buf.is_empty() {
+                Ok(None)
+            } else {
+                Ok(Some(buf))
+            }
+        }
+    }
+}
 
 /// Format a host and port into a socket address string.
 ///
@@ -293,7 +316,13 @@ impl ConnectionManager {
     }
 
     /// Receive a message from the server.
-    pub async fn receive(&mut self) -> Result<Vec<u8>, ConnectionError> {
+    ///
+    /// Returns `Ok(Some(bytes))` when a real payload was received,
+    /// `Ok(None)` when the peer sent a legitimate keep-open frame that
+    /// decrypted to an empty body (so callers can distinguish "no data"
+    /// from a real decryption failure), and `Err(_)` on transport or
+    /// decryption errors.
+    pub async fn receive(&mut self) -> Result<Option<Vec<u8>>, ConnectionError> {
         match &self.config.protocol {
             TransportProtocol::Tcp => {
                 let stream = self.stream.as_mut().ok_or(ConnectionError::Closed)?;
@@ -321,15 +350,7 @@ impl ConnectionManager {
                     .await
                     .map_err(|e| ConnectionError::ReceiveFailed(e.to_string()))?;
 
-                // Decrypt if cipher is available
-                if let Some(cipher) = &self.cipher {
-                    let plaintext = cipher
-                        .decrypt(&buf)
-                        .map_err(|e| ConnectionError::ReceiveFailed(e.to_string()))?;
-                    Ok(plaintext)
-                } else {
-                    Ok(buf)
-                }
+                decrypt_frame(self.cipher.as_ref(), buf)
             }
             TransportProtocol::Udp => {
                 let socket = self.udp_socket.as_ref().ok_or(ConnectionError::Closed)?;
@@ -340,14 +361,7 @@ impl ConnectionManager {
                     .map_err(|e| ConnectionError::ReceiveFailed(e.to_string()))?;
                 buf.truncate(n);
 
-                if let Some(cipher) = &self.cipher {
-                    let plaintext = cipher
-                        .decrypt(&buf)
-                        .map_err(|e| ConnectionError::ReceiveFailed(e.to_string()))?;
-                    Ok(plaintext)
-                } else {
-                    Ok(buf)
-                }
+                decrypt_frame(self.cipher.as_ref(), buf)
             }
         }
     }
