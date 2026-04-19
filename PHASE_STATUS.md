@@ -17,15 +17,15 @@ comparison against the official Wazuh agent 4.9.2.
 | 1.6 | Event bus with priority queues and back-pressure handling | Complete |
 | 1.7 | Shutdown signal + task coordination (SIGINT/SIGTERM) | Complete |
 
-## Phase 2 — Detection Modules (7/9 complete)
+## Phase 2 — Detection Modules (9/9 complete)
 
 | # | Task | Status | Notes |
 |---|---|---|---|
 | 2.1 | FIM (file integrity monitoring), realtime + scheduled baseline | Complete | inotify / ReadDirectoryChangesW / FSEvents, SHA-256 hashing, deletion detection |
 | 2.2 | Log collection — file tailing | Complete | syslog format, position tracking |
 | 2.3 | Log collection — journald (Linux) | Complete | event-driven via journal fd |
-| 2.4 | Log collection — Windows EventLog | **Not started** | |
-| 2.5 | Log collection — macOS OSLog / unified logging | **Not started** | |
+| 2.4 | Log collection — Windows EventLog | Complete | wevtutil-based reader; upgrade to EvtSubscribe via windows-rs planned |
+| 2.5 | Log collection — macOS OSLog / unified logging | Complete | /usr/bin/log stream reader with predicate + level filtering |
 | 2.6 | Inventory (syscollector-compatible) | Complete | os, hardware, packages, network |
 | 2.7 | Active response | Complete | block_ip, kill_process, script execution |
 | 2.8 | SCA (policy evaluation) | Complete | YAML policies, regex / command / file checks |
@@ -107,18 +107,13 @@ raw numbers. Summary vs. proposal targets:
 
 ## Known Gaps
 
-1. **Windows EventLog collector** (Phase 2.4) — not started. The
-   `wda-logcollector` crate only handles `file` and `journal` sources.
-2. **macOS OSLog collector** (Phase 2.5) — not started. Same crate,
-   same gap. The live-log test was previously disabled on macOS for
-   this reason.
-3. **Binary size > 5 MB target.** Release build is now 5.5 MB (down
+1. **Binary size > 5 MB target.** Release build is now 5.5 MB (down
    from 8.0 MB) with `[profile.release]` using `lto = "fat"`,
    `codegen-units = 1`, `panic = "abort"`, `opt-level = "z"`, and
    `strip = true`. The remaining ~0.5 MB to hit the < 5 MB target is
    dominated by `rusqlite` (bundled SQLite) and `rustls`; trimming
    unused features there is the next lever to pull.
-4. **FIM scan CPU > 3 % target.** The current FIM path hashes every
+2. **FIM scan CPU > 3 % target.** The current FIM path hashes every
    new file inline in the same task that dispatches the event. Under
    the "create 1 000 files" stress pattern this pushes the peak to
    ~8 %. The proposal calls for:
@@ -126,7 +121,7 @@ raw numbers. Summary vs. proposal targets:
    - batching of change events into a single bus message
    - optional lazy/background SHA-256 after the metadata event
    None of these are wired in yet.
-5. ~~**Noisy `receive` warnings.**~~ **Fixed.**
+3. ~~**Noisy `receive` warnings.**~~ **Fixed.**
    `ConnectionManager::receive()` now returns
    `Result<Option<Vec<u8>>, ConnectionError>` and a new
    `CryptoError::EmptyPayload` variant lets the read path distinguish
@@ -135,20 +130,35 @@ raw numbers. Summary vs. proposal targets:
    `warn!`, eliminating the ~2 Hz `failed to receive from server`
    spam that appeared every time the manager kept the connection
    idle.
-6. ~~**Event bus back-pressure during first-time inventory.**~~
+4. ~~**Event bus back-pressure during first-time inventory.**~~
    **Fixed.** The default server-event channel capacity was raised
    from 256 to 1024 in `crates/wda-core/src/agent.rs`, which is
    enough to absorb the initial syscollector package burst (~900
    rows) without drops. The `wda-inventory` collector still yields
    every row and sleeps 50 ms every 50 rows, so the forwarder has
    time to drain the channel before it fills.
+5. **Windows EventLog uses `wevtutil` CLI** instead of the native
+   `EvtSubscribe` API. Works end-to-end but spawns a subprocess per
+   poll; upgrading to `windows-rs` `EvtSubscribe` would be
+   push-based and lower overhead.
+6. **Windows network inventory returns empty.** The `wda-inventory`
+   Linux/macOS paths enumerate interfaces natively, but the Windows
+   path still returns an empty list pending `windows-rs`
+   `GetAdaptersAddresses` wiring.
+7. **PAL `PowerMonitor` returns `Unknown`/`None` on macOS and
+   Windows.** Non-blocking for core telemetry — `wda-inventory` has
+   real hardware/OS implementations — but adaptive power-aware
+   scheduling (battery vs AC profile switching) is not yet wired up
+   outside Linux.
 
 ## Recommended Next Steps
 
 Short list, ordered by impact:
 
-1. **Ship Windows EventLog + macOS OSLog collectors** (Phase 2.4/2.5)
-   — the only proposal items not yet implemented.
+1. **Upgrade Windows EventLog to native `EvtSubscribe` API** via
+   `windows-rs` (currently uses `wevtutil` CLI), and add Windows
+   network inventory collection (currently returns empty) via
+   `GetAdaptersAddresses`.
 2. **Enable release-profile size optimizations** in `Cargo.toml`
    (LTO, `opt-level=z`, `strip`, `panic=abort`) to get under the
    5 MB binary-size target.
