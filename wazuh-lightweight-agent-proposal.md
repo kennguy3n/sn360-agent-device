@@ -20,21 +20,21 @@
 10. [Security Architecture](#10-security-architecture)
 11. [Configuration & Deployment](#11-configuration--deployment)
 12. [Implementation Roadmap](#12-implementation-roadmap)
-13. [Risk Assessment](#13-risk-assessment)
-14. [Appendix: Wazuh Source Analysis](#14-appendix-wazuh-source-analysis)
-15. [Local Wazuh Server Test Environment](#15-local-wazuh-server-test-environment)
-16. [Summary](#16-summary)
-17. [Phase 4 Detail: Edge Detection, Software Inventory & Tenant Rule Distribution](#17-phase-4-detail-edge-detection-software-inventory--tenant-rule-distribution)
-    - 17.1 [Local Detection Engine (LDE) Module](#171-local-detection-engine-lde-module)
-    - 17.2 [Enhanced Software Inventory Module](#172-enhanced-software-inventory-module)
-    - 17.3 [Companion Microservices](#173-companion-microservices)
-      - 17.3.1 [Tenant Rule Distribution Service (TRDS)](#1731-tenant-rule-distribution-service-trds)
-      - 17.3.2 [IOC Feed Aggregator Service (IOCFS)](#1732-ioc-feed-aggregator-service-iocfs)
-      - 17.3.3 [Software Inventory Service (SIS)](#1733-software-inventory-service-sis)
-    - 17.4 [Agent Gateway](#174-agent-gateway)
-    - 17.5 [Updated Resource Budget](#175-updated-resource-budget)
-    - 17.6 [Updated Configuration](#176-updated-configuration)
-    - 17.7 [New Crate Structure](#177-new-crate-structure)
+13. [Phase 4 Detail: Edge Detection, Software Inventory & Tenant Rule Distribution](#13-phase-4-detail-edge-detection-software-inventory--tenant-rule-distribution)
+    - 13.1 [Local Detection Engine (LDE) Module](#131-local-detection-engine-lde-module)
+    - 13.2 [Enhanced Software Inventory Module](#132-enhanced-software-inventory-module)
+    - 13.3 [Companion Microservices](#133-companion-microservices)
+      - 13.3.1 [Tenant Rule Distribution Service (TRDS)](#1331-tenant-rule-distribution-service-trds)
+      - 13.3.2 [IOC Feed Aggregator Service (IOCFS)](#1332-ioc-feed-aggregator-service-iocfs)
+      - 13.3.3 [Software Inventory Service (SIS)](#1333-software-inventory-service-sis)
+    - 13.4 [Agent Gateway](#134-agent-gateway)
+    - 13.5 [Updated Resource Budget](#135-updated-resource-budget)
+    - 13.6 [Updated Configuration](#136-updated-configuration)
+    - 13.7 [New Crate Structure](#137-new-crate-structure)
+14. [Risk Assessment](#14-risk-assessment)
+15. [Appendix: Wazuh Source Analysis](#15-appendix-wazuh-source-analysis)
+16. [Local Wazuh Server Test Environment](#16-local-wazuh-server-test-environment)
+17. [Summary](#17-summary)
 
 ---
 
@@ -1000,7 +1000,371 @@ Management:
 
 ---
 
-## 13. Risk Assessment
+## 13. Phase 4 Detail: Edge Detection, Software Inventory & Tenant Rule Distribution
+
+This section expands on Phase 4 of the implementation roadmap, detailing the Local Detection Engine, Enhanced Software Inventory module, and the companion microservices that support them.
+
+### 13.1 Local Detection Engine (LDE) Module
+
+The LDE enables the agent to evaluate detection rules locally — without a round-trip to the server — for low-latency threat response at the edge. It consumes events from the Event Bus, matches them against a tenant-specific rule store, and dispatches local responses when a rule fires.
+
+```
+Local Detection Engine (LDE)
+  |
+  +-- Rule Store (mmap, read-only)
+  |     - MessagePack-encoded rule bundles
+  |     - Versioned: pulled from TRDS, hot-reloaded on update
+  |     - Sections: IOC lists, behavioral rules, YARA rule refs
+  |
+  +-- Micro Rule Evaluator
+  |     +-- Aho-Corasick Pattern Matcher
+  |     |     - Multi-pattern string search across event fields
+  |     |     - Used for IOC domain/hash/IP matching
+  |     |
+  |     +-- IOC Bloom Filter Evaluator
+  |     |     - Pre-compiled bloom filters from IOCFS
+  |     |     - O(1) negative lookups for hashes, IPs, domains
+  |     |
+  |     +-- Behavioral Rule State Machine
+  |           - JSON DSL rules compiled to state machines
+  |           - Tracks sequences (e.g., "process A spawns B within 5 min")
+  |           - Sliding-window counters for threshold rules
+  |
+  +-- Local Response Dispatcher
+  |     - block_ip: platform-native firewall rule insertion
+  |     - kill_process: terminate matching PID
+  |     - quarantine: move file to quarantine directory + strip execute bits
+  |     - notify: emit high-priority alert to Event Bus → server
+  |
+  +-- YARA Scanner (feature-gated: `yara`)
+  |     - On-demand file scanning triggered by FIM events
+  |     - Uses yara-rust crate (links libyara)
+  |     - Rule files pulled alongside detection rules from TRDS
+  |     - Scans rate-limited to 1 file/sec to stay within CPU budget
+  |
+  +-- Telemetry Forwarder
+  |     - All detection events (hit or miss stats) batched to server
+  |     - Offline detection queue: SQLite WAL table
+  |     - Syncs queued detections on server reconnect
+  |
+  +-- Offline Detection Queue
+        - SQLite WAL-mode table for detections generated while offline
+        - Bounded: max 10,000 entries, FIFO eviction
+        - Synced to server on reconnect via batched upload
+```
+
+**LDE Resource Budget:**
+
+| Component | Memory | CPU | Notes |
+|---|---|---|---|
+| Rule store (mmap) | 1-2 MB | — | Memory-mapped, OS paging handles eviction |
+| Aho-Corasick automaton | 0.5 MB | <0.5% per event batch | Built once per rule reload |
+| Bloom filters | 0.25 MB | O(1) per lookup | ~2 MB on disk, partial mmap |
+| Behavioral state machines | 0.5 MB | <0.1% | Sliding windows bounded by rule count |
+| YARA scanner (optional) | 2 MB | <2% during scan | Only loaded when `yara` feature enabled |
+| Offline queue (SQLite) | 0.25 MB | Negligible | Shared WAL with agent state DB |
+| **Total (without YARA)** | **~2.5 MB** | **<1%** | |
+| **Total (with YARA)** | **~4.5 MB** | **<3% during scan** | |
+
+### 13.2 Enhanced Software Inventory Module
+
+The Enhanced Software Inventory module extends the existing Inventory module with running-software monitoring, browser extension enumeration, and on-demand SBOM generation.
+
+```
+Enhanced Software Inventory Module
+  |
+  +-- Installed Software Tracker (existing, enhanced)
+  |     - Package DB watchers (dpkg/rpm/Homebrew/MSI/AppX)
+  |     - Event-driven: re-enumerates only on DB change
+  |
+  +-- Running Software Monitor
+  |     Linux:   /proc polling (idle-only, 60s interval) + netlink proc events
+  |     macOS:   NSWorkspace notifications + kqueue EVFILT_PROC
+  |     Windows: WMI Win32_Process event subscription + ETW process events
+  |     Output:  { name, version, pid, path, sha256, started_at, publisher }
+  |
+  +-- Browser Extension Inventory
+  |     Chrome:   ~/.config/google-chrome/*/Extensions/*/manifest.json
+  |     Firefox:  ~/.mozilla/firefox/*/extensions.json
+  |     Edge:     ~/.config/microsoft-edge/*/Extensions/*/manifest.json
+  |     Safari:   ~/Library/Safari/Extensions/ (macOS)
+  |     Output:  { browser, ext_id, name, version, permissions[], store_url }
+  |     Trigger: FSEvents / inotify on profile directories, plus scheduled (4h)
+  |
+  +-- SBOM Generator (on-demand)
+  |     - Generates CycloneDX 1.5 JSON BOM
+  |     - Sources: installed packages + running software + browser extensions
+  |     - Triggered by server request or local schedule
+  |     - Output written to local file + forwarded to SIS
+  |
+  +-- Normalized Output Format
+        - All inventory sources emit unified JSON schema:
+          { source: "installed"|"running"|"browser_ext",
+            name, version, publisher, platform_id,
+            sha256?, install_path?, detected_at }
+        - Batched to server every inventory interval (default: 1h)
+        - Delta reporting: only changed entries sent after initial baseline
+```
+
+**Enhanced Inventory Resource Budget:**
+
+| Component | Memory | CPU | Notes |
+|---|---|---|---|
+| Running software monitor | 0.5 MB | <0.1% idle | Event-driven where possible |
+| Browser extension cache | 0.25 MB | Negligible | Re-scanned on FS change events |
+| SBOM generator | 1 MB (transient) | <2% during generation | On-demand only, freed after output |
+| **Total additional** | **~0.75 MB steady** | **<0.2%** | |
+
+### 13.3 Companion Microservices
+
+The Phase 4 companion microservices run server-side within the SN360 Control Plane. They manage rule lifecycle, IOC feeds, and software inventory analysis.
+
+```
++-----------------------------------------------------------------------+
+|                        SN360 Control Plane                             |
++-----------------------------------------------------------------------+
+|                                                                        |
+|  +------------------+  +------------------+  +------------------+      |
+|  | Tenant Rule      |  | IOC Feed         |  | Software         |      |
+|  | Distribution     |  | Aggregator       |  | Inventory        |      |
+|  | Service (TRDS)   |  | Service (IOCFS)  |  | Service (SIS)    |      |
+|  +--------+---------+  +--------+---------+  +--------+---------+      |
+|           |                      |                      |              |
+|  +--------v----------------------v----------------------v---------+    |
+|  |                       Message Queue                             |   |
+|  |           (rule updates, IOC deltas, inventory batches)         |   |
+|  +----------------------------+------------------------------------+   |
+|                               |                                        |
+|  +----------------------------v------------------------------------+   |
+|  |                      Agent Gateway                               |  |
+|  |  - mTLS termination          - Tenant routing                    |  |
+|  |  - Rate limiting              - Protocol translation             |  |
+|  +----------------------------+------------------------------------+   |
+|                               |                                        |
++-----------------------------------------------------------------------+
+                                |
+                    +-----------v-----------+
+                    |   WDA Agents (edge)    |
+                    +-----------------------+
+```
+
+#### 13.3.1 Tenant Rule Distribution Service (TRDS)
+
+The TRDS manages the lifecycle of detection rules across tenants, compiles them into agent-consumable bundles, and distributes delta updates.
+
+**API Endpoints:**
+
+| Method | Path | Description |
+|---|---|---|
+| POST | `/api/v1/tenants/{tid}/rules` | Create a new rule |
+| GET | `/api/v1/tenants/{tid}/rules` | List rules (filterable by type, status) |
+| PUT | `/api/v1/tenants/{tid}/rules/{rid}` | Update a rule |
+| DELETE | `/api/v1/tenants/{tid}/rules/{rid}` | Soft-delete a rule |
+| POST | `/api/v1/tenants/{tid}/rules/compile` | Trigger bundle compilation |
+| GET | `/api/v1/tenants/{tid}/bundles/latest` | Get latest compiled bundle metadata |
+| GET | `/api/v1/tenants/{tid}/bundles/{version}/delta?from={prev}` | Get delta update |
+
+**Rule Types:**
+
+| Type | Format | Agent Evaluation |
+|---|---|---|
+| IOC list | CSV/STIX → bloom filter + Aho-Corasick | Pattern match on event fields |
+| Behavioral | JSON DSL (sequence, threshold, boolean) | State machine evaluation |
+| YARA | `.yar` files | File content scanning (feature-gated) |
+| Exclusion | Allowlist entries (hash, path, signer) | Skip matching entries |
+
+**Workflow:**
+
+1. Analyst creates/updates rules via API or dashboard
+2. TRDS validates rule syntax and compiles to agent-native format
+3. Compiled bundle is versioned and stored (S3/MinIO)
+4. Delta diff computed against previous bundle version
+5. Agents poll for updates (or receive push notification via gateway)
+6. Agent downloads delta, applies to local rule store, hot-reloads LDE
+
+**Storage:** PostgreSQL (rule metadata, tenant config) + S3-compatible object store (compiled bundles).
+
+**Footprint:** 2 vCPU, 2 GB RAM per instance. Horizontally scalable behind load balancer.
+
+#### 13.3.2 IOC Feed Aggregator Service (IOCFS)
+
+The IOCFS ingests threat intelligence feeds, normalizes IOCs, and compiles them into optimized data structures for agent consumption.
+
+**Sources:**
+
+| Feed | Format | Refresh Interval |
+|---|---|---|
+| MISP (self-hosted or community) | MISP JSON | 15 min |
+| Abuse.ch (URLhaus, MalBazaar, ThreatFox) | CSV | 1 hour |
+| AlienVault OTX | STIX/TAXII 2.1 | 1 hour |
+| Custom tenant feeds | CSV/STIX upload | On upload |
+
+**Processing Pipeline:**
+
+1. Ingest: pull/receive IOCs from configured feeds
+2. Normalize: map to unified schema `{ type, value, confidence, source, expires_at }`
+3. Deduplicate: merge across feeds, keep highest confidence
+4. Compile:
+   - Bloom filters (one per IOC type: hash, domain, IP, URL) — target FPR: 0.01%
+   - Aho-Corasick automaton for string-matchable IOCs
+5. Package: MessagePack bundle with version metadata
+6. Publish: push to TRDS for inclusion in tenant rule bundles
+
+**Output Size Targets:**
+
+| IOC Type | Typical Count | Bloom Filter Size | Aho-Corasick Size |
+|---|---|---|---|
+| File hashes (SHA-256) | 500K | ~1.2 MB | N/A (bloom only) |
+| Domains | 100K | ~240 KB | ~400 KB |
+| IPv4 addresses | 50K | ~120 KB | N/A (bloom only) |
+| URLs | 200K | ~480 KB | ~800 KB |
+| **Total** | **~850K IOCs** | **~2 MB** | **~1.2 MB** |
+
+**Footprint:** 2 vCPU, 4 GB RAM (bloom filter compilation is memory-intensive). Single instance with HA failover.
+
+#### 13.3.3 Software Inventory Service (SIS)
+
+The SIS ingests software inventory from agents, matches against CVE databases, and provides dashboard APIs for vulnerability visibility.
+
+**Ingest:**
+
+- Receives normalized inventory batches from agents via Agent Gateway
+- Stores per-agent inventory snapshots in PostgreSQL (partitioned by tenant)
+- Computes diffs: tracks install/uninstall/upgrade events over time
+
+**CVE Matching:**
+
+- NVD CPE dictionary + known exploited vulnerabilities (CISA KEV)
+- CPE matching: software name + version → CVE lookup
+- Refresh: NVD feed pulled every 2 hours
+- Results stored per-agent: `{ cve_id, severity, software_name, version, fix_available }`
+
+**Dashboard Integration:**
+
+| Endpoint | Description |
+|---|---|
+| `GET /api/v1/tenants/{tid}/inventory` | Aggregated software inventory |
+| `GET /api/v1/tenants/{tid}/inventory/{agent_id}` | Per-agent inventory |
+| `GET /api/v1/tenants/{tid}/vulnerabilities` | All matched CVEs |
+| `GET /api/v1/tenants/{tid}/vulnerabilities/critical` | Critical/high severity CVEs |
+| `GET /api/v1/tenants/{tid}/sbom/{agent_id}` | Download agent SBOM (CycloneDX) |
+
+**Storage:** PostgreSQL (inventory + CVE matches, partitioned by tenant). NVD mirror in local cache (~2 GB).
+
+**Footprint:** 2 vCPU, 4 GB RAM per instance. Horizontally scalable for large deployments.
+
+### 13.4 Agent Gateway
+
+The Agent Gateway is the single entry point for all agent-to-server communication in the SN360 control plane.
+
+**Responsibilities:**
+
+- **mTLS termination:** Validates agent client certificates, extracts tenant ID from cert subject
+- **Tenant routing:** Routes requests to the correct tenant-scoped backend services
+- **Rate limiting:** Per-agent and per-tenant rate limits to prevent abuse
+- **Protocol translation:** Accepts agent binary protocol, translates to internal gRPC/HTTP
+- **Connection pooling:** Maintains persistent connections to backend services
+
+**Configuration:**
+
+| Parameter | Default | Description |
+|---|---|---|
+| `listen_address` | `0.0.0.0:8443` | mTLS listener |
+| `max_connections` | 50,000 | Per-instance connection limit |
+| `rate_limit_per_agent` | 100 req/min | Per-agent request rate limit |
+| `rate_limit_per_tenant` | 10,000 req/min | Per-tenant aggregate limit |
+| `backend_pool_size` | 64 | Connection pool to each backend service |
+
+**Footprint:** 2 vCPU, 1 GB RAM per instance. Horizontally scalable behind L4 load balancer.
+
+### 13.5 Updated Resource Budget
+
+With the LDE and Enhanced Inventory modules, the WDA memory projection is updated:
+
+```
+WDA (projected, with Phase 4 modules):
+  RSS: ~15 MB (without YARA), ~17 MB (with YARA)
+    - Agent core + runtime:       2.0 MB
+    - SQLite FIM DB (mmap):       3.0 MB
+    - Log collector buffers:      1.0 MB
+    - Inventory cache:            1.0 MB
+    - Enhanced inventory:         0.75 MB  (running sw + browser ext)
+    - Network/TLS buffers:        1.0 MB
+    - SCA policy cache:           0.5 MB
+    - LDE rule store (mmap):     1.5 MB
+    - LDE Aho-Corasick + bloom:  0.75 MB
+    - LDE behavioral state:      0.5 MB
+    - LDE offline queue:         0.25 MB
+    - Stack (2-3 threads):       1.5 MB
+    - Other:                     1.25 MB
+    - YARA scanner (optional):  +2.0 MB
+```
+
+### 13.6 Updated Configuration
+
+The following sections are added to `config.yaml` for the new Phase 4 modules:
+
+```yaml
+modules:
+  # ... existing modules ...
+
+  local_detection:
+    enabled: true
+    rule_pull_interval: 300      # seconds, poll TRDS for rule updates
+    offline_queue_max: 10000     # max queued detections while offline
+    response_actions:
+      block_ip: true
+      kill_process: true
+      quarantine: true
+    yara:
+      enabled: false             # feature-gated, requires 'yara' build feature
+      scan_rate_limit: 1         # files per second
+      max_file_size_mb: 50       # skip files larger than this
+    bloom_filter:
+      false_positive_rate: 0.01
+    behavioral:
+      max_window_sec: 300        # max sliding window for sequence rules
+      max_tracked_entities: 5000 # max concurrent entity state machines
+
+  enhanced_inventory:
+    enabled: true
+    running_software:
+      enabled: true
+      interval: 60               # seconds between running-sw snapshots
+    browser_extensions:
+      enabled: true
+      browsers:
+        - chrome
+        - firefox
+        - edge
+        - safari
+      interval: 14400            # seconds (4h) scheduled re-scan
+    sbom:
+      enabled: true
+      format: cyclonedx          # cyclonedx | spdx (future)
+      on_demand: true            # allow server-triggered generation
+      scheduled_interval: 86400  # seconds (24h), 0 to disable scheduled
+```
+
+### 13.7 New Crate Structure
+
+Two new crates are added to the workspace:
+
+- **`wda-local-detection`** — Local Detection Engine: rule store, pattern matching, behavioral evaluation, response dispatch, YARA integration (feature-gated).
+- **`wda-enhanced-inventory`** — Enhanced Software Inventory: running software monitor, browser extension inventory, SBOM generator.
+
+**New workspace dependencies:**
+
+| Crate | Version | Purpose |
+|---|---|---|
+| `aho-corasick` | 1 | Multi-pattern string matching for IOC detection |
+| `bloomfilter` | 1 | Bloom filter data structure for O(1) IOC lookups |
+| `yara` | 0.28 (optional) | YARA rule scanning via yara-rust bindings |
+| `cyclonedx-bom` | 0.7 | CycloneDX SBOM generation |
+
+---
+
+## 14. Risk Assessment
 
 | Risk | Likelihood | Impact | Mitigation |
 |---|---|---|---|
@@ -1014,7 +1378,7 @@ Management:
 
 ---
 
-## 14. Appendix: Wazuh Source Analysis
+## 15. Appendix: Wazuh Source Analysis
 
 ### A. Module Dependency Graph (Agent Build)
 
@@ -1107,11 +1471,11 @@ WDA (projected same endpoint):
 
 ---
 
-## 15. Local Wazuh Server Test Environment
+## 16. Local Wazuh Server Test Environment
 
 This section describes how to stand up a **local Wazuh server** for development and integration testing of the WDA agent. The recommended approach uses the official Wazuh Docker deployment — it is the fastest way to get the full stack (manager, indexer, dashboard) running on a single machine.
 
-### 15.1 Prerequisites
+### 16.1 Prerequisites
 
 - **Docker Engine 24+** and **Docker Compose v2**
 - At least **4 GB RAM** available for the server stack
@@ -1123,7 +1487,7 @@ This section describes how to stand up a **local Wazuh server** for development 
   | 443 | Wazuh dashboard (web UI) |
   | 55000 | Wazuh manager API |
 
-### 15.2 Download & Start the Wazuh Server (Docker)
+### 16.2 Download & Start the Wazuh Server (Docker)
 
 ```bash
 # Clone the official Wazuh Docker deployment
@@ -1141,7 +1505,7 @@ docker compose up -d
 >
 > **Default credentials:** `admin` / `SecretPassword` (for the dashboard at https://localhost:443).
 
-### 15.3 Verify the Server Is Running
+### 16.3 Verify the Server Is Running
 
 ```bash
 # Check all containers are healthy
@@ -1151,7 +1515,7 @@ docker compose ps
 curl -k -u admin:SecretPassword https://localhost:55000/?pretty
 ```
 
-### 15.4 Configure the Server for WDA Testing
+### 16.4 Configure the Server for WDA Testing
 
 **Retrieve the enrollment password** from the manager container:
 
@@ -1173,7 +1537,7 @@ docker exec -it single-node-wazuh.manager-1 \
   /var/ossec/bin/wazuh-control status
 ```
 
-### 15.5 Enroll & Connect the WDA Agent
+### 16.5 Enroll & Connect the WDA Agent
 
 Create a test configuration file (`test-config.yaml`) pointing at the local Docker server:
 
@@ -1232,7 +1596,7 @@ cargo build
 RUST_LOG=debug cargo run --bin wda-agent -- --config ./test-config.yaml
 ```
 
-### 15.6 Functional Verification Checklist
+### 16.6 Functional Verification Checklist
 
 Use the following checklist to verify each module works against the local test server:
 
@@ -1246,14 +1610,14 @@ Use the following checklist to verify each module works against the local test s
 | **SCA** | Agent runs SCA policies | Dashboard → Agents → (agent) → SCA shows policy results |
 | **Active Response** | Trigger from server: `/var/ossec/bin/agent_control -b 10.0.0.99 -f firewall-drop0 -u <AGENT_ID>` | Agent logs show active response execution |
 
-### 15.7 Teardown
+### 16.7 Teardown
 
 ```bash
 cd wazuh-docker/single-node
 docker compose down -v   # -v removes volumes (all data)
 ```
 
-### 15.8 Alternative: Bare-Metal / VM Server Install
+### 16.8 Alternative: Bare-Metal / VM Server Install
 
 For longer-lived test environments, you can install the Wazuh server directly on a Linux VM using the official quickstart:
 
@@ -1266,7 +1630,7 @@ This installs the full stack (manager + indexer + dashboard) on a single machine
 
 ---
 
-## 16. Summary
+## 17. Summary
 
 The Wazuh Desktop Agent (WDA) is a ground-up reimagining of the Wazuh endpoint agent for user-facing devices. By leveraging Rust's zero-cost abstractions, event-driven OS APIs, adaptive resource management, and a modular architecture that loads only what's needed, WDA achieves a 7-10x reduction in memory usage and near-invisible CPU impact compared to the current agent.
 
@@ -1281,370 +1645,6 @@ The 30-week implementation roadmap breaks the work into six clear phases, each w
 6. **Memory-bounded** -- every component has a hard memory budget
 7. **Edge detection** -- local rule evaluation and response without server dependency
 8. **Comprehensive software inventory** -- running apps, browser extensions, SBOM generation with event-driven tracking
-
----
-
-## 17. Phase 4 Detail: Edge Detection, Software Inventory & Tenant Rule Distribution
-
-This section expands on Phase 4 of the implementation roadmap, detailing the Local Detection Engine, Enhanced Software Inventory module, and the companion microservices that support them.
-
-### 17.1 Local Detection Engine (LDE) Module
-
-The LDE enables the agent to evaluate detection rules locally — without a round-trip to the server — for low-latency threat response at the edge. It consumes events from the Event Bus, matches them against a tenant-specific rule store, and dispatches local responses when a rule fires.
-
-```
-Local Detection Engine (LDE)
-  |
-  +-- Rule Store (mmap, read-only)
-  |     - MessagePack-encoded rule bundles
-  |     - Versioned: pulled from TRDS, hot-reloaded on update
-  |     - Sections: IOC lists, behavioral rules, YARA rule refs
-  |
-  +-- Micro Rule Evaluator
-  |     +-- Aho-Corasick Pattern Matcher
-  |     |     - Multi-pattern string search across event fields
-  |     |     - Used for IOC domain/hash/IP matching
-  |     |
-  |     +-- IOC Bloom Filter Evaluator
-  |     |     - Pre-compiled bloom filters from IOCFS
-  |     |     - O(1) negative lookups for hashes, IPs, domains
-  |     |
-  |     +-- Behavioral Rule State Machine
-  |           - JSON DSL rules compiled to state machines
-  |           - Tracks sequences (e.g., "process A spawns B within 5 min")
-  |           - Sliding-window counters for threshold rules
-  |
-  +-- Local Response Dispatcher
-  |     - block_ip: platform-native firewall rule insertion
-  |     - kill_process: terminate matching PID
-  |     - quarantine: move file to quarantine directory + strip execute bits
-  |     - notify: emit high-priority alert to Event Bus → server
-  |
-  +-- YARA Scanner (feature-gated: `yara`)
-  |     - On-demand file scanning triggered by FIM events
-  |     - Uses yara-rust crate (links libyara)
-  |     - Rule files pulled alongside detection rules from TRDS
-  |     - Scans rate-limited to 1 file/sec to stay within CPU budget
-  |
-  +-- Telemetry Forwarder
-  |     - All detection events (hit or miss stats) batched to server
-  |     - Offline detection queue: SQLite WAL table
-  |     - Syncs queued detections on server reconnect
-  |
-  +-- Offline Detection Queue
-        - SQLite WAL-mode table for detections generated while offline
-        - Bounded: max 10,000 entries, FIFO eviction
-        - Synced to server on reconnect via batched upload
-```
-
-**LDE Resource Budget:**
-
-| Component | Memory | CPU | Notes |
-|---|---|---|---|
-| Rule store (mmap) | 1-2 MB | — | Memory-mapped, OS paging handles eviction |
-| Aho-Corasick automaton | 0.5 MB | <0.5% per event batch | Built once per rule reload |
-| Bloom filters | 0.25 MB | O(1) per lookup | ~2 MB on disk, partial mmap |
-| Behavioral state machines | 0.5 MB | <0.1% | Sliding windows bounded by rule count |
-| YARA scanner (optional) | 2 MB | <2% during scan | Only loaded when `yara` feature enabled |
-| Offline queue (SQLite) | 0.25 MB | Negligible | Shared WAL with agent state DB |
-| **Total (without YARA)** | **~2.5 MB** | **<1%** | |
-| **Total (with YARA)** | **~4.5 MB** | **<3% during scan** | |
-
-### 17.2 Enhanced Software Inventory Module
-
-The Enhanced Software Inventory module extends the existing Inventory module with running-software monitoring, browser extension enumeration, and on-demand SBOM generation.
-
-```
-Enhanced Software Inventory Module
-  |
-  +-- Installed Software Tracker (existing, enhanced)
-  |     - Package DB watchers (dpkg/rpm/Homebrew/MSI/AppX)
-  |     - Event-driven: re-enumerates only on DB change
-  |
-  +-- Running Software Monitor
-  |     Linux:   /proc polling (idle-only, 60s interval) + netlink proc events
-  |     macOS:   NSWorkspace notifications + kqueue EVFILT_PROC
-  |     Windows: WMI Win32_Process event subscription + ETW process events
-  |     Output:  { name, version, pid, path, sha256, started_at, publisher }
-  |
-  +-- Browser Extension Inventory
-  |     Chrome:   ~/.config/google-chrome/*/Extensions/*/manifest.json
-  |     Firefox:  ~/.mozilla/firefox/*/extensions.json
-  |     Edge:     ~/.config/microsoft-edge/*/Extensions/*/manifest.json
-  |     Safari:   ~/Library/Safari/Extensions/ (macOS)
-  |     Output:  { browser, ext_id, name, version, permissions[], store_url }
-  |     Trigger: FSEvents / inotify on profile directories, plus scheduled (4h)
-  |
-  +-- SBOM Generator (on-demand)
-  |     - Generates CycloneDX 1.5 JSON BOM
-  |     - Sources: installed packages + running software + browser extensions
-  |     - Triggered by server request or local schedule
-  |     - Output written to local file + forwarded to SIS
-  |
-  +-- Normalized Output Format
-        - All inventory sources emit unified JSON schema:
-          { source: "installed"|"running"|"browser_ext",
-            name, version, publisher, platform_id,
-            sha256?, install_path?, detected_at }
-        - Batched to server every inventory interval (default: 1h)
-        - Delta reporting: only changed entries sent after initial baseline
-```
-
-**Enhanced Inventory Resource Budget:**
-
-| Component | Memory | CPU | Notes |
-|---|---|---|---|
-| Running software monitor | 0.5 MB | <0.1% idle | Event-driven where possible |
-| Browser extension cache | 0.25 MB | Negligible | Re-scanned on FS change events |
-| SBOM generator | 1 MB (transient) | <2% during generation | On-demand only, freed after output |
-| **Total additional** | **~0.75 MB steady** | **<0.2%** | |
-
-### 17.3 Companion Microservices
-
-The Phase 4 companion microservices run server-side within the SN360 Control Plane. They manage rule lifecycle, IOC feeds, and software inventory analysis.
-
-```
-+-----------------------------------------------------------------------+
-|                        SN360 Control Plane                             |
-+-----------------------------------------------------------------------+
-|                                                                        |
-|  +------------------+  +------------------+  +------------------+      |
-|  | Tenant Rule      |  | IOC Feed         |  | Software         |      |
-|  | Distribution     |  | Aggregator       |  | Inventory        |      |
-|  | Service (TRDS)   |  | Service (IOCFS)  |  | Service (SIS)    |      |
-|  +--------+---------+  +--------+---------+  +--------+---------+      |
-|           |                      |                      |              |
-|  +--------v----------------------v----------------------v---------+    |
-|  |                       Message Queue                             |   |
-|  |           (rule updates, IOC deltas, inventory batches)         |   |
-|  +----------------------------+------------------------------------+   |
-|                               |                                        |
-|  +----------------------------v------------------------------------+   |
-|  |                      Agent Gateway                               |  |
-|  |  - mTLS termination          - Tenant routing                    |  |
-|  |  - Rate limiting              - Protocol translation             |  |
-|  +----------------------------+------------------------------------+   |
-|                               |                                        |
-+-----------------------------------------------------------------------+
-                                |
-                    +-----------v-----------+
-                    |   WDA Agents (edge)    |
-                    +-----------------------+
-```
-
-#### 17.3.1 Tenant Rule Distribution Service (TRDS)
-
-The TRDS manages the lifecycle of detection rules across tenants, compiles them into agent-consumable bundles, and distributes delta updates.
-
-**API Endpoints:**
-
-| Method | Path | Description |
-|---|---|---|
-| POST | `/api/v1/tenants/{tid}/rules` | Create a new rule |
-| GET | `/api/v1/tenants/{tid}/rules` | List rules (filterable by type, status) |
-| PUT | `/api/v1/tenants/{tid}/rules/{rid}` | Update a rule |
-| DELETE | `/api/v1/tenants/{tid}/rules/{rid}` | Soft-delete a rule |
-| POST | `/api/v1/tenants/{tid}/rules/compile` | Trigger bundle compilation |
-| GET | `/api/v1/tenants/{tid}/bundles/latest` | Get latest compiled bundle metadata |
-| GET | `/api/v1/tenants/{tid}/bundles/{version}/delta?from={prev}` | Get delta update |
-
-**Rule Types:**
-
-| Type | Format | Agent Evaluation |
-|---|---|---|
-| IOC list | CSV/STIX → bloom filter + Aho-Corasick | Pattern match on event fields |
-| Behavioral | JSON DSL (sequence, threshold, boolean) | State machine evaluation |
-| YARA | `.yar` files | File content scanning (feature-gated) |
-| Exclusion | Allowlist entries (hash, path, signer) | Skip matching entries |
-
-**Workflow:**
-
-1. Analyst creates/updates rules via API or dashboard
-2. TRDS validates rule syntax and compiles to agent-native format
-3. Compiled bundle is versioned and stored (S3/MinIO)
-4. Delta diff computed against previous bundle version
-5. Agents poll for updates (or receive push notification via gateway)
-6. Agent downloads delta, applies to local rule store, hot-reloads LDE
-
-**Storage:** PostgreSQL (rule metadata, tenant config) + S3-compatible object store (compiled bundles).
-
-**Footprint:** 2 vCPU, 2 GB RAM per instance. Horizontally scalable behind load balancer.
-
-#### 17.3.2 IOC Feed Aggregator Service (IOCFS)
-
-The IOCFS ingests threat intelligence feeds, normalizes IOCs, and compiles them into optimized data structures for agent consumption.
-
-**Sources:**
-
-| Feed | Format | Refresh Interval |
-|---|---|---|
-| MISP (self-hosted or community) | MISP JSON | 15 min |
-| Abuse.ch (URLhaus, MalBazaar, ThreatFox) | CSV | 1 hour |
-| AlienVault OTX | STIX/TAXII 2.1 | 1 hour |
-| Custom tenant feeds | CSV/STIX upload | On upload |
-
-**Processing Pipeline:**
-
-1. Ingest: pull/receive IOCs from configured feeds
-2. Normalize: map to unified schema `{ type, value, confidence, source, expires_at }`
-3. Deduplicate: merge across feeds, keep highest confidence
-4. Compile:
-   - Bloom filters (one per IOC type: hash, domain, IP, URL) — target FPR: 0.01%
-   - Aho-Corasick automaton for string-matchable IOCs
-5. Package: MessagePack bundle with version metadata
-6. Publish: push to TRDS for inclusion in tenant rule bundles
-
-**Output Size Targets:**
-
-| IOC Type | Typical Count | Bloom Filter Size | Aho-Corasick Size |
-|---|---|---|---|
-| File hashes (SHA-256) | 500K | ~1.2 MB | N/A (bloom only) |
-| Domains | 100K | ~240 KB | ~400 KB |
-| IPv4 addresses | 50K | ~120 KB | N/A (bloom only) |
-| URLs | 200K | ~480 KB | ~800 KB |
-| **Total** | **~850K IOCs** | **~2 MB** | **~1.2 MB** |
-
-**Footprint:** 2 vCPU, 4 GB RAM (bloom filter compilation is memory-intensive). Single instance with HA failover.
-
-#### 17.3.3 Software Inventory Service (SIS)
-
-The SIS ingests software inventory from agents, matches against CVE databases, and provides dashboard APIs for vulnerability visibility.
-
-**Ingest:**
-
-- Receives normalized inventory batches from agents via Agent Gateway
-- Stores per-agent inventory snapshots in PostgreSQL (partitioned by tenant)
-- Computes diffs: tracks install/uninstall/upgrade events over time
-
-**CVE Matching:**
-
-- NVD CPE dictionary + known exploited vulnerabilities (CISA KEV)
-- CPE matching: software name + version → CVE lookup
-- Refresh: NVD feed pulled every 2 hours
-- Results stored per-agent: `{ cve_id, severity, software_name, version, fix_available }`
-
-**Dashboard Integration:**
-
-| Endpoint | Description |
-|---|---|
-| `GET /api/v1/tenants/{tid}/inventory` | Aggregated software inventory |
-| `GET /api/v1/tenants/{tid}/inventory/{agent_id}` | Per-agent inventory |
-| `GET /api/v1/tenants/{tid}/vulnerabilities` | All matched CVEs |
-| `GET /api/v1/tenants/{tid}/vulnerabilities/critical` | Critical/high severity CVEs |
-| `GET /api/v1/tenants/{tid}/sbom/{agent_id}` | Download agent SBOM (CycloneDX) |
-
-**Storage:** PostgreSQL (inventory + CVE matches, partitioned by tenant). NVD mirror in local cache (~2 GB).
-
-**Footprint:** 2 vCPU, 4 GB RAM per instance. Horizontally scalable for large deployments.
-
-### 17.4 Agent Gateway
-
-The Agent Gateway is the single entry point for all agent-to-server communication in the SN360 control plane.
-
-**Responsibilities:**
-
-- **mTLS termination:** Validates agent client certificates, extracts tenant ID from cert subject
-- **Tenant routing:** Routes requests to the correct tenant-scoped backend services
-- **Rate limiting:** Per-agent and per-tenant rate limits to prevent abuse
-- **Protocol translation:** Accepts agent binary protocol, translates to internal gRPC/HTTP
-- **Connection pooling:** Maintains persistent connections to backend services
-
-**Configuration:**
-
-| Parameter | Default | Description |
-|---|---|---|
-| `listen_address` | `0.0.0.0:8443` | mTLS listener |
-| `max_connections` | 50,000 | Per-instance connection limit |
-| `rate_limit_per_agent` | 100 req/min | Per-agent request rate limit |
-| `rate_limit_per_tenant` | 10,000 req/min | Per-tenant aggregate limit |
-| `backend_pool_size` | 64 | Connection pool to each backend service |
-
-**Footprint:** 2 vCPU, 1 GB RAM per instance. Horizontally scalable behind L4 load balancer.
-
-### 17.5 Updated Resource Budget
-
-With the LDE and Enhanced Inventory modules, the WDA memory projection is updated:
-
-```
-WDA (projected, with Phase 4 modules):
-  RSS: ~15 MB (without YARA), ~17 MB (with YARA)
-    - Agent core + runtime:       2.0 MB
-    - SQLite FIM DB (mmap):       3.0 MB
-    - Log collector buffers:      1.0 MB
-    - Inventory cache:            1.0 MB
-    - Enhanced inventory:         0.75 MB  (running sw + browser ext)
-    - Network/TLS buffers:        1.0 MB
-    - SCA policy cache:           0.5 MB
-    - LDE rule store (mmap):     1.5 MB
-    - LDE Aho-Corasick + bloom:  0.75 MB
-    - LDE behavioral state:      0.5 MB
-    - LDE offline queue:         0.25 MB
-    - Stack (2-3 threads):       1.5 MB
-    - Other:                     1.25 MB
-    - YARA scanner (optional):  +2.0 MB
-```
-
-### 17.6 Updated Configuration
-
-The following sections are added to `config.yaml` for the new Phase 4 modules:
-
-```yaml
-modules:
-  # ... existing modules ...
-
-  local_detection:
-    enabled: true
-    rule_pull_interval: 300      # seconds, poll TRDS for rule updates
-    offline_queue_max: 10000     # max queued detections while offline
-    response_actions:
-      block_ip: true
-      kill_process: true
-      quarantine: true
-    yara:
-      enabled: false             # feature-gated, requires 'yara' build feature
-      scan_rate_limit: 1         # files per second
-      max_file_size_mb: 50       # skip files larger than this
-    bloom_filter:
-      false_positive_rate: 0.01
-    behavioral:
-      max_window_sec: 300        # max sliding window for sequence rules
-      max_tracked_entities: 5000 # max concurrent entity state machines
-
-  enhanced_inventory:
-    enabled: true
-    running_software:
-      enabled: true
-      interval: 60               # seconds between running-sw snapshots
-    browser_extensions:
-      enabled: true
-      browsers:
-        - chrome
-        - firefox
-        - edge
-        - safari
-      interval: 14400            # seconds (4h) scheduled re-scan
-    sbom:
-      enabled: true
-      format: cyclonedx          # cyclonedx | spdx (future)
-      on_demand: true            # allow server-triggered generation
-      scheduled_interval: 86400  # seconds (24h), 0 to disable scheduled
-```
-
-### 17.7 New Crate Structure
-
-Two new crates are added to the workspace:
-
-- **`wda-local-detection`** — Local Detection Engine: rule store, pattern matching, behavioral evaluation, response dispatch, YARA integration (feature-gated).
-- **`wda-enhanced-inventory`** — Enhanced Software Inventory: running software monitor, browser extension inventory, SBOM generator.
-
-**New workspace dependencies:**
-
-| Crate | Version | Purpose |
-|---|---|---|
-| `aho-corasick` | 1 | Multi-pattern string matching for IOC detection |
-| `bloomfilter` | 1 | Bloom filter data structure for O(1) IOC lookups |
-| `yara` | 0.28 (optional) | YARA rule scanning via yara-rust bindings |
-| `cyclonedx-bom` | 0.7 | CycloneDX SBOM generation |
 
 ---
 
