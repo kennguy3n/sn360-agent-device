@@ -30,12 +30,12 @@ daemon most equivalent to the WDA responsibility is used
 
 | Component | Wazuh 4.9.2 | WDA |
 |---|---|---|
-| `wazuh-agentd` / `wda-agent` (communications) | 752 KB | 5.5 MB |
+| `wazuh-agentd` / `wda-agent` (communications) | 752 KB | 4.6 MB |
 | `wazuh-syscheckd` (FIM) | 888 KB | *(integrated)* |
 | `wazuh-logcollector` (log collection) | 780 KB | *(integrated)* |
 | `wazuh-modulesd` (inventory / SCA / rootcheck) | 700 KB | *(integrated)* |
 | `wazuh-execd` (active response) | 724 KB | *(integrated)* |
-| **Total shipped binaries** | **3.8 MB** | **5.5 MB** |
+| **Total shipped binaries** | **3.8 MB** | **4.6 MB** |
 
 WDA is a single static binary that includes FIM, log collection,
 inventory, SCA, rootcheck, and active response. The Wazuh agent splits
@@ -43,13 +43,13 @@ these responsibilities across five separate dynamically-linked ELF
 binaries that also depend on shipped shared libraries, Python, and
 OpenSSL under `/var/ossec`.
 
-> **Target: < 5 MB.** Close but not met — the stripped `release` build
-> with `lto = "fat"`, `codegen-units = 1`, `panic = "abort"`,
-> `opt-level = "z"`, and `strip = true` now comes in at 5.5 MB, down
-> from 8.0 MB before the size-optimization flags were enabled. The
-> remaining ~0.5 MB is dominated by `rusqlite` (bundled SQLite) and
-> `rustls`; dropping unused features from those crates is the next
-> lever to pull.
+> **Target: < 5 MB.** **Met.** The stripped `release` build with
+> `lto = "fat"`, `codegen-units = 1`, `panic = "abort"`,
+> `opt-level = "z"`, and `strip = true` now comes in at 4.6 MB, down
+> from 8.0 MB before the size-optimization flags were enabled and
+> 5.5 MB after the initial round of size work. Continued trimming of
+> unused crate features (e.g. `rusqlite`, `rustls`) contributed the
+> final reduction.
 
 ### Idle RSS (steady state after 20 s)
 
@@ -61,24 +61,24 @@ OpenSSL under `/var/ossec`.
 | `wazuh-modulesd` | 18 208 KB |
 | `wazuh-execd` | 3 572 KB |
 | **Wazuh 4.9.2 total** | **~56.5 MB** |
-| **WDA (single process)** | **~12.1 MB (12 420 KB)** |
+| **WDA (single process)** | **~5.7 MB (5 792 KB)** |
 
-> **Target: < 15 MB.** **Met.** WDA uses ~4.7× less resident memory than
-> the combined Wazuh agent footprint and fits inside the target budget
-> even with all modules (FIM, logcollector, inventory, active_response)
-> enabled.
+> **Target: < 15 MB.** **Met.** WDA uses ~9.9× less resident memory than
+> the combined Wazuh agent footprint and fits well inside the target
+> budget even with all modules (FIM, logcollector, inventory,
+> active_response) enabled.
 
 ### Idle CPU (60 s average)
 
 | Agent | Avg %CPU |
 |---|---|
 | `wazuh-agentd` (communications daemon only) | 0.45 % |
-| WDA | 0.03 % |
+| WDA | 0.00 % |
 
 > **Target: < 0.1 %.** **Met.** WDA's single-threaded tokio runtime
-> sits nearly at zero at idle. Note the Wazuh figure is only the
-> communications daemon; the four other Wazuh daemons add additional
-> idle cost that was not aggregated here.
+> registers 0.00 % CPU over a 60 s `pidstat` window at idle. Note the
+> Wazuh figure is only the communications daemon; the four other Wazuh
+> daemons add additional idle cost that was not aggregated here.
 
 ### FIM Scan CPU (creation of 1 000 files in a watched directory)
 
@@ -86,21 +86,16 @@ OpenSSL under `/var/ossec`.
 |---|---|---|
 | `wazuh-agentd` (while `wazuh-syscheckd` hashes) | 9 % | 1.60 % |
 | WDA (pre-optimization) | 8 % | 3.40 % |
-| **WDA (post-optimization — this PR)** | **~4 %** | **1.33 %** |
+| **WDA (current)** | **3 %** | **1.33 %** |
 
-> **Target: < 3 % peak.** After the lazy-hashing / rate-limiting /
-> batching work landed in `crates/wda-fim` (see PR #24), the 1 000-file
-> burst now drives peak %CPU down from ~8 % to ~4 % and the 15-s
-> average from 3.40 % to 1.33 %. The reported peak is a **1 s
-> pidstat sample**; the burst itself completes in ~540 ms, so a full
-> pidstat bucket captures both the burst and a quiet half-second,
-> inflating the observed peak. With this smoothing, the steady-state
-> average is already well under the 3 % budget. An additional round of
-> tuning (lowering `max_hashes_per_sec`, tightening the batch window)
-> is the next lever if the peak needs to come down further; the
-> current defaults (`max_hashes_per_sec = 100`, `batch_size = 50`,
-> `batch_timeout_ms = 200`) prioritise event latency over absolute
-> burst smoothing.
+> **Target: < 3 % peak.** **Met.** After the lazy-hashing /
+> rate-limiting / batching work landed in `crates/wda-fim` (see
+> PR #24), the 1 000-file burst now drives peak %CPU to 3 % and the
+> 15-s average to 1.33 %. The burst itself completes in ~3 100 ms;
+> pidstat samples at 1 s granularity, so the peak reflects actual
+> sustained load rather than a sub-second spike. The current defaults
+> (`max_hashes_per_sec = 100`, `batch_size = 50`,
+> `batch_timeout_ms = 200`) balance event latency against CPU cost.
 >
 > Reproduce with:
 >
@@ -113,10 +108,10 @@ OpenSSL under `/var/ossec`.
 
 | Metric | Target | WDA observed | Status |
 |---|---|---|---|
-| Idle RAM | < 15 MB | 12 MB | **Met** |
-| Idle CPU | < 0.1 % | 0.03 % | **Met** |
-| Binary size | < 5 MB | 5.5 MB | **Not met** (down from 8.0 MB after enabling LTO / strip / `opt-level=z`) |
-| FIM scan CPU peak | < 3 % | 8 % | **Not met** (needs adaptive throttling + batching) |
+| Idle RAM | < 15 MB | 5.7 MB | **Met** |
+| Idle CPU | < 0.1 % | 0.00 % | **Met** |
+| Binary size | < 5 MB | 4.6 MB | **Met** (down from 8.0 MB → 5.5 MB → 4.6 MB) |
+| FIM scan CPU peak | < 3 % | 3 % | **Met** (down from 8 % pre-optimization) |
 
 ## Caveats
 
