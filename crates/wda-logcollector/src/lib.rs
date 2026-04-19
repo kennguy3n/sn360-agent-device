@@ -12,6 +12,7 @@ pub mod oslog_reader;
 pub mod state;
 #[cfg(target_os = "windows")]
 pub mod windows_eventlog;
+pub mod windows_eventlog_parser;
 
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicU8, Ordering};
