@@ -18,7 +18,8 @@ use tracing::{debug, error, info, warn};
 use wda_core::signal::ShutdownSignal;
 use wda_event_bus::{Event, EventBus, EventKind, Priority};
 
-use windows::core::{HSTRING, PCWSTR};
+use windows::core::{Error as WinError, HSTRING, PCWSTR};
+use windows::Win32::Foundation::ERROR_INSUFFICIENT_BUFFER;
 use windows::Win32::System::EventLog::{
     EvtClose, EvtRender, EvtRenderEventXml, EvtSubscribe, EvtSubscribeActionDeliver,
     EvtSubscribeActionError, EvtSubscribeToFutureEvents, EVT_HANDLE, EVT_SUBSCRIBE_CALLBACK,
@@ -143,10 +144,11 @@ fn render_event_xml(event: EVT_HANDLE) -> windows::core::Result<String> {
     let mut property_count: u32 = 0;
 
     // First call with a zero-size buffer so Windows reports the
-    // required size in `buffer_used`. This call is expected to fail
-    // with `ERROR_INSUFFICIENT_BUFFER`; ignore its result.
-    unsafe {
-        let _ = EvtRender(
+    // required size in `buffer_used`. The call is expected to fail
+    // with `ERROR_INSUFFICIENT_BUFFER`; any other failure is real
+    // and should be propagated so the caller can log it.
+    let probe = unsafe {
+        EvtRender(
             None,
             event,
             XML_FLAG,
@@ -154,7 +156,12 @@ fn render_event_xml(event: EVT_HANDLE) -> windows::core::Result<String> {
             None,
             &mut buffer_used,
             &mut property_count,
-        );
+        )
+    };
+    if let Err(e) = probe {
+        if e.code() != WinError::from(ERROR_INSUFFICIENT_BUFFER).code() {
+            return Err(e);
+        }
     }
 
     if buffer_used == 0 {

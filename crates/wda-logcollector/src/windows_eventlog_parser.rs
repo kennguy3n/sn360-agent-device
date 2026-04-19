@@ -16,28 +16,29 @@ pub fn parse_event_message(xml: &str) -> String {
     let mut parts: Vec<String> = Vec::new();
 
     if let Some(v) = extract_attr(xml, "Provider", "Name") {
-        parts.push(format!("Provider: {}", v));
+        parts.push(format!("Provider: {}", decode_entities(&v)));
     }
     if let Some(v) = extract_element_text(xml, "EventID") {
-        parts.push(format!("EventID: {}", v.trim()));
+        parts.push(format!("EventID: {}", decode_entities(v.trim())));
     }
     if let Some(v) = extract_element_text(xml, "Level") {
-        parts.push(format!("Level: {}", v.trim()));
+        parts.push(format!("Level: {}", decode_entities(v.trim())));
     }
     if let Some(v) = extract_attr(xml, "TimeCreated", "SystemTime") {
-        parts.push(format!("TimeCreated: {}", v));
+        parts.push(format!("TimeCreated: {}", decode_entities(&v)));
     }
     if let Some(v) = extract_element_text(xml, "Channel") {
-        parts.push(format!("Channel: {}", v.trim()));
+        parts.push(format!("Channel: {}", decode_entities(v.trim())));
     }
     if let Some(v) = extract_element_text(xml, "Computer") {
-        parts.push(format!("Computer: {}", v.trim()));
+        parts.push(format!("Computer: {}", decode_entities(v.trim())));
     }
 
     for (name, value) in extract_data_elements(xml) {
+        let decoded = decode_entities(value.trim());
         match name {
-            Some(n) => parts.push(format!("Data [{}]: {}", n, value.trim())),
-            None => parts.push(format!("Data: {}", value.trim())),
+            Some(n) => parts.push(format!("Data [{}]: {}", n, decoded)),
+            None => parts.push(format!("Data: {}", decoded)),
         }
     }
 
@@ -50,47 +51,61 @@ pub fn parse_event_message(xml: &str) -> String {
 
 /// Extract the text content of the first `<tag ...>content</tag>`.
 /// Returns None for self-closing tags.
+///
+/// Text inside `<![CDATA[...]]>` sections is returned verbatim
+/// (without the CDATA wrapper).
 fn extract_element_text(xml: &str, tag: &str) -> Option<String> {
     let open = format!("<{}", tag);
     let close = format!("</{}>", tag);
-    let start = xml.find(&open)?;
-    let after_open = &xml[start + open.len()..];
 
-    // The character right after the tag name must be whitespace, '>'
-    // or '/' — otherwise we matched a prefix (e.g. "EventID" is a
-    // prefix of "EventIDQualifiers").
-    let next = after_open.chars().next()?;
-    if !matches!(next, ' ' | '\t' | '\n' | '\r' | '>' | '/') {
-        // Recurse on the remainder to look for a later match.
-        let next_start = start + open.len();
-        return extract_element_text(&xml[next_start..], tag);
-    }
+    // Walk forward through every occurrence of `<tag` iteratively so
+    // that prefix matches (e.g. `EventID` is a prefix of
+    // `EventIDQualifiers`) are skipped without recursion.
+    let mut offset = 0usize;
+    while offset < xml.len() {
+        let rel = xml[offset..].find(&open)?;
+        let start = offset + rel;
+        let after_open = &xml[start + open.len()..];
 
-    let tag_end = after_open.find('>')?;
-    // Self-closing tags have no text content.
-    if after_open[..tag_end].ends_with('/') {
-        return None;
+        let next = after_open.chars().next()?;
+        if !matches!(next, ' ' | '\t' | '\n' | '\r' | '>' | '/') {
+            offset = start + open.len();
+            continue;
+        }
+
+        let tag_end = after_open.find('>')?;
+        if after_open[..tag_end].ends_with('/') {
+            return None;
+        }
+        let content_start = start + open.len() + tag_end + 1;
+        let rel_close = xml[content_start..].find(&close)?;
+        let raw = &xml[content_start..content_start + rel_close];
+        return Some(strip_cdata(raw));
     }
-    let content_start = start + open.len() + tag_end + 1;
-    let rel_close = xml[content_start..].find(&close)?;
-    Some(xml[content_start..content_start + rel_close].to_string())
+    None
 }
 
 /// Extract the value of `attr` on the first `<tag ...>` opening tag.
 fn extract_attr(xml: &str, tag: &str, attr: &str) -> Option<String> {
     let open = format!("<{}", tag);
-    let start = xml.find(&open)?;
-    let after = &xml[start..];
 
-    let next = after.as_bytes().get(open.len()).copied()?;
-    if !matches!(next, b' ' | b'\t' | b'\n' | b'\r' | b'>' | b'/') {
-        let next_start = start + open.len();
-        return extract_attr(&xml[next_start..], tag, attr);
+    let mut offset = 0usize;
+    while offset < xml.len() {
+        let rel = xml[offset..].find(&open)?;
+        let start = offset + rel;
+        let after = &xml[start..];
+
+        let next = after.as_bytes().get(open.len()).copied()?;
+        if !matches!(next, b' ' | b'\t' | b'\n' | b'\r' | b'>' | b'/') {
+            offset = start + open.len();
+            continue;
+        }
+
+        let close = after.find('>')?;
+        let tag_contents = &after[..close];
+        return extract_attr_in_tag(tag_contents, attr);
     }
-
-    let close = after.find('>')?;
-    let tag_contents = &after[..close];
-    extract_attr_in_tag(tag_contents, attr)
+    None
 }
 
 /// Extract every `<Data>` element in document order, along with its
@@ -135,7 +150,7 @@ fn extract_data_elements(xml: &str) -> Vec<(Option<String>, String)> {
             Some(i) => i,
             None => break,
         };
-        let value = xml[value_start..value_start + rel_close].to_string();
+        let value = strip_cdata(&xml[value_start..value_start + rel_close]);
         out.push((name, value));
         cursor = value_start + rel_close + close.len();
     }
@@ -172,6 +187,81 @@ fn extract_attr_in_tag(tag_body: &str, attr: &str) -> Option<String> {
             }
         }
     }
+}
+
+/// Replace any surrounding `<![CDATA[...]]>` wrapper with its raw
+/// content. If the slice does not start with a CDATA opener the
+/// input is returned unchanged. Whitespace around the CDATA section
+/// is tolerated; the caller still trims the result for display.
+fn strip_cdata(raw: &str) -> String {
+    const OPEN: &str = "<![CDATA[";
+    const CLOSE: &str = "]]>";
+    let trimmed = raw.trim();
+    if let Some(body) = trimmed.strip_prefix(OPEN) {
+        if let Some(inner) = body.strip_suffix(CLOSE) {
+            return inner.to_string();
+        }
+    }
+    raw.to_string()
+}
+
+/// Decode the five XML predefined entities plus numeric character
+/// references (`&#NN;`, `&#xHH;`). Unknown entities pass through
+/// unchanged so we never drop data.
+fn decode_entities(input: &str) -> String {
+    if !input.contains('&') {
+        return input.to_string();
+    }
+
+    let bytes = input.as_bytes();
+    let mut out = String::with_capacity(input.len());
+    let mut i = 0;
+    while i < bytes.len() {
+        if bytes[i] != b'&' {
+            out.push(bytes[i] as char);
+            i += 1;
+            continue;
+        }
+        // Find the terminating ';' within a reasonable window so we
+        // don't consume arbitrarily large prefixes on malformed input.
+        let end = match input[i + 1..].find(';') {
+            Some(off) if off <= 16 => i + 1 + off,
+            _ => {
+                out.push('&');
+                i += 1;
+                continue;
+            }
+        };
+        let entity = &input[i + 1..end];
+        let replacement: Option<String> = match entity {
+            "amp" => Some("&".to_string()),
+            "lt" => Some("<".to_string()),
+            "gt" => Some(">".to_string()),
+            "quot" => Some("\"".to_string()),
+            "apos" => Some("'".to_string()),
+            e if e.starts_with("#x") || e.starts_with("#X") => u32::from_str_radix(&e[2..], 16)
+                .ok()
+                .and_then(char::from_u32)
+                .map(|c| c.to_string()),
+            e if e.starts_with('#') => e[1..]
+                .parse::<u32>()
+                .ok()
+                .and_then(char::from_u32)
+                .map(|c| c.to_string()),
+            _ => None,
+        };
+        match replacement {
+            Some(s) => {
+                out.push_str(&s);
+                i = end + 1;
+            }
+            None => {
+                out.push_str(&input[i..=end]);
+                i = end + 1;
+            }
+        }
+    }
+    out
 }
 
 #[cfg(test)]
@@ -294,5 +384,75 @@ mod tests {
         assert!(msg.contains("EventID: 1"));
         assert!(!msg.contains("Level:"));
         assert!(!msg.contains("Channel:"));
+    }
+
+    #[test]
+    fn decodes_predefined_xml_entities_in_data_values() {
+        let xml = r#"<Event><EventData>
+            <Data Name='Cmd'>echo &quot;hi&quot; &amp;&amp; exit 0</Data>
+            <Data Name='Tag'>&lt;root/&gt;</Data>
+        </EventData></Event>"#;
+        let msg = parse_event_message(xml);
+        assert!(
+            msg.contains(r#"Data [Cmd]: echo "hi" && exit 0"#),
+            "entities not decoded: {}",
+            msg
+        );
+        assert!(msg.contains("Data [Tag]: <root/>"), "got: {}", msg);
+    }
+
+    #[test]
+    fn decodes_numeric_character_references() {
+        let xml = r#"<Event><EventData>
+            <Data>A&#65;&#x42;</Data>
+        </EventData></Event>"#;
+        let msg = parse_event_message(xml);
+        // &#65; -> 'A', &#x42; -> 'B'
+        assert!(msg.contains("Data: AAB"), "got: {}", msg);
+    }
+
+    #[test]
+    fn preserves_unknown_entities_verbatim() {
+        let xml = r#"<Event><EventData>
+            <Data>&unknown;&amp;</Data>
+        </EventData></Event>"#;
+        let msg = parse_event_message(xml);
+        assert!(msg.contains("Data: &unknown;&"), "got: {}", msg);
+    }
+
+    #[test]
+    fn unwraps_cdata_sections_in_data_elements() {
+        let xml = r#"<Event><EventData>
+            <Data Name='Raw'><![CDATA[<html>&amp;payload</html>]]></Data>
+        </EventData></Event>"#;
+        let msg = parse_event_message(xml);
+        assert!(
+            msg.contains("Data [Raw]: <html>&payload</html>"),
+            "got: {}",
+            msg
+        );
+    }
+
+    #[test]
+    fn unwraps_cdata_in_system_field() {
+        let xml = r#"<Event><System>
+            <Channel><![CDATA[Application]]></Channel>
+        </System></Event>"#;
+        let msg = parse_event_message(xml);
+        assert!(msg.contains("Channel: Application"), "got: {}", msg);
+    }
+
+    #[test]
+    fn iterative_prefix_match_does_not_stack_overflow() {
+        // Many prefix-only tags before the real EventID. The old
+        // recursive implementation would blow the stack on input
+        // like this; the iterative version must still find `777`.
+        let mut xml = String::from("<Event><System>");
+        for _ in 0..10_000 {
+            xml.push_str("<EventIDQualifiers>x</EventIDQualifiers>");
+        }
+        xml.push_str("<EventID>777</EventID></System></Event>");
+        let msg = parse_event_message(&xml);
+        assert!(msg.contains("EventID: 777"), "did not find real tag");
     }
 }

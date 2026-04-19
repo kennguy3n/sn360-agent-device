@@ -326,7 +326,15 @@ mod windows_impl {
         while !adapter.is_null() {
             let a = unsafe { &*adapter };
 
-            let name = unsafe { wide_ptr_to_string(a.FriendlyName.0) };
+            // Prefer the user-visible FriendlyName, but fall back to
+            // the AdapterName GUID when it is null/empty so we never
+            // emit an empty `iface` in dbsync payloads.
+            let friendly = unsafe { wide_ptr_to_string(a.FriendlyName.0) };
+            let name = if friendly.is_empty() {
+                unsafe { ansi_ptr_to_string(a.AdapterName.0) }
+            } else {
+                friendly
+            };
             let mac = format_mac(&a.PhysicalAddress, a.PhysicalAddressLength as usize);
             let state = oper_status_str(a.OperStatus);
             let mtu = a.Mtu as u64;
@@ -412,6 +420,26 @@ mod windows_impl {
         String::from_utf16_lossy(slice)
     }
 
+    /// Convert a null-terminated ANSI string pointer into a Rust
+    /// `String`. Returns an empty string if the pointer is null.
+    /// `AdapterName` is documented as ANSI and contains the adapter
+    /// GUID (e.g. `{3F0A...}`), so plain ASCII handling is sufficient.
+    ///
+    /// # Safety
+    /// `ptr` must be null or a valid pointer to a null-terminated
+    /// byte sequence for the duration of this call.
+    unsafe fn ansi_ptr_to_string(ptr: *const u8) -> String {
+        if ptr.is_null() {
+            return String::new();
+        }
+        let mut len = 0usize;
+        while *ptr.add(len) != 0 {
+            len += 1;
+        }
+        let slice = slice::from_raw_parts(ptr, len);
+        String::from_utf8_lossy(slice).into_owned()
+    }
+
     fn format_mac(bytes: &[u8], len: usize) -> String {
         if len == 0 {
             return String::new();
@@ -464,11 +492,12 @@ mod windows_impl {
             let sin6 = sockaddr as *const SOCKADDR_IN6;
             let bytes = unsafe { (*sin6).sin6_addr.u.Byte };
             let ip = Ipv6Addr::from(bytes);
+            let netmask = prefix_to_ipv6_netmask(prefix_len);
             Some(serde_json::json!({
                 "iface": iface_name,
                 "proto": 1,
                 "address": ip.to_string(),
-                "netmask": prefix_len.to_string(),
+                "netmask": netmask,
                 "broadcast": "",
             }))
         } else {
@@ -486,6 +515,26 @@ mod windows_impl {
         Ipv4Addr::from(mask).to_string()
     }
 
+    /// Convert an IPv6 on-link prefix length into an expanded IPv6
+    /// netmask string (e.g. prefix `64` -> `ffff:ffff:ffff:ffff::`).
+    ///
+    /// The Unix path in this module emits the full expanded netmask
+    /// for v6 addresses; matching that format keeps the Wazuh manager
+    /// `dbsync_netaddr` consumer happy regardless of platform.
+    fn prefix_to_ipv6_netmask(prefix: u8) -> String {
+        let prefix = prefix.min(128) as u32;
+        let mut bytes = [0u8; 16];
+        let full_bytes = (prefix / 8) as usize;
+        let remainder_bits = (prefix % 8) as u8;
+        for b in bytes.iter_mut().take(full_bytes) {
+            *b = 0xff;
+        }
+        if full_bytes < 16 && remainder_bits > 0 {
+            bytes[full_bytes] = 0xffu8 << (8 - remainder_bits);
+        }
+        Ipv6Addr::from(bytes).to_string()
+    }
+
     #[cfg(test)]
     mod tests {
         use super::*;
@@ -497,6 +546,26 @@ mod windows_impl {
             assert_eq!(prefix_to_ipv4_netmask(16), "255.255.0.0");
             assert_eq!(prefix_to_ipv4_netmask(24), "255.255.255.0");
             assert_eq!(prefix_to_ipv4_netmask(32), "255.255.255.255");
+        }
+
+        #[test]
+        fn prefix_to_ipv6_netmask_common_values() {
+            assert_eq!(prefix_to_ipv6_netmask(0), "::");
+            assert_eq!(prefix_to_ipv6_netmask(64), "ffff:ffff:ffff:ffff::");
+            assert_eq!(
+                prefix_to_ipv6_netmask(128),
+                "ffff:ffff:ffff:ffff:ffff:ffff:ffff:ffff"
+            );
+            // Non-byte-aligned prefix.
+            assert_eq!(prefix_to_ipv6_netmask(72), "ffff:ffff:ffff:ffff:ff00::");
+        }
+
+        #[test]
+        fn prefix_to_ipv6_netmask_clamps_oversized_prefix() {
+            assert_eq!(
+                prefix_to_ipv6_netmask(255),
+                "ffff:ffff:ffff:ffff:ffff:ffff:ffff:ffff"
+            );
         }
 
         #[test]
