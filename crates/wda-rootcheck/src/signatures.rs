@@ -35,10 +35,12 @@ pub const BUILTIN_SIGNATURES: &[Signature] = &[
         path: "/usr/lib/libproc_hider.so",
         family: "libprocesshider",
     },
-    Signature {
-        path: "/etc/ld.so.preload",
-        family: "libprocesshider",
-    },
+    // Note: /etc/ld.so.preload is intentionally NOT in this list.
+    // It is a legitimate dynamic-linker configuration file (used by
+    // jemalloc, tcmalloc, libsafe, etc.), so presence alone is not an
+    // indicator. Upstream Wazuh rootcheck inspects the file's contents
+    // for references to known malicious `.so` paths; a content-based
+    // check would go here if that is ever added.
     // t0rn rootkit
     Signature {
         path: "/usr/src/.puta",

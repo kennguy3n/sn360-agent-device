@@ -135,6 +135,7 @@ impl WazuhMessage {
             MessageType::Syscheck => format!("8:syscheck:{}", self.payload),
             MessageType::Log => format!("1:{}", self.payload),
             MessageType::Syscollector => format!("d:{}", self.payload),
+            MessageType::Rootcheck => format!("9:{}", self.payload),
             // Control messages already carry the correct prefix.
             MessageType::Keepalive | MessageType::Startup | MessageType::Shutdown => {
                 self.payload.clone()
