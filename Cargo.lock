@@ -1753,6 +1753,7 @@ dependencies = [
  "wda-inventory",
  "wda-logcollector",
  "wda-pal",
+ "wda-sca",
 ]
 
 [[package]]

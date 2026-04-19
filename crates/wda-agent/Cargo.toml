@@ -17,6 +17,7 @@ wda-pal = { workspace = true }
 wda-fim = { workspace = true }
 wda-logcollector = { workspace = true, features = ["linux-journal"] }
 wda-inventory = { workspace = true }
+wda-sca = { workspace = true }
 wda-active-response = { workspace = true }
 tokio = { workspace = true, features = ["rt-multi-thread"] }
 tracing = { workspace = true }

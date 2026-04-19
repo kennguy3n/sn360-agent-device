@@ -10,12 +10,24 @@
 //! - **registry** (Windows only): check registry key existence / value.
 
 use std::path::Path;
+use std::sync::atomic::{AtomicU8, Ordering};
+use std::sync::Arc;
+use std::time::Duration;
 
 use regex::RegexBuilder;
 use serde::{Deserialize, Serialize};
-use tracing::{debug, info};
+use tracing::{debug, error, info, warn};
 
+use wda_core::config::{AgentConfig, ScaConfig};
+use wda_core::module::{ModuleHandle, ModuleHealth, ModuleStatus};
+use wda_core::signal::ShutdownSignal;
 use wda_event_bus::{Event, EventBus, EventKind, Priority};
+
+// Module-status encoding for atomic access.
+const STATUS_INITIALIZED: u8 = 0;
+const STATUS_RUNNING: u8 = 1;
+const STATUS_STOPPED: u8 = 2;
+const STATUS_FAILED: u8 = 3;
 
 // ── Public types ─────────────────────────────────────────────────────────────
 
@@ -165,12 +177,134 @@ impl ScaModule {
     pub fn policies(&self) -> &[ScaPolicy] {
         &self.policies
     }
+
+    /// Spawn the SCA module run loop.
+    ///
+    /// Loads every `*.yaml` / `*.yml` policy under
+    /// [`ScaConfig::policy_dir`], runs one evaluation on startup, then
+    /// re-evaluates every [`ScaConfig::scan_interval`] seconds until
+    /// `shutdown` is signalled.
+    pub fn start(config: &AgentConfig, bus: EventBus, shutdown: ShutdownSignal) -> ModuleHandle {
+        let sca_config = config.modules.sca.clone();
+        let status = Arc::new(AtomicU8::new(STATUS_INITIALIZED));
+        let task_status = Arc::clone(&status);
+
+        let task = tokio::spawn(async move {
+            if let Err(e) = run(sca_config, bus, shutdown, task_status.clone()).await {
+                error!(error = %e, "SCA module failed");
+                task_status.store(STATUS_FAILED, Ordering::Relaxed);
+                return Err(e);
+            }
+            Ok(())
+        });
+
+        ModuleHandle::new("sca", task)
+    }
 }
 
 impl Default for ScaModule {
     fn default() -> Self {
         Self::new()
     }
+}
+
+impl wda_core::module::AgentModule for ScaModule {
+    fn name(&self) -> &'static str {
+        "sca"
+    }
+
+    fn status(&self) -> ModuleStatus {
+        ModuleStatus::Running
+    }
+
+    fn health(&self) -> ModuleHealth {
+        ModuleHealth::Healthy
+    }
+}
+
+/// Load every `*.yaml` / `*.yml` policy file under `policy_dir` into
+/// `module`. Missing directories are logged and skipped so the module
+/// can still start on a fresh install.
+fn load_policies_from_dir(module: &mut ScaModule, policy_dir: &Path) {
+    if !policy_dir.exists() {
+        warn!(
+            path = %policy_dir.display(),
+            "SCA policy directory does not exist; no policies loaded"
+        );
+        return;
+    }
+
+    let entries = match std::fs::read_dir(policy_dir) {
+        Ok(entries) => entries,
+        Err(e) => {
+            warn!(path = %policy_dir.display(), error = %e, "failed to read SCA policy directory");
+            return;
+        }
+    };
+
+    for entry in entries.flatten() {
+        let path = entry.path();
+        let is_yaml = path
+            .extension()
+            .and_then(|e| e.to_str())
+            .map(|e| e.eq_ignore_ascii_case("yaml") || e.eq_ignore_ascii_case("yml"))
+            .unwrap_or(false);
+        if !is_yaml {
+            continue;
+        }
+        if let Err(e) = module.load_policy_file(&path) {
+            warn!(path = %path.display(), error = %e, "failed to load SCA policy");
+        }
+    }
+}
+
+/// SCA module run loop.
+async fn run(
+    sca_config: ScaConfig,
+    bus: EventBus,
+    mut shutdown: ShutdownSignal,
+    status: Arc<AtomicU8>,
+) -> anyhow::Result<()> {
+    info!("SCA module starting");
+
+    let mut module = ScaModule::new();
+    load_policies_from_dir(&mut module, &sca_config.policy_dir);
+    info!(
+        policies = module.policies().len(),
+        path = %sca_config.policy_dir.display(),
+        "SCA policies loaded"
+    );
+
+    status.store(STATUS_RUNNING, Ordering::Relaxed);
+
+    // Initial evaluation on startup.
+    module.evaluate_all(&bus).await;
+
+    let interval = Duration::from_secs(sca_config.scan_interval.max(1));
+    let mut timer = tokio::time::interval(interval);
+    // Consume the timer's immediate first tick — the startup
+    // evaluation above already covered it.
+    timer.tick().await;
+
+    loop {
+        tokio::select! {
+            biased;
+
+            _ = shutdown.wait() => {
+                info!("SCA module received shutdown signal");
+                break;
+            }
+
+            _ = timer.tick() => {
+                debug!("SCA scan timer fired");
+                module.evaluate_all(&bus).await;
+            }
+        }
+    }
+
+    status.store(STATUS_STOPPED, Ordering::Relaxed);
+    info!("SCA module stopped");
+    Ok(())
 }
 
 // ── Check evaluation ─────────────────────────────────────────────────────────
