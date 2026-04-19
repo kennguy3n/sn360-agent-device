@@ -1,0 +1,482 @@
+   Compiling cfg-if v1.0.4
+   Compiling once_cell v1.21.4
+   Compiling log v0.4.29
+   Compiling libc v0.2.185
+   Compiling serde_core v1.0.228
+   Compiling pin-project-lite v0.2.17
+   Compiling memchr v2.8.0
+   Compiling num-traits v0.2.19
+   Compiling bitflags v2.11.1
+   Compiling thiserror v2.0.18
+   Compiling tracing-core v0.1.36
+   Compiling itoa v1.0.18
+   Compiling bytes v1.11.1
+   Compiling iana-time-zone v0.1.65
+   Compiling bitflags v1.3.2
+   Compiling zmij v1.0.21
+   Compiling tracing v0.1.44
+   Compiling aho-corasick v1.1.4
+   Compiling instant v0.1.13
+   Compiling same-file v1.0.6
+   Compiling regex-syntax v0.8.10
+   Compiling linux-raw-sys v0.4.15
+   Compiling notify-types v1.0.1
+   Compiling walkdir v2.5.0
+   Compiling memoffset v0.9.1
+   Compiling smallvec v1.15.1
+   Compiling anyhow v1.0.102
+   Compiling rustix v0.38.44
+   Compiling hashbrown v0.17.0
+   Compiling equivalent v1.0.2
+   Compiling lazy_static v1.5.0
+   Compiling sharded-slab v0.1.7
+   Compiling tracing-log v0.2.0
+   Compiling errno v0.3.14
+   Compiling mio v1.2.0
+   Compiling signal-hook-registry v1.4.8
+   Compiling socket2 v0.6.3
+   Compiling inotify-sys v0.1.5
+   Compiling getrandom v0.4.2
+   Compiling inotify v0.10.2
+   Compiling filetime v0.2.27
+   Compiling tokio v1.52.1
+   Compiling gethostname v0.5.0
+   Compiling notify v7.0.0
+   Compiling nix v0.29.0
+   Compiling indexmap v2.14.0
+   Compiling uuid v1.23.1
+   Compiling serde v1.0.228
+   Compiling serde_json v1.0.149
+   Compiling regex-automata v0.4.14
+   Compiling chrono v0.4.44
+   Compiling tracing-serde v0.2.0
+   Compiling thread_local v1.1.9
+   Compiling ryu v1.0.23
+   Compiling nu-ansi-term v0.50.3
+   Compiling unsafe-libyaml v0.2.11
+   Compiling typenum v1.19.0
+   Compiling linux-raw-sys v0.12.1
+   Compiling fastrand v2.4.1
+   Compiling cpufeatures v0.2.17
+   Compiling rustix v1.1.4
+   Compiling zerocopy v0.8.48
+   Compiling serde_yaml v0.9.34+deprecated
+   Compiling generic-array v0.14.7
+   Compiling getrandom v0.2.17
+   Compiling zeroize v1.8.2
+   Compiling libsqlite3-sys v0.30.1
+   Compiling aws-lc-sys v0.40.0
+   Compiling matchers v0.2.0
+   Compiling crypto-common v0.1.7
+   Compiling tracing-subscriber v0.3.23
+   Compiling block-buffer v0.10.4
+   Compiling digest v0.10.7
+   Compiling tempfile v3.27.0
+   Compiling sha2 v0.10.9
+   Compiling block-padding v0.3.3
+   Compiling fallible-streaming-iterator v0.1.9
+   Compiling untrusted v0.9.0
+   Compiling fallible-iterator v0.3.0
+   Compiling inout v0.1.4
+   Compiling aws-lc-rs v1.16.3
+   Compiling regex v1.12.3
+   Compiling wda-event-bus v0.1.0 (/home/ubuntu/repos/sn360-agent-device/crates/wda-event-bus)
+   Compiling wda-pal v0.1.0 (/home/ubuntu/repos/sn360-agent-device/crates/wda-pal)
+   Compiling rustls-pki-types v1.14.0
+   Compiling wda-core v0.1.0 (/home/ubuntu/repos/sn360-agent-device/crates/wda-core)
+   Compiling rustls-webpki v0.103.12
+   Compiling cipher v0.4.4
+   Compiling subtle v2.6.1
+   Compiling ahash v0.8.12
+   Compiling powerfmt v0.2.0
+   Compiling simd-adler32 v0.3.9
+   Compiling hashbrown v0.14.5
+   Compiling adler2 v2.0.1
+   Compiling miniz_oxide v0.8.9
+   Compiling deranged v0.5.8
+   Compiling rustls v0.23.38
+   Compiling crc32fast v1.5.0
+   Compiling num-conv v0.2.1
+   Compiling hashlink v0.9.1
+   Compiling hex v0.4.3
+   Compiling percent-encoding v2.3.2
+   Compiling time-core v0.1.8
+   Compiling purl v0.1.6
+   Compiling rusqlite v0.32.1
+   Compiling flate2 v1.1.9
+   Compiling thiserror v1.0.69
+   Compiling ring v0.17.14
+   Compiling time v0.3.47
+   Compiling strum v0.26.3
+   Compiling cbc v0.1.2
+   Compiling aes v0.8.4
+   Compiling md-5 v0.10.6
+   Compiling socket2 v0.5.10
+   Compiling spdx v0.10.9
+   Compiling ordered-float v4.6.0
+   Compiling wda-fim v0.1.0 (/home/ubuntu/repos/sn360-agent-device/crates/wda-fim)
+   Compiling fluent-uri v0.1.4
+   Compiling base64 v0.21.7
+   Compiling bit-vec v0.7.0
+   Compiling xml-rs v0.8.28
+   Compiling siphasher v1.0.2
+   Compiling wda-active-response v0.1.0 (/home/ubuntu/repos/sn360-agent-device/crates/wda-active-response)
+   Compiling bloomfilter v1.0.16
+   Compiling wda-logcollector v0.1.0 (/home/ubuntu/repos/sn360-agent-device/crates/wda-logcollector)
+   Compiling wda-inventory v0.1.0 (/home/ubuntu/repos/sn360-agent-device/crates/wda-inventory)
+   Compiling cyclonedx-bom v0.7.0
+   Compiling wda-local-detection v0.1.0 (/home/ubuntu/repos/sn360-agent-device/crates/wda-local-detection)
+   Compiling wda-sca v0.1.0 (/home/ubuntu/repos/sn360-agent-device/crates/wda-sca)
+   Compiling wda-rootcheck v0.1.0 (/home/ubuntu/repos/sn360-agent-device/crates/wda-rootcheck)
+   Compiling tokio-rustls v0.26.4
+   Compiling wda-comms v0.1.0 (/home/ubuntu/repos/sn360-agent-device/crates/wda-comms)
+   Compiling wda-agent v0.1.0 (/home/ubuntu/repos/sn360-agent-device/crates/wda-agent)
+   Compiling wda-enhanced-inventory v0.1.0 (/home/ubuntu/repos/sn360-agent-device/crates/wda-enhanced-inventory)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 47.07s
+     Running unittests src/lib.rs (target/debug/deps/wda_active_response-b82ff68268d5d895)
+
+running 29 tests
+test actions::disable_account::tests::test_valid_username ... ok
+test actions::firewall_drop::tests::test_is_ipv6 ... ok
+test actions::firewall_drop::tests::test_valid_ipv6 ... ok
+test actions::firewall_drop::tests::test_valid_ipv4 ... ok
+test actions::disable_account::tests::test_invalid_username ... ok
+test actions::firewall_drop::tests::test_invalid_ip_undo ... ok
+test actions::firewall_drop::tests::test_invalid_ip ... ok
+test actions::disable_account::tests::test_missing_user ... ok
+test actions::disable_account::tests::test_refuse_root ... ok
+test actions::firewall_drop::tests::test_missing_ip_parameter ... ok
+test actions::tests::test_registry_unknown_action ... ok
+test actions::kill_process::tests::test_refuse_pid_1 ... ok
+test actions::kill_process::tests::test_missing_pid ... ok
+test executor::tests::test_execute_nonexistent_command ... ok
+test tests::test_extract_action_name ... ok
+test actions::tests::test_registry_registers_allowed_actions ... ok
+test actions::kill_process::tests::test_kill_nonexistent_pid ... ok
+test tests::test_parse_ar_execd_prefix ... ok
+test tests::test_parse_ar_json_command ... ok
+test tests::test_parse_ar_legacy_disable_account ... ok
+test tests::test_parse_ar_legacy_format ... ok
+test executor::tests::test_execute_successful_command ... ok
+test executor::tests::test_execute_failing_command ... ok
+test tests::test_parse_ar_undo_command ... ok
+test executor::tests::test_combined_output ... ok
+test tests::test_module_starts_and_stops ... ok
+test tests::test_module_processes_server_command ... ok
+test tests::test_module_processes_ar_request ... ok
+test executor::tests::test_execute_timeout ... ok
+
+test result: ok. 29 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.11s
+
+     Running unittests src/main.rs (target/debug/deps/wda_agent-79bf12f7e9a5febf)
+
+running 18 tests
+test tests::test_active_response_maps_to_active_response ... ok
+test tests::test_config_reloaded_not_forwarded ... ok
+test tests::test_file_created_maps_to_syscheck_with_payload ... ok
+test tests::test_file_created_without_syscheck_payload_falls_back ... ok
+test tests::test_file_deleted_maps_to_syscheck_with_payload ... ok
+test tests::test_file_metadata_changed_maps_to_syscheck_with_payload ... ok
+test tests::test_inventory_maps_to_syscollector ... ok
+test tests::test_file_modified_maps_to_syscheck_with_payload ... ok
+test tests::test_parse_server_command_execd ... ok
+test tests::test_keepalive_not_forwarded ... ok
+test tests::test_parse_server_command_generic ... ok
+test tests::test_parse_server_command_strips_trailing_nulls ... ok
+test tests::test_parse_server_command_request ... ok
+test tests::test_sca_maps_to_sca ... ok
+test tests::test_log_collected_maps_to_log_wire_format ... ok
+test tests::test_server_message_maps_to_generic ... ok
+test tests::test_shutdown_not_forwarded ... ok
+test tests::test_event_forwarding_via_bus ... ok
+
+test result: ok. 18 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/lib.rs (target/debug/deps/wda_comms-71f24b1689959c33)
+
+running 23 tests
+test blowfish_wazuh::tests::test_64_byte_key ... ok
+test blowfish_wazuh::tests::test_cbc_block_aligned ... ok
+test blowfish_wazuh::tests::test_cbc_empty ... ok
+test blowfish_wazuh::tests::test_cbc_roundtrip ... ok
+test blowfish_wazuh::tests::test_known_vector ... ok
+test crypto::tests::test_crypto_token ... ok
+test crypto::tests::test_message_framing_format ... ok
+test crypto::tests::test_key_derivation_matches_wazuh ... ok
+test crypto::tests::test_strip_trailing_nulls ... ok
+test enrollment::tests::test_agent_key_parse_invalid ... ok
+test enrollment::tests::test_agent_key_roundtrip ... ok
+test protocol::tests::test_keepalive_message ... ok
+test protocol::tests::test_message_decode ... ok
+test protocol::tests::test_message_encode ... ok
+test crypto::tests::test_blowfish_roundtrip ... ok
+test protocol::tests::test_startup_message ... ok
+test protocol::tests::test_message_type_roundtrip ... ok
+test crypto::tests::test_different_keys_fail_aes ... ok
+test crypto::tests::test_aes_roundtrip ... ok
+test protocol::tests::test_compress_decompress ... ok
+test crypto::tests::test_different_keys_fail_blowfish ... ok
+test crypto::tests::test_large_message_blowfish ... ok
+test crypto::tests::test_large_message_aes ... ok
+
+test result: ok. 23 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running unittests src/lib.rs (target/debug/deps/wda_core-c02c65421373d47d)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/lib.rs (target/debug/deps/wda_enhanced_inventory-cd40ceeb8a50f877)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/lib.rs (target/debug/deps/wda_event_bus-51901ea4e10d6bec)
+
+running 4 tests
+test bus::tests::test_subscriber_count ... ok
+test bus::tests::test_publish_and_receive ... ok
+test bus::tests::test_multiple_subscribers ... ok
+test bus::tests::test_server_queue ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/lib.rs (target/debug/deps/wda_fim-c18266ff6ad0bf53)
+
+running 43 tests
+test db::tests::test_entry_with_null_sha256 ... ok
+test db::tests::test_delete_nonexistent_is_ok ... ok
+test db::tests::test_get_nonexistent ... ok
+test db::tests::test_get_entries_with_old_scan ... ok
+test db::tests::test_delete ... ok
+test db::tests::test_open_creates_parent_dirs ... ok
+test db::tests::test_insert_and_get ... ok
+test db::tests::test_get_all_entries ... ok
+test debounce::tests::test_is_empty ... ok
+test db::tests::test_open_in_memory ... ok
+test debounce::tests::test_next_deadline_empty ... ok
+test db::tests::test_update_last_scan ... ok
+test event_format::tests::test_format_added_event ... ok
+test db::tests::test_upsert_updates_existing ... ok
+test event_format::tests::test_format_deleted_event ... ok
+test event_format::tests::test_format_with_special_chars_in_path ... ok
+test event_format::tests::test_format_modified_event ... ok
+test event_format::tests::test_permissions_format ... ok
+test hasher::tests::test_hash_empty_file ... ok
+test hasher::tests::test_hash_known_content ... ok
+test hasher::tests::test_hash_nonexistent_file ... ok
+test idle::tests::test_high_threshold_returns_idle ... ok
+test db::tests::test_open_on_disk_and_reopen ... ok
+test idle::tests::test_is_system_idle_returns_bool ... ok
+test idle::tests::test_read_load_average ... ok
+test idle::tests::test_zero_threshold_returns_busy ... ok
+test scanner::tests::test_baseline_scan_detects_new_files ... ok
+test scanner::tests::test_baseline_scan_detects_modified_files ... ok
+test scanner::tests::test_baseline_scan_detects_deleted_files ... ok
+test scanner::tests::test_baseline_scan_handles_permission_denied ... ok
+test scanner::tests::test_baseline_scan_respects_check_sha256_flag ... ok
+test scanner::tests::test_is_excluded ... ok
+test scanner::tests::test_baseline_scan_skips_excluded_patterns ... ok
+test scanner::tests::test_baseline_scan_no_changes ... ok
+test scanner::tests::test_simple_glob ... ok
+test debounce::tests::test_next_deadline_decreases ... ok
+test debounce::tests::test_events_outside_window_are_separate ... ok
+test hasher::tests::test_hash_large_file ... ok
+test debounce::tests::test_latest_kind_wins ... ok
+test watcher::tests::test_watcher_detects_creation ... ok
+test debounce::tests::test_events_within_window_collapse ... ok
+test watcher::tests::test_debounce_collapses_events ... ok
+test tests::test_fim_module_detects_file_creation_and_publishes_event has been running for over 60 seconds
+test tests::test_fim_module_detects_file_creation_and_publishes_event ... ok
+
+test result: ok. 43 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 120.02s
+
+     Running tests/baseline_scan_integration.rs (target/debug/deps/baseline_scan_integration-384dce53098c91af)
+
+running 1 test
+test test_baseline_scan_lifecycle ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 24.02s
+
+     Running tests/fim_integration.rs (target/debug/deps/fim_integration-3b681e9358ab1358)
+
+running 5 tests
+test test_fim_clean_shutdown ... ok
+test test_fim_detects_file_creation ... ok
+test test_fim_detects_file_modification ... ok
+test test_fim_detects_file_deletion ... ok
+test test_fim_sha256_is_correct ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.46s
+
+     Running tests/integration.rs (target/debug/deps/integration-89752db098f70674)
+
+running 4 tests
+test test_fim_clean_shutdown ... ok
+test test_fim_detects_file_creation ... ok
+test test_fim_detects_file_modification ... ok
+test test_fim_detects_file_deletion ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.51s
+
+     Running unittests src/lib.rs (target/debug/deps/wda_inventory-6d10d89429348491)
+
+running 30 tests
+test hardware::tests::test_parse_cpuinfo_content ... ok
+test hardware::tests::test_parse_cpuinfo_empty ... ok
+test hardware::tests::test_parse_kb_value ... ok
+test hardware::tests::test_parse_meminfo_content ... ok
+test hardware::tests::test_parse_meminfo_empty ... ok
+test hardware::tests::test_collect_hardware_info_returns_valid_json ... ok
+test network::unix_impl::tests::test_read_mac_address_loopback ... ok
+test network::unix_impl::tests::test_read_interface_mtu_loopback ... ok
+test network::unix_impl::tests::test_read_interface_state_loopback ... ok
+test network::unix_impl::tests::test_read_mac_address_nonexistent ... ok
+test os_info::tests::test_parse_os_release_empty ... ok
+test os_info::tests::test_parse_os_release_fedora ... ok
+test os_info::tests::test_parse_os_release_comments_and_blanks ... ok
+test os_info::tests::test_parse_os_release_ubuntu ... ok
+test os_info::tests::test_collect_os_info_returns_valid_json ... ok
+test packages::tests::test_parse_dpkg_output_empty ... ok
+test packages::tests::test_parse_dpkg_output ... ok
+test network::unix_impl::tests::test_collect_network_info_returns_results ... ok
+test packages::tests::test_parse_rpm_output_empty ... ok
+test packages::tests::test_parse_rpm_output ... ok
+test packages::tests::test_parse_dpkg_output_partial_fields ... ok
+test syscollector_format::tests::test_build_netaddr ... ok
+test syscollector_format::tests::test_build_hwinfo ... ok
+test syscollector_format::tests::test_build_osinfo ... ok
+test syscollector_format::tests::test_wrap_syscollector_format ... ok
+test syscollector_format::tests::test_build_netiface ... ok
+test syscollector_format::tests::test_build_packages ... ok
+test tests::test_collect_and_publish_os_only ... ok
+test tests::test_inventory_module_lifecycle ... ok
+test packages::tests::test_collect_packages_runs_without_panic ... ok
+
+test result: ok. 30 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+
+     Running unittests src/lib.rs (target/debug/deps/wda_local_detection-07af2fe75f738a59)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/lib.rs (target/debug/deps/wda_logcollector-c7872c035d5fbac4)
+
+running 12 tests
+test journal_reader::tests::test_journal_entry_display_without_identifier ... ok
+test journal_reader::tests::test_journal_entry_display_with_identifier ... ok
+test journal_reader::tests::test_journal_reader_construction ... ok
+test state::tests::test_load_empty_state ... ok
+test state::tests::test_corrupt_state_file ... ok
+test state::tests::test_set_and_get_offset ... ok
+test state::tests::test_save_and_reload ... ok
+test journal_reader::tests::test_journal_reader_with_unit_filters ... ok
+test journal_reader::tests::test_journal_reader_opens_and_shuts_down ... ok
+test file_reader::tests::test_file_reader_handles_file_rotation ... ok
+test file_reader::tests::test_file_reader_detects_new_lines ... ok
+test journal_reader::tests::test_journal_reader_receives_events ... ok
+
+test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.95s
+
+     Running unittests src/lib.rs (target/debug/deps/wda_pal-cac47871d5f42deb)
+
+running 4 tests
+test fs_watcher::tests::test_watcher_creation ... ok
+test fs_watcher::tests::test_watch_directory ... ok
+test fs_watcher::tests::test_unwatch ... ok
+test fs_watcher::tests::test_detect_file_creation ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.10s
+
+     Running unittests src/lib.rs (target/debug/deps/wda_rootcheck-4baf34959c600012)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/lib.rs (target/debug/deps/wda_sca-352a10fbb9b0e562)
+
+running 5 tests
+test tests::test_file_not_exists_check ... ok
+test tests::test_file_exists_check ... ok
+test tests::test_load_policy ... ok
+test tests::test_command_check ... ok
+test tests::test_evaluate_all ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.12s
+
+   Doc-tests wda_active_response
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests wda_comms
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests wda_core
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests wda_enhanced_inventory
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests wda_event_bus
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests wda_fim
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests wda_inventory
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests wda_local_detection
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests wda_logcollector
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests wda_pal
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests wda_rootcheck
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests wda_sca
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+

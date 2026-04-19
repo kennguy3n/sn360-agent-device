@@ -8,7 +8,7 @@ use std::time::Duration;
 
 use anyhow::{Context, Result};
 use tokio::sync::Mutex;
-use tracing::{error, info};
+use tracing::{error, info, warn};
 
 use wda_comms::connection::{ConnectionConfig, ConnectionManager, TransportProtocol};
 use wda_comms::crypto::WazuhCipher;
@@ -17,7 +17,7 @@ use wda_comms::keepalive::run_keepalive_loop;
 use wda_comms::protocol::{MessageType, WazuhMessage};
 use wda_core::config::AgentConfig;
 use wda_core::Agent;
-use wda_event_bus::EventKind;
+use wda_event_bus::{Event, EventKind, Priority};
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -188,6 +188,70 @@ async fn main() -> Result<()> {
         info!("event forwarding loop stopped");
     });
 
+    // 10b. Spawn server message receive loop.
+    //      Reads incoming frames from the Wazuh server, parses them, and
+    //      publishes them as `EventKind::ServerCommand` events on the bus
+    //      so modules like active_response can act on server-pushed
+    //      commands.  The loop uses a short timeout on each receive so
+    //      the connection mutex is released periodically, allowing the
+    //      keepalive and forward tasks to send.
+    let receive_conn = Arc::clone(&conn);
+    let receive_bus = agent.event_bus();
+    let mut receive_shutdown = agent.shutdown_signal();
+
+    let receive_handle = tokio::spawn(async move {
+        info!("server receive loop started");
+        loop {
+            tokio::select! {
+                biased;
+
+                _ = receive_shutdown.wait() => {
+                    info!("server receive loop shutting down");
+                    break;
+                }
+
+                result = async {
+                    let mut guard = receive_conn.lock().await;
+                    tokio::time::timeout(Duration::from_secs(1), guard.receive()).await
+                } => {
+                    match result {
+                        Ok(Ok(data)) => {
+                            let payload = match std::str::from_utf8(&data) {
+                                Ok(s) => s.to_string(),
+                                Err(_) => {
+                                    warn!("received non-UTF8 server message, ignoring");
+                                    continue;
+                                }
+                            };
+                            let (command, payload_body) = parse_server_command(&payload);
+                            let event = Event::new(
+                                "comms",
+                                Priority::Critical,
+                                EventKind::ServerCommand {
+                                    command,
+                                    payload: payload_body,
+                                },
+                            );
+                            if let Err(e) = receive_bus.publish(event) {
+                                warn!(error = %e, "failed to publish server command");
+                            }
+                        }
+                        Ok(Err(e)) => {
+                            warn!(error = %e, "failed to receive from server");
+                            tokio::time::sleep(Duration::from_millis(500)).await;
+                        }
+                        Err(_) => {
+                            // Timeout elapsed with no data; yield so other tasks
+                            // (keepalive, forward) can acquire the connection.
+                            tokio::time::sleep(Duration::from_millis(50)).await;
+                        }
+                    }
+                }
+            }
+        }
+        info!("server receive loop stopped");
+    });
+
     // 11. Start FIM module if enabled
     if config.modules.fim.enabled {
         info!("starting FIM module");
@@ -248,9 +312,10 @@ async fn main() -> Result<()> {
         guard.disconnect().await;
     }
 
-    // Wait for keepalive and forwarding tasks to finish
+    // Wait for keepalive, forwarding, and receive tasks to finish
     let _ = keepalive_handle.await;
     let _ = forward_handle.await;
+    let _ = receive_handle.await;
 
     agent.shutdown().await;
     info!("wazuh desktop agent stopped");
@@ -311,6 +376,26 @@ fn map_event_to_message(agent_id: &str, kind: &EventKind) -> Option<WazuhMessage
     };
 
     Some(WazuhMessage::new(agent_id, msg_type, payload))
+}
+
+/// Classify a raw server payload into a command identifier and passthrough
+/// body.  Wazuh server-pushed commands are typically prefixed with a magic
+/// sentinel (e.g. `#!-execd` for the execution daemon).  The full payload
+/// is preserved so downstream modules can perform their own parsing.
+fn parse_server_command(payload: &str) -> (String, String) {
+    let trimmed = payload.trim_end_matches('\0').trim();
+    let command = if trimmed.starts_with("#!-execd") {
+        "execd"
+    } else if trimmed.starts_with("#!-req") {
+        "request"
+    } else if trimmed.starts_with("#!-up_file") {
+        "up_file"
+    } else if trimmed.starts_with("#!-") {
+        "internal"
+    } else {
+        "generic"
+    };
+    (command.to_string(), trimmed.to_string())
 }
 
 /// Get the system hostname as a fallback agent name.
@@ -459,6 +544,37 @@ mod tests {
     fn test_config_reloaded_not_forwarded() {
         let kind = EventKind::ConfigReloaded;
         assert!(map_event_to_message("010", &kind).is_none());
+    }
+
+    #[test]
+    fn test_parse_server_command_execd() {
+        let payload = r#"#!-execd {"command":"firewall-drop0","parameters":{"ip":"10.0.0.1"}}"#;
+        let (command, body) = parse_server_command(payload);
+        assert_eq!(command, "execd");
+        assert!(body.starts_with("#!-execd"));
+        assert!(body.contains("firewall-drop0"));
+    }
+
+    #[test]
+    fn test_parse_server_command_request() {
+        let (command, body) = parse_server_command("#!-req 1234 getconfig");
+        assert_eq!(command, "request");
+        assert_eq!(body, "#!-req 1234 getconfig");
+    }
+
+    #[test]
+    fn test_parse_server_command_generic() {
+        let (command, body) = parse_server_command("hello world\n");
+        assert_eq!(command, "generic");
+        assert_eq!(body, "hello world");
+    }
+
+    #[test]
+    fn test_parse_server_command_strips_trailing_nulls() {
+        let payload = "#!-execd {\"command\":\"noop\"}\0\0\0";
+        let (command, body) = parse_server_command(payload);
+        assert_eq!(command, "execd");
+        assert!(!body.ends_with('\0'));
     }
 
     #[tokio::test]
