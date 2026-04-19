@@ -111,6 +111,21 @@ pub struct FimConfig {
     /// Debounce window in milliseconds (default 100).
     #[serde(default = "default_fim_debounce_ms")]
     pub debounce_ms: u64,
+    /// Maximum SHA-256 hashes dispatched per second (default 100).
+    ///
+    /// Bounds CPU usage of the real-time FIM path under bursts. When
+    /// the limit is reached the loop sleeps to the next second boundary
+    /// before dispatching more hashes. Set to `0` to disable rate
+    /// limiting.
+    #[serde(default = "default_fim_max_hashes_per_sec")]
+    pub max_hashes_per_sec: u32,
+    /// Maximum number of events to accumulate before flushing to the
+    /// event bus (default 50).
+    #[serde(default = "default_fim_batch_size")]
+    pub batch_size: usize,
+    /// Maximum time to hold events before flushing (default 200 ms).
+    #[serde(default = "default_fim_batch_timeout_ms")]
+    pub batch_timeout_ms: u64,
 }
 
 /// A directory entry in FIM configuration.
@@ -271,6 +286,15 @@ fn default_fim_scan_interval() -> u64 {
 fn default_fim_debounce_ms() -> u64 {
     100
 }
+fn default_fim_max_hashes_per_sec() -> u32 {
+    100
+}
+fn default_fim_batch_size() -> usize {
+    50
+}
+fn default_fim_batch_timeout_ms() -> u64 {
+    200
+}
 fn default_source_type() -> String {
     "file".to_string()
 }
@@ -359,6 +383,9 @@ impl Default for FimConfig {
             directories: default_fim_directories(),
             scan_interval: default_fim_scan_interval(),
             debounce_ms: default_fim_debounce_ms(),
+            max_hashes_per_sec: default_fim_max_hashes_per_sec(),
+            batch_size: default_fim_batch_size(),
+            batch_timeout_ms: default_fim_batch_timeout_ms(),
         }
     }
 }

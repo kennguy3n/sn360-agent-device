@@ -3,13 +3,33 @@
 //! Monitors filesystem changes using OS-native notification APIs
 //! (inotify/FSEvents/ReadDirectoryChangesW) and reports changes
 //! to the event bus for server delivery.
+//!
+//! # Real-time pipeline
+//!
+//! Under burst workloads (e.g., 1000 files created in rapid
+//! succession) a naive "collect metadata + hash + publish" loop
+//! pushes peak CPU well above the <3% budget. This module keeps the
+//! real-time path cheap by:
+//!
+//! 1. **Lazy hashing** — a file change event is emitted immediately
+//!    with `hash_sha256: None` (metadata only). The SHA-256 digest is
+//!    computed asynchronously on the blocking pool, and a follow-up
+//!    event with the hash populated is emitted once it completes.
+//! 2. **Rate limiting** — `max_hashes_per_sec` bounds how many hash
+//!    jobs can be dispatched per second. When the budget is spent the
+//!    loop sleeps to the next second boundary before dispatching more.
+//! 3. **Event batching** — events accumulate in a small in-memory
+//!    buffer and are flushed to the bus as a burst when either
+//!    `batch_size` or `batch_timeout_ms` is reached.
 
+pub mod batcher;
 pub mod config;
 pub mod db;
 pub mod debounce;
 pub mod event_format;
 pub mod hasher;
 pub mod idle;
+pub mod rate_limiter;
 pub mod scanner;
 pub mod watcher;
 
@@ -17,6 +37,8 @@ use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU8, Ordering};
 use std::time::Duration;
 
+use tokio::sync::mpsc;
+use tokio::time::Instant;
 use tracing::{debug, error, info, warn};
 
 use wda_core::config::AgentConfig;
@@ -24,11 +46,16 @@ use wda_core::module::{ModuleHandle, ModuleHealth, ModuleStatus};
 use wda_core::signal::ShutdownSignal;
 use wda_event_bus::{Event, EventBus, EventKind, Priority};
 
+use crate::batcher::EventBatcher;
 use crate::db::{FimEntry, StateDb};
 use crate::event_format::{format_syscheck_event, ChangeType};
+use crate::rate_limiter::RateLimiter;
 use crate::watcher::DebouncedWatcher;
 
 use wda_pal::types::FsEventKind;
+
+/// Internal capacity for the hash-completion channel.
+const HASH_RESULT_CHAN_CAP: usize = 1024;
 
 // Encode ModuleStatus as a u8 for atomic access.
 const STATUS_INITIALIZED: u8 = 0;
@@ -85,6 +112,11 @@ impl wda_core::module::AgentModule for FimModule {
 }
 
 /// Collect file metadata into a `FimEntry`.
+///
+/// When `check_sha256` is `true` the returned entry includes the
+/// file's SHA-256 digest. Pass `false` from the real-time path to
+/// keep the hot loop off of blocking I/O — callers compute the hash
+/// asynchronously via [`hash_file_async`] and patch the entry later.
 fn collect_metadata(path: &Path, check_sha256: bool) -> anyhow::Result<FimEntry> {
     let meta = std::fs::metadata(path)
         .map_err(|e| anyhow::anyhow!("failed to stat {}: {}", path.display(), e))?;
@@ -142,6 +174,67 @@ fn should_check_sha256(path: &Path, directories: &[wda_core::config::FimDirector
         }
     }
     true // default to hashing
+}
+
+/// Result of an async SHA-256 computation for a previously-emitted
+/// metadata-only event.
+struct HashResult {
+    /// Kind of change the original event described.
+    kind: ChangeType,
+    /// Whether the original event was delivered as
+    /// `FileMetadataChanged` (as opposed to `FileModified` /
+    /// `FileCreated`).
+    metadata_only: bool,
+    /// Snapshot of the DB entry *before* this event's metadata
+    /// overwrote it.
+    old_entry: Option<FimEntry>,
+    /// The entry that was emitted with `hash_sha256: None`.
+    new_entry: FimEntry,
+    /// The computed hash, or `None` if hashing failed.
+    hash: Option<String>,
+}
+
+/// Compute a file's SHA-256 on the blocking pool.
+fn hash_file_async(path: PathBuf) -> tokio::task::JoinHandle<Option<String>> {
+    tokio::task::spawn_blocking(move || match hasher::hash_file(&path) {
+        Ok(h) => Some(h),
+        Err(e) => {
+            debug!(path = %path.display(), error = %e, "async hash failed");
+            None
+        }
+    })
+}
+
+/// Build the `EventKind` for a given change + payload.
+fn build_event_kind(
+    change: ChangeType,
+    metadata_only: bool,
+    path: String,
+    payload: String,
+) -> EventKind {
+    match change {
+        ChangeType::Added => EventKind::FileCreated {
+            path,
+            syscheck_payload: Some(payload),
+        },
+        ChangeType::Deleted => EventKind::FileDeleted {
+            path,
+            syscheck_payload: Some(payload),
+        },
+        ChangeType::Modified => {
+            if metadata_only {
+                EventKind::FileMetadataChanged {
+                    path,
+                    syscheck_payload: Some(payload),
+                }
+            } else {
+                EventKind::FileModified {
+                    path,
+                    syscheck_payload: Some(payload),
+                }
+            }
+        }
+    }
 }
 
 /// The main FIM run loop.
@@ -206,13 +299,26 @@ async fn run(
         });
     }
 
+    // Rate limiter + batcher for the real-time hashing pipeline.
+    let mut rate_limiter = RateLimiter::new(fim_config.max_hashes_per_sec);
+    let mut batcher = EventBatcher::new(fim_config.batch_size, fim_config.batch_timeout_ms);
+
+    // Internal channel for completed hash jobs. Bounded so a
+    // misbehaving hash pool can't blow up memory; if the channel is
+    // momentarily full we drop the follow-up event (the metadata
+    // one was already delivered).
+    let (hash_tx, mut hash_rx) = mpsc::channel::<HashResult>(HASH_RESULT_CHAN_CAP);
+
     // Main event loop.
     loop {
+        let batch_deadline = batcher.deadline();
+
         tokio::select! {
             biased;
 
             _ = shutdown.wait() => {
                 info!("FIM module received shutdown signal");
+                batcher.flush(&bus).await;
                 break;
             }
 
@@ -226,6 +332,17 @@ async fn run(
                 });
             }
 
+            Some(result) = hash_rx.recv() => {
+                handle_hash_result(result, &db, &mut batcher);
+                if batcher.is_full() {
+                    batcher.flush(&bus).await;
+                }
+            }
+
+            _ = sleep_until_deadline(batch_deadline), if batch_deadline.is_some() => {
+                batcher.flush(&bus).await;
+            }
+
             event = watcher.next_event() => {
                 let event = match event {
                     Some(ev) => ev,
@@ -235,186 +352,14 @@ async fn run(
                     }
                 };
 
-                let path = event.path.clone();
-                let kind = event.kind;
-                let check_sha256 = should_check_sha256(&path, &fim_config.directories);
+                let pending = process_fs_event(event, &fim_config, &db, &mut batcher);
 
-                debug!(path = %path.display(), kind = ?kind, "processing FIM event");
+                if batcher.is_full() {
+                    batcher.flush(&bus).await;
+                }
 
-                match kind {
-                    FsEventKind::Created => {
-                        let path_clone = path.clone();
-                        let new_entry = match tokio::task::spawn_blocking(move || {
-                            collect_metadata(&path_clone, check_sha256)
-                        })
-                        .await?
-                        {
-                            Ok(entry) => entry,
-                            Err(e) => {
-                                debug!(error = %e, path = %path.display(), "file disappeared before stat");
-                                continue;
-                            }
-                        };
-
-                        let syscheck_json = format_syscheck_event(
-                            ChangeType::Added,
-                            &new_entry.path,
-                            None,
-                            Some(&new_entry),
-                        );
-
-                        db.upsert_entry(&new_entry)?;
-
-                        let bus_event = Event::new(
-                            "fim",
-                            Priority::Normal,
-                            EventKind::FileCreated {
-                                path: path.to_string_lossy().to_string(),
-                                syscheck_payload: Some(syscheck_json.clone()),
-                            },
-                        );
-                        if let Err(e) = bus.publish_to_server(bus_event).await {
-                            warn!(error = %e, "failed to publish FIM event");
-                        }
-                        debug!(payload = %syscheck_json, "FIM created event");
-                    }
-
-                    FsEventKind::Modified | FsEventKind::MetadataChanged => {
-                        let path_str = path.to_string_lossy().to_string();
-                        let old_entry = db.get_entry(&path_str)?;
-
-                        let path_clone = path.clone();
-                        let new_entry = match tokio::task::spawn_blocking(move || {
-                            collect_metadata(&path_clone, check_sha256)
-                        })
-                        .await?
-                        {
-                            Ok(entry) => entry,
-                            Err(e) => {
-                                debug!(error = %e, path = %path_str, "file disappeared before stat");
-                                continue;
-                            }
-                        };
-
-                        // Only emit an event if something actually changed.
-                        let changed = match &old_entry {
-                            Some(old) => {
-                                old.sha256 != new_entry.sha256
-                                    || old.size != new_entry.size
-                                    || old.permissions != new_entry.permissions
-                                    || old.uid != new_entry.uid
-                                    || old.gid != new_entry.gid
-                                    || old.mtime != new_entry.mtime
-                            }
-                            None => true,
-                        };
-
-                        if changed {
-                            let syscheck_json = format_syscheck_event(
-                                ChangeType::Modified,
-                                &new_entry.path,
-                                old_entry.as_ref(),
-                                Some(&new_entry),
-                            );
-
-                            db.upsert_entry(&new_entry)?;
-
-                            let event_kind = if kind == FsEventKind::MetadataChanged {
-                                EventKind::FileMetadataChanged {
-                                    path: path_str.clone(),
-                                    syscheck_payload: Some(syscheck_json.clone()),
-                                }
-                            } else {
-                                EventKind::FileModified {
-                                    path: path_str.clone(),
-                                    syscheck_payload: Some(syscheck_json.clone()),
-                                }
-                            };
-
-                            let bus_event = Event::new("fim", Priority::Normal, event_kind);
-                            if let Err(e) = bus.publish_to_server(bus_event).await {
-                                warn!(error = %e, "failed to publish FIM event");
-                            }
-                            debug!(payload = %syscheck_json, "FIM modified event");
-                        }
-                    }
-
-                    FsEventKind::Deleted => {
-                        let path_str = path.to_string_lossy().to_string();
-                        let old_entry = db.get_entry(&path_str)?;
-
-                        let syscheck_json = format_syscheck_event(
-                            ChangeType::Deleted,
-                            &path_str,
-                            old_entry.as_ref(),
-                            None,
-                        );
-
-                        db.delete_entry(&path_str)?;
-
-                        let bus_event = Event::new(
-                            "fim",
-                            Priority::Normal,
-                            EventKind::FileDeleted {
-                                path: path_str,
-                                syscheck_payload: Some(syscheck_json.clone()),
-                            },
-                        );
-                        if let Err(e) = bus.publish_to_server(bus_event).await {
-                            warn!(error = %e, "failed to publish FIM event");
-                        }
-                        debug!(payload = %syscheck_json, "FIM deleted event");
-                    }
-
-                    FsEventKind::Renamed => {
-                        let path_str = path.to_string_lossy().to_string();
-                        let old_entry = db.get_entry(&path_str)?;
-
-                        if let Some(ref old) = old_entry {
-                            let syscheck_json = format_syscheck_event(
-                                ChangeType::Deleted,
-                                &path_str,
-                                Some(old),
-                                None,
-                            );
-                            db.delete_entry(&path_str)?;
-                            let bus_event = Event::new(
-                                "fim",
-                                Priority::Normal,
-                                EventKind::FileDeleted {
-                                    path: path_str.clone(),
-                                    syscheck_payload: Some(syscheck_json),
-                                },
-                            );
-                            let _ = bus.publish_to_server(bus_event).await;
-                        }
-
-                        if path.exists() {
-                            let path_clone = path.clone();
-                            if let Ok(new_entry) = tokio::task::spawn_blocking(move || {
-                                collect_metadata(&path_clone, check_sha256)
-                            })
-                            .await?
-                            {
-                                let syscheck_json = format_syscheck_event(
-                                    ChangeType::Added,
-                                    &new_entry.path,
-                                    None,
-                                    Some(&new_entry),
-                                );
-                                db.upsert_entry(&new_entry)?;
-                                let bus_event = Event::new(
-                                    "fim",
-                                    Priority::Normal,
-                                    EventKind::FileCreated {
-                                        path: path_str,
-                                        syscheck_payload: Some(syscheck_json),
-                                    },
-                                );
-                                let _ = bus.publish_to_server(bus_event).await;
-                            }
-                        }
-                    }
+                for job in pending {
+                    dispatch_hash_job(job, &mut rate_limiter, &hash_tx).await;
                 }
             }
         }
@@ -423,6 +368,283 @@ async fn run(
     status.store(STATUS_STOPPED, Ordering::Relaxed);
     info!("FIM module stopped");
     Ok(())
+}
+
+/// Sleep until `deadline`, or wait forever if `deadline` is `None`.
+async fn sleep_until_deadline(deadline: Option<Instant>) {
+    match deadline {
+        Some(d) => tokio::time::sleep_until(d).await,
+        None => std::future::pending::<()>().await,
+    }
+}
+
+/// Parameters captured for a pending async hash computation.
+struct PendingHashJob {
+    kind: ChangeType,
+    metadata_only: bool,
+    old_entry: Option<FimEntry>,
+    new_entry: FimEntry,
+    path: PathBuf,
+}
+
+/// Handle one raw filesystem event from the debounced watcher.
+///
+/// This is the hot path under a burst and runs fully synchronously:
+/// it never awaits while holding the `StateDb` borrow. Any hash
+/// computation that needs to happen is returned as a list of
+/// [`PendingHashJob`]s; the caller is responsible for dispatching
+/// them through the rate-limited hash pool.
+fn process_fs_event(
+    event: wda_pal::types::FsEvent,
+    fim_config: &wda_core::config::FimConfig,
+    db: &StateDb,
+    batcher: &mut EventBatcher,
+) -> Vec<PendingHashJob> {
+    let mut pending = Vec::new();
+    let path = event.path.clone();
+    let kind = event.kind;
+    let check_sha256 = should_check_sha256(&path, &fim_config.directories);
+
+    debug!(path = %path.display(), kind = ?kind, "processing FIM event");
+
+    match kind {
+        FsEventKind::Created => {
+            let path_str = path.to_string_lossy().to_string();
+            let new_entry = match collect_metadata(&path, false) {
+                Ok(entry) => entry,
+                Err(e) => {
+                    debug!(error = %e, path = %path_str, "file disappeared before stat");
+                    return pending;
+                }
+            };
+
+            if let Err(e) = db.upsert_entry(&new_entry) {
+                warn!(error = %e, path = %path_str, "DB upsert failed");
+            }
+
+            let payload =
+                format_syscheck_event(ChangeType::Added, &new_entry.path, None, Some(&new_entry));
+            batcher.push(Event::new(
+                "fim",
+                Priority::Normal,
+                build_event_kind(ChangeType::Added, false, path_str.clone(), payload),
+            ));
+
+            if check_sha256 && new_entry.sha256.is_none() {
+                pending.push(PendingHashJob {
+                    kind: ChangeType::Added,
+                    metadata_only: false,
+                    old_entry: None,
+                    new_entry,
+                    path,
+                });
+            }
+        }
+
+        FsEventKind::Modified | FsEventKind::MetadataChanged => {
+            let path_str = path.to_string_lossy().to_string();
+            let old_entry = match db.get_entry(&path_str) {
+                Ok(e) => e,
+                Err(e) => {
+                    warn!(error = %e, path = %path_str, "DB lookup failed");
+                    return pending;
+                }
+            };
+
+            let new_entry = match collect_metadata(&path, false) {
+                Ok(entry) => entry,
+                Err(e) => {
+                    debug!(error = %e, path = %path_str, "file disappeared before stat");
+                    return pending;
+                }
+            };
+
+            let metadata_changed = match &old_entry {
+                Some(old) => {
+                    old.size != new_entry.size
+                        || old.permissions != new_entry.permissions
+                        || old.uid != new_entry.uid
+                        || old.gid != new_entry.gid
+                        || old.mtime != new_entry.mtime
+                }
+                None => true,
+            };
+
+            let metadata_only = kind == FsEventKind::MetadataChanged;
+
+            if metadata_changed {
+                let payload = format_syscheck_event(
+                    ChangeType::Modified,
+                    &new_entry.path,
+                    old_entry.as_ref(),
+                    Some(&new_entry),
+                );
+                if let Err(e) = db.upsert_entry(&new_entry) {
+                    warn!(error = %e, path = %path_str, "DB upsert failed");
+                }
+                batcher.push(Event::new(
+                    "fim",
+                    Priority::Normal,
+                    build_event_kind(
+                        ChangeType::Modified,
+                        metadata_only,
+                        path_str.clone(),
+                        payload,
+                    ),
+                ));
+            }
+
+            if check_sha256 && new_entry.sha256.is_none() {
+                pending.push(PendingHashJob {
+                    kind: ChangeType::Modified,
+                    metadata_only,
+                    old_entry,
+                    new_entry,
+                    path,
+                });
+            }
+        }
+
+        FsEventKind::Deleted => {
+            let path_str = path.to_string_lossy().to_string();
+            let old_entry = match db.get_entry(&path_str) {
+                Ok(e) => e,
+                Err(e) => {
+                    warn!(error = %e, path = %path_str, "DB lookup failed");
+                    return pending;
+                }
+            };
+
+            let payload =
+                format_syscheck_event(ChangeType::Deleted, &path_str, old_entry.as_ref(), None);
+
+            if let Err(e) = db.delete_entry(&path_str) {
+                warn!(error = %e, path = %path_str, "DB delete failed");
+            }
+
+            batcher.push(Event::new(
+                "fim",
+                Priority::Normal,
+                build_event_kind(ChangeType::Deleted, false, path_str, payload),
+            ));
+        }
+
+        FsEventKind::Renamed => {
+            let path_str = path.to_string_lossy().to_string();
+            let old_entry = match db.get_entry(&path_str) {
+                Ok(e) => e,
+                Err(e) => {
+                    warn!(error = %e, path = %path_str, "DB lookup failed");
+                    None
+                }
+            };
+
+            if let Some(ref old) = old_entry {
+                let payload =
+                    format_syscheck_event(ChangeType::Deleted, &path_str, Some(old), None);
+                if let Err(e) = db.delete_entry(&path_str) {
+                    warn!(error = %e, path = %path_str, "DB delete failed");
+                }
+                batcher.push(Event::new(
+                    "fim",
+                    Priority::Normal,
+                    build_event_kind(ChangeType::Deleted, false, path_str.clone(), payload),
+                ));
+            }
+
+            if path.exists() {
+                if let Ok(new_entry) = collect_metadata(&path, false) {
+                    if let Err(e) = db.upsert_entry(&new_entry) {
+                        warn!(error = %e, path = %path_str, "DB upsert failed");
+                    }
+                    let payload = format_syscheck_event(
+                        ChangeType::Added,
+                        &new_entry.path,
+                        None,
+                        Some(&new_entry),
+                    );
+                    batcher.push(Event::new(
+                        "fim",
+                        Priority::Normal,
+                        build_event_kind(ChangeType::Added, false, path_str, payload),
+                    ));
+
+                    if check_sha256 && new_entry.sha256.is_none() {
+                        pending.push(PendingHashJob {
+                            kind: ChangeType::Added,
+                            metadata_only: false,
+                            old_entry: None,
+                            new_entry,
+                            path,
+                        });
+                    }
+                }
+            }
+        }
+    }
+
+    pending
+}
+
+/// Rate-limited dispatch of a single pending hash job.
+async fn dispatch_hash_job(
+    job: PendingHashJob,
+    rate_limiter: &mut RateLimiter,
+    hash_tx: &mpsc::Sender<HashResult>,
+) {
+    rate_limiter.acquire().await;
+
+    let tx = hash_tx.clone();
+    let PendingHashJob {
+        kind,
+        metadata_only,
+        old_entry,
+        new_entry,
+        path,
+    } = job;
+    tokio::spawn(async move {
+        let hash = hash_file_async(path).await.ok().flatten();
+        let _ = tx
+            .send(HashResult {
+                kind,
+                metadata_only,
+                old_entry,
+                new_entry,
+                hash,
+            })
+            .await;
+    });
+}
+
+/// Apply a completed hash result: update the DB with the now-known
+/// hash and enqueue a follow-up event.
+fn handle_hash_result(mut result: HashResult, db: &StateDb, batcher: &mut EventBatcher) {
+    let hash = match result.hash.take() {
+        Some(h) => h,
+        None => return,
+    };
+
+    result.new_entry.sha256 = Some(hash);
+    if let Err(e) = db.upsert_entry(&result.new_entry) {
+        warn!(
+            error = %e,
+            path = %result.new_entry.path,
+            "failed to persist hashed entry"
+        );
+    }
+
+    let payload = format_syscheck_event(
+        result.kind,
+        &result.new_entry.path,
+        result.old_entry.as_ref(),
+        Some(&result.new_entry),
+    );
+    let path_str = result.new_entry.path.clone();
+    batcher.push(Event::new(
+        "fim",
+        Priority::Normal,
+        build_event_kind(result.kind, result.metadata_only, path_str, payload),
+    ));
 }
 
 /// Async wrapper that runs the baseline scan in a blocking task and
@@ -495,6 +717,9 @@ mod tests {
                     }],
                     scan_interval: 86400,
                     debounce_ms: 50,
+                    max_hashes_per_sec: 1000,
+                    batch_size: 1,
+                    batch_timeout_ms: 50,
                 },
                 ..Default::default()
             },

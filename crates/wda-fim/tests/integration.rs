@@ -25,6 +25,9 @@ fn test_config(dir: &TempDir) -> AgentConfig {
         }],
         scan_interval: 86400,
         debounce_ms: 50, // short debounce for tests
+        max_hashes_per_sec: 1000,
+        batch_size: 1,
+        batch_timeout_ms: 50,
     };
     config
 }
