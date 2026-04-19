@@ -4,7 +4,7 @@
 //! Supports both pre-shared key and password-based enrollment.
 //! Uses TLS for the enrollment connection (Wazuh authd requires SSL).
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use rustls::client::danger::{HandshakeSignatureValid, ServerCertVerified, ServerCertVerifier};
@@ -257,7 +257,13 @@ impl ServerCertVerifier for AcceptAnyCert {
 }
 
 /// Path to the agent keys file.
-pub fn keys_file_path() -> PathBuf {
+///
+/// When `override_path` is `Some`, that path is used verbatim. Otherwise the
+/// platform default applies.
+pub fn keys_file_path(override_path: Option<&Path>) -> PathBuf {
+    if let Some(p) = override_path {
+        return p.to_path_buf();
+    }
     #[cfg(unix)]
     {
         PathBuf::from("/etc/wazuh-desktop-agent/client.keys")
@@ -269,16 +275,16 @@ pub fn keys_file_path() -> PathBuf {
 }
 
 /// Load an existing agent key from disk.
-pub fn load_agent_key() -> Option<AgentKey> {
-    let path = keys_file_path();
+pub fn load_agent_key(override_path: Option<&Path>) -> Option<AgentKey> {
+    let path = keys_file_path(override_path);
     let contents = std::fs::read_to_string(&path).ok()?;
     let line = contents.lines().next()?;
     AgentKey::from_keys_line(line.trim())
 }
 
 /// Save an agent key to disk.
-pub fn save_agent_key(key: &AgentKey) -> Result<(), EnrollmentError> {
-    let path = keys_file_path();
+pub fn save_agent_key(key: &AgentKey, override_path: Option<&Path>) -> Result<(), EnrollmentError> {
+    let path = keys_file_path(override_path);
 
     // Ensure parent directory exists
     if let Some(parent) = path.parent() {

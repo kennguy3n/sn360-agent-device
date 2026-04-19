@@ -62,21 +62,34 @@ jobs:
         run: cargo build --release
 
   e2e:
-    name: E2E Tests (Linux)
-    runs-on: ubuntu-latest
+    name: E2E Tests (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
     needs: [build]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            script: bash tests/scripts/run-e2e.sh
+            deps: sudo apt-get update && sudo apt-get install -y libsystemd-dev
+          - os: macos-latest
+            script: bash tests/scripts/run-e2e-macos.sh
+            deps: echo "No extra deps needed"
+          - os: windows-latest
+            script: pwsh tests/scripts/run-e2e-windows.ps1
+            deps: echo "No extra deps needed"
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
       - name: Install system dependencies
-        run: sudo apt-get update && sudo apt-get install -y libsystemd-dev
+        run: ${{ matrix.deps }}
       - name: Build release
         run: cargo build --release
       - name: Run E2E tests
-        run: bash tests/scripts/run-e2e.sh
-        timeout-minutes: 10
+        run: ${{ matrix.script }}
+        timeout-minutes: 15
 
   nightly-benchmark:
     name: Nightly Benchmark

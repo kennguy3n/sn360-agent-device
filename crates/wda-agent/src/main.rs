@@ -42,8 +42,9 @@ async fn main() -> Result<()> {
     let mut agent = Agent::new(config.clone());
 
     // 4. Check for existing agent key; enroll if missing
+    let keys_file_override = config.enrollment.keys_file.as_deref();
     let mut fresh_enrollment = false;
-    let agent_key = match load_agent_key() {
+    let agent_key = match load_agent_key(keys_file_override) {
         Some(key) => {
             info!(agent_id = %key.id, "loaded existing agent key");
             key
@@ -72,7 +73,7 @@ async fn main() -> Result<()> {
             let key = client.enroll().await.context("enrollment failed")?;
 
             // 5. Save the key
-            save_agent_key(&key).context("failed to save agent key")?;
+            save_agent_key(&key, keys_file_override).context("failed to save agent key")?;
             info!(agent_id = %key.id, "enrollment complete, key saved");
             fresh_enrollment = true;
             key
