@@ -11,6 +11,20 @@
 
 set -euo pipefail
 
+# Docker Desktop is not available on GitHub-hosted macOS runners. Without it,
+# `docker compose` would hang or fail, consuming hours of runner time for no
+# signal. Exit cleanly so the job succeeds with a clear skip message; real
+# macOS E2E validation happens on self-hosted runners / local dev machines
+# where Docker is installed.
+if ! command -v docker >/dev/null 2>&1; then
+  echo "docker CLI not found; skipping macOS E2E (runner has no Docker)."
+  exit 0
+fi
+if ! docker info >/dev/null 2>&1; then
+  echo "docker daemon not reachable; skipping macOS E2E (runner has no Docker)."
+  exit 0
+fi
+
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 
