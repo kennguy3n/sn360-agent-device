@@ -29,6 +29,9 @@ fn test_config(dir: &str) -> AgentConfig {
                 }],
                 scan_interval: 86400,
                 debounce_ms: 50,
+                max_hashes_per_sec: 1000,
+                batch_size: 1,
+                batch_timeout_ms: 50,
             },
             ..Default::default()
         },
@@ -148,29 +151,37 @@ async fn test_fim_detects_file_deletion() {
     tokio::time::sleep(Duration::from_millis(100)).await;
     std::fs::remove_file(&file_path).unwrap();
 
-    // Wait for a FileDeleted event (use longer timeout for macOS CI runners where
-    // kqueue-based watchers can be slower to report deletions).
-    let event = timeout(Duration::from_secs(30), server_rx.recv())
-        .await
-        .expect("timed out waiting for delete event")
-        .expect("server_rx closed");
-
-    match &event.kind {
-        EventKind::FileDeleted { path, .. } => {
-            assert!(
-                path.contains("delete_test.txt"),
-                "event path should reference the deleted file, got: {path}"
-            );
+    // Wait for a FileDeleted event. With two-phase emission (metadata +
+    // follow-up hash) there may be additional FileCreated/FileModified
+    // events for the same path queued ahead of the deletion; skip past
+    // them and keep polling until the deletion shows up (or the
+    // watcher reports it as a metadata change, as macOS kqueue can).
+    let mut found_deletion = false;
+    let mut last: Option<EventKind> = None;
+    for _ in 0..30 {
+        match timeout(Duration::from_secs(5), server_rx.recv()).await {
+            Ok(Some(event)) => match &event.kind {
+                EventKind::FileDeleted { path, .. }
+                | EventKind::FileMetadataChanged { path, .. }
+                    if path.contains("delete_test.txt") =>
+                {
+                    found_deletion = matches!(
+                        &event.kind,
+                        EventKind::FileDeleted { .. } | EventKind::FileMetadataChanged { .. }
+                    );
+                    last = Some(event.kind);
+                    break;
+                }
+                other => last = Some(other.clone()),
+            },
+            _ => break,
         }
-        // macOS kqueue may report a deletion as a metadata change.
-        EventKind::FileMetadataChanged { path, .. } => {
-            assert!(
-                path.contains("delete_test.txt"),
-                "event path should reference the deleted file, got: {path}"
-            );
-        }
-        other => panic!("expected FileDeleted or FileMetadataChanged, got: {other:?}"),
     }
+
+    assert!(
+        found_deletion,
+        "expected FileDeleted or FileMetadataChanged for delete_test.txt, last saw: {last:?}"
+    );
 
     controller.shutdown();
 }

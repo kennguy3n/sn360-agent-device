@@ -25,6 +25,9 @@ fn test_config(dir: &str, scan_interval: u64) -> AgentConfig {
                 }],
                 scan_interval,
                 debounce_ms: 50,
+                max_hashes_per_sec: 1000,
+                batch_size: 1,
+                batch_timeout_ms: 50,
             },
             ..Default::default()
         },
