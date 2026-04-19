@@ -15,30 +15,32 @@
 pub fn parse_event_message(xml: &str) -> String {
     let mut parts: Vec<String> = Vec::new();
 
+    let render_element = |parts: &mut Vec<String>, label: &str, text: Option<ElementText>| {
+        if let Some(t) = text {
+            parts.push(format!("{}: {}", label, t.for_display()));
+        }
+    };
+
     if let Some(v) = extract_attr(xml, "Provider", "Name") {
         parts.push(format!("Provider: {}", decode_entities(&v)));
     }
-    if let Some(v) = extract_element_text(xml, "EventID") {
-        parts.push(format!("EventID: {}", decode_entities(v.trim())));
-    }
-    if let Some(v) = extract_element_text(xml, "Level") {
-        parts.push(format!("Level: {}", decode_entities(v.trim())));
-    }
+    render_element(&mut parts, "EventID", extract_element_text(xml, "EventID"));
+    render_element(&mut parts, "Level", extract_element_text(xml, "Level"));
     if let Some(v) = extract_attr(xml, "TimeCreated", "SystemTime") {
         parts.push(format!("TimeCreated: {}", decode_entities(&v)));
     }
-    if let Some(v) = extract_element_text(xml, "Channel") {
-        parts.push(format!("Channel: {}", decode_entities(v.trim())));
-    }
-    if let Some(v) = extract_element_text(xml, "Computer") {
-        parts.push(format!("Computer: {}", decode_entities(v.trim())));
-    }
+    render_element(&mut parts, "Channel", extract_element_text(xml, "Channel"));
+    render_element(
+        &mut parts,
+        "Computer",
+        extract_element_text(xml, "Computer"),
+    );
 
     for (name, value) in extract_data_elements(xml) {
-        let decoded = decode_entities(value.trim());
+        let display = value.for_display();
         match name {
-            Some(n) => parts.push(format!("Data [{}]: {}", n, decoded)),
-            None => parts.push(format!("Data: {}", decoded)),
+            Some(n) => parts.push(format!("Data [{}]: {}", n, display)),
+            None => parts.push(format!("Data: {}", display)),
         }
     }
 
@@ -49,12 +51,32 @@ pub fn parse_event_message(xml: &str) -> String {
     }
 }
 
+/// Text extracted from an element, along with whether it came from a
+/// `<![CDATA[...]]>` section. CDATA is literal character data per the
+/// XML spec, so entity references inside it are *not* decoded.
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct ElementText {
+    value: String,
+    is_cdata: bool,
+}
+
+impl ElementText {
+    fn for_display(&self) -> String {
+        let trimmed = self.value.trim();
+        if self.is_cdata {
+            trimmed.to_string()
+        } else {
+            decode_entities(trimmed)
+        }
+    }
+}
+
 /// Extract the text content of the first `<tag ...>content</tag>`.
 /// Returns None for self-closing tags.
 ///
 /// Text inside `<![CDATA[...]]>` sections is returned verbatim
 /// (without the CDATA wrapper).
-fn extract_element_text(xml: &str, tag: &str) -> Option<String> {
+fn extract_element_text(xml: &str, tag: &str) -> Option<ElementText> {
     let open = format!("<{}", tag);
     let close = format!("</{}>", tag);
 
@@ -111,7 +133,7 @@ fn extract_attr(xml: &str, tag: &str, attr: &str) -> Option<String> {
 /// Extract every `<Data>` element in document order, along with its
 /// optional `Name` attribute. Handles both `<Data Name="x">value</Data>`
 /// and self-closing `<Data Name="x"/>` forms.
-fn extract_data_elements(xml: &str) -> Vec<(Option<String>, String)> {
+fn extract_data_elements(xml: &str) -> Vec<(Option<String>, ElementText)> {
     let mut out = Vec::new();
     let mut cursor = 0;
     let open = "<Data";
@@ -141,7 +163,13 @@ fn extract_data_elements(xml: &str) -> Vec<(Option<String>, String)> {
         let value_start = tag_start + open.len() + tag_end_rel + 1;
 
         if self_closing {
-            out.push((name, String::new()));
+            out.push((
+                name,
+                ElementText {
+                    value: String::new(),
+                    is_cdata: false,
+                },
+            ));
             cursor = value_start;
             continue;
         }
@@ -189,20 +217,28 @@ fn extract_attr_in_tag(tag_body: &str, attr: &str) -> Option<String> {
     }
 }
 
-/// Replace any surrounding `<![CDATA[...]]>` wrapper with its raw
-/// content. If the slice does not start with a CDATA opener the
-/// input is returned unchanged. Whitespace around the CDATA section
-/// is tolerated; the caller still trims the result for display.
-fn strip_cdata(raw: &str) -> String {
+/// Unwrap any surrounding `<![CDATA[...]]>` marker. If the slice is a
+/// CDATA section the inner literal text is returned with `is_cdata =
+/// true`; otherwise the original text is returned with `is_cdata =
+/// false`. Callers use the flag to skip entity decoding on literal
+/// CDATA content. Whitespace around the CDATA section is tolerated;
+/// the caller still trims the result for display.
+fn strip_cdata(raw: &str) -> ElementText {
     const OPEN: &str = "<![CDATA[";
     const CLOSE: &str = "]]>";
     let trimmed = raw.trim();
     if let Some(body) = trimmed.strip_prefix(OPEN) {
         if let Some(inner) = body.strip_suffix(CLOSE) {
-            return inner.to_string();
+            return ElementText {
+                value: inner.to_string(),
+                is_cdata: true,
+            };
         }
     }
-    raw.to_string()
+    ElementText {
+        value: raw.to_string(),
+        is_cdata: false,
+    }
 }
 
 /// Decode the five XML predefined entities plus numeric character
@@ -428,15 +464,27 @@ mod tests {
 
     #[test]
     fn unwraps_cdata_sections_in_data_elements() {
+        // CDATA content is literal per the XML spec: the `&amp;`
+        // inside the CDATA is five literal characters, not an
+        // entity reference, so the output must preserve it verbatim.
         let xml = r#"<Event><EventData>
             <Data Name='Raw'><![CDATA[<html>&amp;payload</html>]]></Data>
         </EventData></Event>"#;
         let msg = parse_event_message(xml);
         assert!(
-            msg.contains("Data [Raw]: <html>&payload</html>"),
+            msg.contains("Data [Raw]: <html>&amp;payload</html>"),
             "got: {}",
             msg
         );
+    }
+
+    #[test]
+    fn cdata_content_is_not_entity_decoded_in_system_field() {
+        let xml = r#"<Event><System>
+            <Channel><![CDATA[App&amp;Test]]></Channel>
+        </System></Event>"#;
+        let msg = parse_event_message(xml);
+        assert!(msg.contains("Channel: App&amp;Test"), "got: {}", msg);
     }
 
     #[test]
