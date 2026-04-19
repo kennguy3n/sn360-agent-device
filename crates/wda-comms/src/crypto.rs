@@ -42,6 +42,12 @@ pub enum CryptoError {
     DecryptionFailed(String),
     #[error("invalid key length")]
     InvalidKeyLength,
+    /// Decryption produced an empty payload. This happens when the
+    /// peer sends a legitimate keep-open frame with no body and is
+    /// not a real error, so callers should distinguish it from
+    /// `DecryptionFailed`.
+    #[error("empty decrypted payload")]
+    EmptyPayload,
 }
 
 /// Which block cipher to use for the Wazuh secure channel.
@@ -188,7 +194,7 @@ impl WazuhCipher {
         };
 
         if decrypted.is_empty() {
-            return Err(CryptoError::DecryptionFailed("empty decrypted data".into()));
+            return Err(CryptoError::EmptyPayload);
         }
 
         if decrypted[0] == b'!' {

@@ -215,7 +215,7 @@ async fn main() -> Result<()> {
                     tokio::time::timeout(Duration::from_secs(1), guard.receive()).await
                 } => {
                     match result {
-                        Ok(Ok(data)) => {
+                        Ok(Ok(Some(data))) => {
                             let payload = match std::str::from_utf8(&data) {
                                 Ok(s) => s.to_string(),
                                 Err(_) => {
@@ -235,6 +235,13 @@ async fn main() -> Result<()> {
                             if let Err(e) = receive_bus.publish(event) {
                                 warn!(error = %e, "failed to publish server command");
                             }
+                        }
+                        Ok(Ok(None)) => {
+                            // Peer sent a keep-open frame with no body.
+                            // Not an error; release the connection mutex
+                            // so other tasks can send.
+                            tracing::debug!("received empty server frame");
+                            tokio::time::sleep(Duration::from_millis(50)).await;
                         }
                         Ok(Err(e)) => {
                             warn!(error = %e, "failed to receive from server");

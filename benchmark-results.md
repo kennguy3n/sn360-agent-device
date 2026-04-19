@@ -30,12 +30,12 @@ daemon most equivalent to the WDA responsibility is used
 
 | Component | Wazuh 4.9.2 | WDA |
 |---|---|---|
-| `wazuh-agentd` / `wda-agent` (communications) | 752 KB | 8.0 MB |
+| `wazuh-agentd` / `wda-agent` (communications) | 752 KB | 5.5 MB |
 | `wazuh-syscheckd` (FIM) | 888 KB | *(integrated)* |
 | `wazuh-logcollector` (log collection) | 780 KB | *(integrated)* |
 | `wazuh-modulesd` (inventory / SCA / rootcheck) | 700 KB | *(integrated)* |
 | `wazuh-execd` (active response) | 724 KB | *(integrated)* |
-| **Total shipped binaries** | **3.8 MB** | **8.0 MB** |
+| **Total shipped binaries** | **3.8 MB** | **5.5 MB** |
 
 WDA is a single static binary that includes FIM, log collection,
 inventory, SCA, rootcheck, and active response. The Wazuh agent splits
@@ -43,10 +43,13 @@ these responsibilities across five separate dynamically-linked ELF
 binaries that also depend on shipped shared libraries, Python, and
 OpenSSL under `/var/ossec`.
 
-> **Target: < 5 MB.** Not yet met. Current WDA debug+release build
-> without strip/LTO/`panic=abort` comes in at 8.0 MB. The proposal
-> identifies LTO + `opt-level=z` + strip as Phase 3.6 optimization work;
-> these are not yet enabled in `Cargo.toml`.
+> **Target: < 5 MB.** Close but not met — the stripped `release` build
+> with `lto = "fat"`, `codegen-units = 1`, `panic = "abort"`,
+> `opt-level = "z"`, and `strip = true` now comes in at 5.5 MB, down
+> from 8.0 MB before the size-optimization flags were enabled. The
+> remaining ~0.5 MB is dominated by `rusqlite` (bundled SQLite) and
+> `rustls`; dropping unused features from those crates is the next
+> lever to pull.
 
 ### Idle RSS (steady state after 20 s)
 
@@ -99,7 +102,7 @@ OpenSSL under `/var/ossec`.
 |---|---|---|---|
 | Idle RAM | < 15 MB | 12 MB | **Met** |
 | Idle CPU | < 0.1 % | 0.03 % | **Met** |
-| Binary size | < 5 MB | 8.0 MB | **Not met** (needs LTO / strip / `opt-level=z`) |
+| Binary size | < 5 MB | 5.5 MB | **Not met** (down from 8.0 MB after enabling LTO / strip / `opt-level=z`) |
 | FIM scan CPU peak | < 3 % | 8 % | **Not met** (needs adaptive throttling + batching) |
 
 ## Caveats
