@@ -60,7 +60,11 @@ fn create_files_burst(dir: &std::path::Path, count: usize) -> Duration {
 /// progress on a 100 ms cadence even while the FIM module is busy
 /// processing the burst. If the FIM run loop were still computing
 /// hashes inline, those ticks would slip by hundreds of ms.
-#[tokio::test]
+#[cfg_attr(
+    target_os = "macos",
+    ignore = "kqueue may drop events under burst load on macOS CI; see docs/known-issues/fim-burst-workload-macos-ci.md"
+)]
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn test_burst_does_not_block_event_loop() {
     let tmp = TempDir::new().unwrap();
     let canon = tmp.path().canonicalize().unwrap();
@@ -97,7 +101,10 @@ async fn test_burst_does_not_block_event_loop() {
 
     // Create 1000 files as fast as we can.
     let burst_start = Instant::now();
-    let burst_duration = create_files_burst(tmp.path(), 1_000);
+    let burst_dir = tmp.path().to_path_buf();
+    let burst_duration = tokio::task::spawn_blocking(move || create_files_burst(&burst_dir, 1_000))
+        .await
+        .expect("burst file-creation task panicked");
     // The file-creation loop itself is synchronous std::fs work
     // running on the test thread; the FIM runtime should not have
     // added noticeable back-pressure.
