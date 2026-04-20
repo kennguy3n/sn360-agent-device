@@ -160,7 +160,7 @@ echo "    Test directories ready."
 # ── Step 5: Run the agent ───────────────────────────────────────────
 echo "==> Step 5: Starting agent..."
 sudo mkdir -p /etc/wazuh-desktop-agent
-timeout 120 sudo ./target/release/wda-agent tests/wazuh-test-config.yaml 2>&1 | tee /tmp/wda-agent-e2e.log &
+timeout 120 sudo ./target/release/wda-agent tests/wazuh-test-config.yaml > /tmp/wda-agent-e2e.log 2>&1 &
 AGENT_PID=$!
 # Give the agent time to enrol and send first keepalive.
 sleep 20

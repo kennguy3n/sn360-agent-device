@@ -24,7 +24,7 @@ try {
         Write-Host "Docker not available; skipping Windows E2E."
         exit 0
     }
-    if ($dockerInfo -notmatch 'linux') {
+    if (-not (($dockerInfo | Out-String) -match 'linux')) {
         Write-Host "Docker is not in Linux containers mode; skipping Windows E2E."
         exit 0
     }

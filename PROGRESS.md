@@ -47,24 +47,24 @@ run as part of `cargo test --all`.
 
 Command: `cargo test --all 2>&1 | tee unit-test-results.txt`
 
-**Result: all 237 tests passed, 0 failed.**
+**Result: all 289 tests passed, 0 failed.**
 
 | Crate | Passed |
 |---|---|
 | `wda-active-response` | 29 |
 | `wda-agent` | 18 |
-| `wda-comms` | 30 |
+| `wda-comms` | 31 |
 | `wda-core` | 0 |
 | `wda-enhanced-inventory` | 0 |
 | `wda-event-bus` | 4 |
 | `wda-fim` | 65 (53 lib + 12 integration across 4 integration binaries; 60 s — slowest, uses real inotify/kqueue) |
 | `wda-inventory` | 30 |
-| `wda-local-detection` | 23 |
+| `wda-local-detection` | 51 |
 | `wda-logcollector` | 31 |
 | `wda-pal` | 5 |
 | `wda-rootcheck` | 20 |
 | `wda-sca` | 5 |
-| **Total** | **260** |
+| **Total** | **289** |
 
 Full log: [`unit-test-results.txt`](./unit-test-results.txt).
 
@@ -340,7 +340,7 @@ Can start in parallel where possible.
 All Phase 1 (7/7), Phase 2 (9/9), and Phase 3 (3/3) tasks are
 complete, and Phase 4 LDE work (tasks 4.1–4.6) landed in PR #38.
 All four benchmark targets (idle RAM 5.7 MB, idle CPU 0.00 %,
-binary size 4.6 MB, FIM scan CPU peak 3 %) are met. 260 unit
+binary size 4.6 MB, FIM scan CPU peak 3 %) are met. 289 unit
 tests pass and 9/9 base E2E checks pass against a local Wazuh
 4.9.2 manager. A new security-focused E2E suite covers 10
 scenarios (malware drop, brute-force SSH, privilege escalation,
