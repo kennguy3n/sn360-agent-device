@@ -1,8 +1,8 @@
 # WDA Phase Status — 2026-04-20
 
-This document summarizes the status of Phase 1 and Phase 2 of the Wazuh
-Desktop Agent (WDA) against the original proposal, the results of the E2E
-and unit test runs against a local Wazuh 4.9.2 manager, and the benchmark
+This document summarizes the status of Phases 1–4 of the Wazuh Desktop
+Agent (WDA) against the original proposal, the results of the E2E and
+unit test runs against a local Wazuh 4.9.2 manager, and the benchmark
 comparison against the official Wazuh agent 4.9.2.
 
 ## Phase 1 — Core Plumbing (7/7 complete)
@@ -59,12 +59,12 @@ Command: `cargo test --all 2>&1 | tee unit-test-results.txt`
 | `wda-event-bus` | 4 |
 | `wda-fim` | 53 (43 lib + 10 integration; 120 s — slowest, uses real inotify/kqueue) |
 | `wda-inventory` | 30 |
-| `wda-local-detection` | 0 |
+| `wda-local-detection` | 23 |
 | `wda-logcollector` | 12 |
 | `wda-pal` | 4 |
 | `wda-rootcheck` | 0 |
 | `wda-sca` | 5 |
-| **Total** | **178** |
+| **Total** | **201** |
 
 Full log: [`unit-test-results.txt`](./unit-test-results.txt).
 
@@ -187,29 +187,26 @@ raw numbers. Summary vs. proposal targets:
 
 ## Recommended Next Steps
 
-Short list for Phase 4, ordered by impact:
+The Local Detection Engine (tasks 4.1–4.6) is complete. Short list of
+remaining Phase 4 work, ordered by impact:
 
-1. **Implement the Local Detection Engine (`wda-local-detection`).**
-   The crate is currently an empty skeleton. Build out the rule
-   store (MessagePack schema + mmap loader), Aho-Corasick IOC
-   matcher, bloom-filter evaluator, behavioral rule state machines,
-   local response dispatcher, and feature-gated YARA scanner — see
-   PROPOSAL.md tasks 4.1–4.6.
-2. **Implement Enhanced Software Inventory (`wda-enhanced-inventory`).**
-   Also an empty skeleton today. Add the running-software monitor
-   (Linux `/proc`, macOS `sysctl`, Windows WMI / ToolHelp32), browser
+1. **Implement Enhanced Software Inventory (`wda-enhanced-inventory`).**
+   Still an empty skeleton. Add the running-software monitor (Linux
+   `/proc`, macOS `sysctl`, Windows WMI / ToolHelp32), browser
    extension enumeration (Chrome, Firefox, Edge, Safari), and a
-   CycloneDX SBOM generator — see PROPOSAL.md tasks 4.7–4.9.
+   CycloneDX SBOM generator — PROPOSAL.md tasks 4.7–4.9.
+2. **Build the companion microservices (4.10–4.14).** TRDS (rule
+   distribution), IOCFS (feed ingestion / bloom compilation), SIS
+   (inventory ingestion / CVE matching), and the Agent Gateway
+   (mTLS, tenant routing, rate limiting). These live outside this
+   repo but the agent side now exposes the hooks needed to consume
+   rule bundles (see `RuleBundle::load` in `wda-local-detection`).
 3. **Wire adaptive power-aware scheduling into module loops.**
    `PowerProfile` is defined in `crates/wda-pal/src/power.rs` but
    unused. Plumb it into FIM, logcollector, inventory, and SCA so
    that `fim_scan_rate`, `log_batch_interval`, `inventory_interval`,
    and `sca_enabled` actually shape scan cadence and batch windows.
-4. **Wire `wda-local-detection` into the agent main loop.** Once the
-   crate has working detection, mirror the FIM / SCA / rootcheck
-   wiring pattern in `crates/wda-agent/src/main.rs` (config gate,
-   `ModuleHandle`, event-bus subscription, `EventKind::*` mapping).
-5. **Tune FIM defaults for burst-heavy environments.** The
+4. **Tune FIM defaults for burst-heavy environments.** The
    `max_hashes_per_sec` / `batch_size` / `batch_timeout_ms` knobs
    landed in Phase 3; the next step is to sweep them against
    representative workloads and pick config-file defaults that keep
@@ -226,12 +223,12 @@ Software Inventory, and companion microservices.
 
 | # | Task | Status |
 |---|------|--------|
-| 4.1 | Local Detection Engine: rule store format, MessagePack schema, mmap loader | Not Started |
-| 4.2 | LDE: Aho-Corasick pattern matcher + IOC bloom filter evaluator | Not Started |
-| 4.3 | LDE: Behavioral rule state machine (JSON DSL → evaluator) | Not Started |
-| 4.4 | LDE: Local Response Dispatcher (block IP, kill process, quarantine) | Not Started |
-| 4.5 | LDE: YARA scanner integration (feature-gated, `yara-rust`) | Not Started |
-| 4.6 | LDE: Offline detection queue + server sync on reconnect | Not Started |
+| 4.1 | Local Detection Engine: rule store format, MessagePack schema, mmap loader | **Complete** |
+| 4.2 | LDE: Aho-Corasick pattern matcher + IOC bloom filter evaluator | **Complete** |
+| 4.3 | LDE: Behavioral rule state machine (JSON DSL → evaluator) | **Complete** |
+| 4.4 | LDE: Local Response Dispatcher (block IP, kill process, quarantine) | **Complete** |
+| 4.5 | LDE: YARA scanner integration (**required**, not feature-gated) | **Complete** |
+| 4.6 | LDE: Offline detection queue + server sync on reconnect | **Complete** |
 | 4.7 | Enhanced Inventory: running software monitor (all platforms) | Not Started |
 | 4.8 | Enhanced Inventory: browser extension inventory (Chrome/Firefox/Edge/Safari) | Not Started |
 | 4.9 | Enhanced Inventory: SBOM generator (CycloneDX, on-demand) | Not Started |
@@ -241,9 +238,13 @@ Software Inventory, and companion microservices.
 | 4.13 | Agent Gateway: mTLS termination, tenant routing, rate limiting | Not Started |
 | 4.14 | Integration: agent ↔ TRDS rule pull, hot-reload, version tracking | Not Started |
 
-The `wda-local-detection` and `wda-enhanced-inventory` crates exist in
-the workspace but are empty skeletons; 4.10–4.13 are server-side
-microservices that live outside this repository.
+The `wda-local-detection` crate is now fully implemented (Phase 4,
+tasks 4.1–4.6). YARA is a **required** runtime dependency (not
+feature-gated); `libyara-dev` (Linux) / `brew install yara` (macOS) /
+the corresponding Windows prebuilt must be present on the build host.
+The `wda-enhanced-inventory` crate is still an empty skeleton, and
+4.10–4.14 are server-side microservices that live outside this
+repository.
 
 ## Development Assessment — 2026-04-19 (Post-PR #33)
 
@@ -259,7 +260,15 @@ prefixes for SCA/ActiveResponse were fixed in PR #33.
 - macOS FIM burst test skipped due to kqueue event drops on CI
   (see
   [`docs/known-issues/fim-burst-workload-macos-ci.md`](./docs/known-issues/fim-burst-workload-macos-ci.md)).
-- `wda-local-detection` crate is an empty skeleton (Phase 4).
+- ~~`wda-local-detection` crate is an empty skeleton (Phase 4).~~
+  **Fixed.** Phase 4 LDE (tasks 4.1–4.6) is implemented: rule-store
+  MessagePack loader with versioning, Aho-Corasick + bloom-filter
+  IOC matcher, JSON-DSL behavioral rule engine (threshold +
+  sequence), required YARA scanner with rate-limit and size-cap,
+  local response dispatcher (block_ip, kill_process, quarantine),
+  SQLite WAL-mode offline detection queue, and a top-level
+  `LocalDetectionModule` wired into `wda-agent` that republishes
+  matches as `EventKind::LocalDetectionAlert` → `MessageType::LocalDetection`.
 - `wda-enhanced-inventory` crate is an empty skeleton (Phase 4).
 - No E2E test coverage for SCA or Rootcheck modules.
 - Rootcheck only does file-existence checks, not content-based
