@@ -432,8 +432,10 @@ mod tests {
     }
 
     fn bundle_with_string_ioc(value: &str) -> RuleBundle {
-        let mut b = RuleBundle::default();
-        b.version = 1;
+        let mut b = RuleBundle {
+            version: 1,
+            ..Default::default()
+        };
         b.iocs.strings.push(StringIoc {
             id: "test-ioc".into(),
             value: value.into(),
@@ -448,9 +450,11 @@ mod tests {
     async fn test_module_lifecycle_starts_and_stops() {
         let tmp = tempfile::tempdir().unwrap();
         let cfg = test_config(&tmp);
-        let mut agent_config = AgentConfig::default();
-        agent_config.modules = ModulesConfig {
-            local_detection: cfg,
+        let agent_config = AgentConfig {
+            modules: ModulesConfig {
+                local_detection: cfg,
+                ..Default::default()
+            },
             ..Default::default()
         };
 

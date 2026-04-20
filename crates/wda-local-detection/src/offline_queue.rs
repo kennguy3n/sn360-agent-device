@@ -95,8 +95,8 @@ impl OfflineQueue {
             "INSERT INTO detection_queue (enqueued_at, payload) VALUES (?1, ?2)",
             params![ts_secs, payload],
         )?;
-        let count: i64 = conn
-            .query_row("SELECT COUNT(*) FROM detection_queue", [], |row| row.get(0))?;
+        let count: i64 =
+            conn.query_row("SELECT COUNT(*) FROM detection_queue", [], |row| row.get(0))?;
         if count as usize > self.capacity {
             let to_drop = count as usize - self.capacity;
             conn.execute(

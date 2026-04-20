@@ -235,10 +235,14 @@ mod tests {
 
     #[test]
     fn test_is_newer_than() {
-        let mut a = RuleBundle::default();
-        a.version = 2;
-        let mut b = RuleBundle::default();
-        b.version = 1;
+        let a = RuleBundle {
+            version: 2,
+            ..Default::default()
+        };
+        let b = RuleBundle {
+            version: 1,
+            ..Default::default()
+        };
         assert!(a.is_newer_than(&b));
         assert!(!b.is_newer_than(&a));
         assert!(!a.is_newer_than(&a));
