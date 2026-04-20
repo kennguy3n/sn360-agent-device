@@ -8,12 +8,17 @@
 //! * **Sequence** — fire when a keyed entity observes the configured
 //!   ordered substrings inside a sliding window.
 //!
-//! State is bounded by `max_tracked_entities`: the oldest entity is
-//! evicted when the limit is exceeded.  Windows older than
+//! State is bounded by `max_tracked_entities`: the oldest-inserted
+//! entity is evicted when the limit is exceeded — the state maps are
+//! backed by [`IndexMap`] so `keys()` iterates in deterministic
+//! insertion order and eviction always targets the stalest entries
+//! rather than an arbitrary hash-bucket victim.  Windows older than
 //! `max_window_sec` are purged on every evaluation.
 
-use std::collections::{HashMap, VecDeque};
+use std::collections::VecDeque;
 use std::time::{Duration, Instant};
+
+use indexmap::IndexMap;
 
 use crate::rule_store::{BehavioralRule, BehavioralRuleKind};
 
@@ -44,9 +49,11 @@ pub struct BehavioralEvent<'a> {
 pub struct BehavioralEngine {
     rules: Vec<BehavioralRule>,
     // Per-rule, per-entity state.  A simple linear index in `rules`
-    // keeps the hash key compact.
-    threshold_state: HashMap<(usize, String), VecDeque<Instant>>,
-    sequence_state: HashMap<(usize, String), SequenceState>,
+    // keeps the hash key compact.  `IndexMap` preserves insertion
+    // order so eviction deterministically removes the oldest entries
+    // rather than arbitrary hash-bucket victims.
+    threshold_state: IndexMap<(usize, String), VecDeque<Instant>>,
+    sequence_state: IndexMap<(usize, String), SequenceState>,
     max_entities: usize,
     max_window: Duration,
 }
@@ -63,8 +70,8 @@ impl BehavioralEngine {
     pub fn new(rules: Vec<BehavioralRule>, max_entities: usize, max_window_sec: u64) -> Self {
         Self {
             rules,
-            threshold_state: HashMap::new(),
-            sequence_state: HashMap::new(),
+            threshold_state: IndexMap::new(),
+            sequence_state: IndexMap::new(),
             max_entities: max_entities.max(1),
             max_window: Duration::from_secs(max_window_sec.max(1)),
         }
@@ -135,10 +142,13 @@ impl BehavioralEngine {
                     }
                     let window = Duration::from_secs(window_secs).min(self.max_window);
                     let key = (idx, event.entity.to_string());
-                    let mut state = self.sequence_state.remove(&key).unwrap_or(SequenceState {
-                        position: 0,
-                        started_at: now,
-                    });
+                    let mut state =
+                        self.sequence_state
+                            .shift_remove(&key)
+                            .unwrap_or(SequenceState {
+                                position: 0,
+                                started_at: now,
+                            });
 
                     if now.duration_since(state.started_at) > window {
                         state = SequenceState {
@@ -172,8 +182,11 @@ impl BehavioralEngine {
         out
     }
 
-    /// Enforce the `max_tracked_entities` cap by evicting the oldest
-    /// half of the relevant map when it grows past the limit.
+    /// Enforce the `max_tracked_entities` cap by evicting the
+    /// oldest-inserted entries once the map grows past the limit.
+    /// Backing the state maps with [`IndexMap`] means `drain(0..n)`
+    /// drops the `n` stalest entries rather than arbitrary hash-bucket
+    /// victims.
     fn maybe_evict(&mut self, touched_threshold: bool) {
         let len = if touched_threshold {
             self.threshold_state.len()
@@ -185,15 +198,9 @@ impl BehavioralEngine {
         }
         let victims = len - self.max_entities;
         if touched_threshold {
-            let keys: Vec<_> = self.threshold_state.keys().take(victims).cloned().collect();
-            for k in keys {
-                self.threshold_state.remove(&k);
-            }
+            self.threshold_state.drain(..victims);
         } else {
-            let keys: Vec<_> = self.sequence_state.keys().take(victims).cloned().collect();
-            for k in keys {
-                self.sequence_state.remove(&k);
-            }
+            self.sequence_state.drain(..victims);
         }
     }
 
@@ -383,5 +390,33 @@ mod tests {
             "eviction should hold to max_entities (got {})",
             eng.tracked_entities()
         );
+    }
+
+    #[test]
+    fn test_eviction_drops_oldest_inserted_first() {
+        // Regression — eviction must be deterministic (oldest-inserted
+        // first), not driven by arbitrary hash-bucket order.  We insert
+        // entities in a known sequence, overflow the cap, and verify the
+        // survivors are precisely the most recently inserted entries.
+        let mut eng = BehavioralEngine::new(vec![threshold_rule("t", "x", 99, 60)], 3, 3600);
+        let t0 = Instant::now();
+        let order = ["a", "b", "c", "d", "e"];
+        for name in &order {
+            eng.evaluate_at(
+                &BehavioralEvent {
+                    source: "logcollector",
+                    entity: name,
+                    text: "x",
+                },
+                t0,
+            );
+        }
+        assert_eq!(eng.tracked_entities(), 3);
+        let surviving: Vec<&str> = eng
+            .threshold_state
+            .keys()
+            .map(|(_, e)| e.as_str())
+            .collect();
+        assert_eq!(surviving, vec!["c", "d", "e"]);
     }
 }

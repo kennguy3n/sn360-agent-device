@@ -296,6 +296,13 @@ pub struct LocalDetectionConfig {
     /// Directory where quarantined files are moved.
     #[serde(default = "default_lde_quarantine_dir")]
     pub quarantine_dir: PathBuf,
+    /// Interval in seconds between attempts to replay detections from
+    /// the offline queue back to the server. Floored to 5 s.
+    #[serde(default = "default_lde_offline_drain_interval")]
+    pub offline_drain_interval: u64,
+    /// Maximum number of detections drained per replay tick.
+    #[serde(default = "default_lde_offline_drain_batch")]
+    pub offline_drain_batch: usize,
 }
 
 /// SCA (Security Configuration Assessment) module configuration.
@@ -547,6 +554,12 @@ fn default_lde_offline_queue_path() -> PathBuf {
         PathBuf::new()
     }
 }
+fn default_lde_offline_drain_interval() -> u64 {
+    30
+}
+fn default_lde_offline_drain_batch() -> usize {
+    128
+}
 fn default_lde_quarantine_dir() -> PathBuf {
     #[cfg(unix)]
     {
@@ -654,6 +667,8 @@ impl Default for LocalDetectionConfig {
             rule_bundle_path: default_lde_rule_bundle_path(),
             offline_queue_path: default_lde_offline_queue_path(),
             quarantine_dir: default_lde_quarantine_dir(),
+            offline_drain_interval: default_lde_offline_drain_interval(),
+            offline_drain_batch: default_lde_offline_drain_batch(),
         }
     }
 }

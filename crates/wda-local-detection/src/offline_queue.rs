@@ -110,6 +110,11 @@ impl OfflineQueue {
 
     /// Drain up to `max` entries from the front of the queue.
     /// Returned entries are already removed from the underlying store.
+    ///
+    /// This is a destructive bulk read — callers that want strict FIFO
+    /// in the presence of partial publish failures should prefer
+    /// [`peek_batch`](Self::peek_batch) + [`ack`](Self::ack) so unsent
+    /// items keep their original IDs and stay at the head of the queue.
     pub fn drain(&self, max: usize) -> anyhow::Result<Vec<QueuedDetection>> {
         let conn = self.conn.lock().map_err(|e| anyhow::anyhow!("{e}"))?;
         let mut stmt = conn.prepare(
@@ -133,6 +138,37 @@ impl OfflineQueue {
             )?;
         }
         Ok(rows)
+    }
+
+    /// Read up to `max` entries from the front of the queue without
+    /// removing them.  Use [`ack`](Self::ack) to delete an entry once
+    /// its payload has been durably handled (e.g. published to the
+    /// server).  This preserves strict FIFO across partial failures:
+    /// un-ack'd rows keep their original IDs and remain ahead of any
+    /// newer enqueues.
+    pub fn peek_batch(&self, max: usize) -> anyhow::Result<Vec<QueuedDetection>> {
+        let conn = self.conn.lock().map_err(|e| anyhow::anyhow!("{e}"))?;
+        let mut stmt = conn.prepare(
+            "SELECT id, enqueued_at, payload FROM detection_queue ORDER BY id ASC LIMIT ?1",
+        )?;
+        let rows = stmt
+            .query_map(params![max as i64], |row| {
+                Ok(QueuedDetection {
+                    id: row.get(0)?,
+                    enqueued_at: row.get(1)?,
+                    payload: row.get(2)?,
+                })
+            })?
+            .collect::<Result<Vec<_>, _>>()?;
+        Ok(rows)
+    }
+
+    /// Delete a single entry by id after its payload has been handled.
+    /// Missing ids are silently ignored so callers can ack idempotently.
+    pub fn ack(&self, id: i64) -> anyhow::Result<()> {
+        let conn = self.conn.lock().map_err(|e| anyhow::anyhow!("{e}"))?;
+        conn.execute("DELETE FROM detection_queue WHERE id = ?1", params![id])?;
+        Ok(())
     }
 
     /// Number of entries currently resident.
