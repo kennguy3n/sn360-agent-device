@@ -13,6 +13,7 @@ members = [
     "crates/wda-agent",
     "crates/wda-local-detection",
     "crates/wda-enhanced-inventory",
+    "crates/wda-updater",
 ]
 resolver = "2"
 
@@ -95,6 +96,14 @@ wda-active-response = { path = "crates/wda-active-response" }
 wda-rootcheck = { path = "crates/wda-rootcheck" }
 wda-local-detection = { path = "crates/wda-local-detection" }
 wda-enhanced-inventory = { path = "crates/wda-enhanced-inventory" }
+wda-updater = { path = "crates/wda-updater" }
+
+# Self-update (P3.1)
+reqwest = { version = "0.12", default-features = false, features = ["rustls-tls-native-roots", "stream", "json"] }
+ed25519-dalek = { version = "2", default-features = false, features = ["std"] }
+hex = "0.4"
+tempfile = "3"
+futures-util = { version = "0.3", default-features = false, features = ["std"] }
 
 # Detection & inventory
 aho-corasick = "1"
