@@ -12,8 +12,8 @@ REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 cd "$REPO_ROOT"
 
 echo "==> Docker version:"
-docker --version
-docker compose version
+docker --version || true
+docker compose version || true
 echo ""
 
 if ! docker info >/dev/null 2>&1; then
