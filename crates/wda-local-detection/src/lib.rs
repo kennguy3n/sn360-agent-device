@@ -251,24 +251,69 @@ impl LocalAlert {
 /// backend and firing alerts for each hit.
 async fn handle_event(pipeline: &DetectionPipeline, bus: &EventBus, event: &Event) {
     // Extract the interesting fields from the event kind.
-    let (source_tag, entity, primary_text, fim_path): (&str, String, String, Option<PathBuf>) =
-        match &event.kind {
-            EventKind::FileCreated { path, .. } | EventKind::FileModified { path, .. } => {
-                ("fim", path.clone(), path.clone(), Some(PathBuf::from(path)))
-            }
-            EventKind::FileDeleted { path, .. } | EventKind::FileMetadataChanged { path, .. } => {
-                ("fim", path.clone(), path.clone(), None)
-            }
-            EventKind::LogCollected {
-                source, message, ..
-            } => ("logcollector", source.clone(), message.clone(), None),
-            // The LDE only observes FIM and logcollector streams; other
-            // event kinds pass through untouched.
-            _ => return,
-        };
+    let (source_tag, entity, primary_text, fim_path, sha256, ips): (
+        &str,
+        String,
+        String,
+        Option<PathBuf>,
+        Option<String>,
+        Vec<String>,
+    ) = match &event.kind {
+        EventKind::FileCreated {
+            path,
+            syscheck_payload,
+        }
+        | EventKind::FileModified {
+            path,
+            syscheck_payload,
+        } => (
+            "fim",
+            path.clone(),
+            path.clone(),
+            Some(PathBuf::from(path)),
+            extract_sha256_from_syscheck(syscheck_payload.as_deref()),
+            Vec::new(),
+        ),
+        EventKind::FileDeleted {
+            path,
+            syscheck_payload,
+        }
+        | EventKind::FileMetadataChanged {
+            path,
+            syscheck_payload,
+        } => (
+            "fim",
+            path.clone(),
+            path.clone(),
+            None,
+            extract_sha256_from_syscheck(syscheck_payload.as_deref()),
+            Vec::new(),
+        ),
+        EventKind::LogCollected {
+            source, message, ..
+        } => (
+            "logcollector",
+            source.clone(),
+            message.clone(),
+            None,
+            None,
+            extract_ipv4s(message),
+        ),
+        // The LDE only observes FIM and logcollector streams; other
+        // event kinds pass through untouched.
+        _ => return,
+    };
 
-    // --- IOC matching ---
-    let ioc_hits = pipeline.iocs.matches(&[&primary_text], None, None);
+    // --- IOC matching (string, hash, IP backends) ---
+    let mut ioc_hits = pipeline
+        .iocs
+        .matches(&[&primary_text], sha256.as_deref(), None);
+    // Probe every IP found in the log message against the IP bloom.
+    for ip in &ips {
+        if let Some(m) = pipeline.iocs.match_ip(ip) {
+            ioc_hits.push(m);
+        }
+    }
     for hit in ioc_hits {
         let alert: LocalAlert = hit.into();
         maybe_respond(pipeline, &alert, fim_path.as_deref()).await;
@@ -400,6 +445,99 @@ async fn run(
 /// minimal pipeline.
 pub fn empty_ioc_list() -> IocList {
     IocList::default()
+}
+
+/// Extract the SHA-256 digest from a Wazuh-syscheck JSON payload.
+///
+/// The syscheck daemon emits events like
+/// `{"type":"event","data":{"path":"...","hash_sha256":"...", ...}}`.
+/// We accept a handful of common field names (`hash_sha256`, `sha256`,
+/// `sha256sum`) and return the lower-cased 64-character hex string when
+/// found.  Anything else yields `None`, letting the caller skip the
+/// hash backend cleanly.
+fn extract_sha256_from_syscheck(payload: Option<&str>) -> Option<String> {
+    let raw = payload?;
+    let v: serde_json::Value = serde_json::from_str(raw).ok()?;
+    let keys = ["hash_sha256", "sha256", "sha256sum", "sha256_after"];
+    fn find<'a>(v: &'a serde_json::Value, keys: &[&str]) -> Option<&'a str> {
+        for k in keys {
+            if let Some(s) = v.get(*k).and_then(|x| x.as_str()) {
+                return Some(s);
+            }
+        }
+        None
+    }
+    let found = find(&v, &keys)
+        .or_else(|| v.get("data").and_then(|d| find(d, &keys)))
+        .or_else(|| {
+            v.get("data")
+                .and_then(|d| d.get("attributes"))
+                .and_then(|a| find(a, &keys))
+        })?;
+    let lower = found.to_ascii_lowercase();
+    if lower.len() == 64 && lower.bytes().all(|c| c.is_ascii_hexdigit()) {
+        Some(lower)
+    } else {
+        None
+    }
+}
+
+/// Scan free-form text for dotted-quad IPv4 literals.
+///
+/// Deliberately avoids a regex dependency — syslog lines rarely contain
+/// more than a handful of candidates and a linear scan is more than
+/// fast enough.  IPv6 extraction is intentionally out of scope until we
+/// have a concrete detection use case for it.
+fn extract_ipv4s(text: &str) -> Vec<String> {
+    let bytes = text.as_bytes();
+    let mut out = Vec::new();
+    let mut i = 0;
+    while i < bytes.len() {
+        if bytes[i].is_ascii_digit() {
+            let start = i;
+            let mut octets = 0usize;
+            let mut digits = 0usize;
+            let mut valid = true;
+            while i < bytes.len() && octets < 4 {
+                if bytes[i].is_ascii_digit() {
+                    digits += 1;
+                    if digits > 3 {
+                        valid = false;
+                        break;
+                    }
+                    i += 1;
+                } else if bytes[i] == b'.' && digits > 0 && octets < 3 {
+                    octets += 1;
+                    digits = 0;
+                    i += 1;
+                } else {
+                    break;
+                }
+            }
+            if valid && octets == 3 && digits > 0 {
+                // Reject candidates that are actually a prefix of a longer
+                // dotted sequence (e.g. "1.2.3.4.5") — those aren't IPv4.
+                let followed_by_dot_digit = i + 1 < bytes.len()
+                    && bytes[i] == b'.'
+                    && bytes[i + 1].is_ascii_digit();
+                let candidate = &text[start..i];
+                if !followed_by_dot_digit
+                    && candidate.split('.').all(|o| o.parse::<u8>().is_ok())
+                {
+                    out.push(candidate.to_string());
+                    continue;
+                }
+            }
+            // Advance past the partial run to avoid re-scanning the
+            // same prefix on the next iteration.
+            while i < bytes.len() && (bytes[i].is_ascii_digit() || bytes[i] == b'.') {
+                i += 1;
+            }
+        } else {
+            i += 1;
+        }
+    }
+    out
 }
 
 #[cfg(test)]
@@ -607,6 +745,143 @@ mod tests {
         assert_eq!(alert.matched_value, "/tmp/x.bin");
         assert_eq!(alert.rule_type, "yara");
         assert_eq!(alert.severity, SEV_HIGH);
+    }
+
+    #[test]
+    fn test_extract_sha256_from_syscheck_top_level() {
+        let payload = serde_json::json!({ "sha256": "A".repeat(64) }).to_string();
+        let got = extract_sha256_from_syscheck(Some(&payload)).unwrap();
+        assert_eq!(got.len(), 64);
+        assert!(got.chars().all(|c| c == 'a'));
+    }
+
+    #[test]
+    fn test_extract_sha256_from_syscheck_nested() {
+        let payload = serde_json::json!({
+            "type": "event",
+            "data": { "path": "/etc/passwd", "hash_sha256": "b".repeat(64) }
+        })
+        .to_string();
+        let got = extract_sha256_from_syscheck(Some(&payload)).unwrap();
+        assert_eq!(got, "b".repeat(64));
+    }
+
+    #[test]
+    fn test_extract_sha256_rejects_wrong_length_or_garbage() {
+        assert!(extract_sha256_from_syscheck(None).is_none());
+        assert!(extract_sha256_from_syscheck(Some("not json")).is_none());
+        let short = serde_json::json!({ "sha256": "abc" }).to_string();
+        assert!(extract_sha256_from_syscheck(Some(&short)).is_none());
+        let non_hex = serde_json::json!({ "sha256": "z".repeat(64) }).to_string();
+        assert!(extract_sha256_from_syscheck(Some(&non_hex)).is_none());
+    }
+
+    #[test]
+    fn test_extract_ipv4s_finds_all_dotted_quads() {
+        let msg = "sshd: failed login from 203.0.113.9 port 22 (also seen via proxy 198.51.100.4)";
+        let found = extract_ipv4s(msg);
+        assert_eq!(found, vec!["203.0.113.9", "198.51.100.4"]);
+    }
+
+    #[test]
+    fn test_extract_ipv4s_rejects_invalid_octets_and_malformed() {
+        // 256 is out of range, 1.2.3 is too short, 1.2.3.4.5 has a trailing group.
+        let msg = "bad 256.0.0.1 short 1.2.3 ok 10.0.0.1 trailing 1.2.3.4.5";
+        let found = extract_ipv4s(msg);
+        assert_eq!(found, vec!["10.0.0.1"]);
+    }
+
+    #[tokio::test]
+    async fn test_hash_ioc_match_via_syscheck_payload() {
+        let tmp = tempfile::tempdir().unwrap();
+        let cfg = test_config(&tmp);
+        let mut bundle = RuleBundle {
+            version: 1,
+            ..Default::default()
+        };
+        let bad_hash = "c".repeat(64);
+        bundle.iocs.hashes.push(HashIoc {
+            id: "bad-file".into(),
+            sha256: bad_hash.clone(),
+            severity: SEV_HIGH.into(),
+            description: "known-bad".into(),
+        });
+
+        let (bus, mut server_rx) = EventBus::new(16, 16);
+        let pipeline = DetectionPipeline::new(&cfg, bundle).unwrap();
+
+        let payload = serde_json::json!({
+            "type": "event",
+            "data": { "path": "/tmp/clean-path", "sha256": bad_hash }
+        })
+        .to_string();
+        let ev = Event::new(
+            "fim",
+            Priority::Normal,
+            EventKind::FileCreated {
+                path: "/tmp/clean-path".into(),
+                syscheck_payload: Some(payload),
+            },
+        );
+        handle_event(&pipeline, &bus, &ev).await;
+
+        let alert = tokio::time::timeout(Duration::from_millis(200), server_rx.recv())
+            .await
+            .expect("expected hash IOC alert")
+            .expect("server_rx closed");
+        match alert.kind {
+            EventKind::LocalDetectionAlert {
+                rule_type, rule_id, ..
+            } => {
+                assert_eq!(rule_type, "hash");
+                assert_eq!(rule_id, "bad-file");
+            }
+            other => panic!("unexpected: {:?}", other),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_ip_ioc_match_via_log_message() {
+        let tmp = tempfile::tempdir().unwrap();
+        let cfg = test_config(&tmp);
+        let mut bundle = RuleBundle {
+            version: 1,
+            ..Default::default()
+        };
+        bundle.iocs.ips.push(IpIoc {
+            id: "c2".into(),
+            ip: "203.0.113.9".into(),
+            severity: SEV_MEDIUM.into(),
+            description: "known C2".into(),
+        });
+
+        let (bus, mut server_rx) = EventBus::new(16, 16);
+        let pipeline = DetectionPipeline::new(&cfg, bundle).unwrap();
+
+        let ev = Event::new(
+            "logcollector",
+            Priority::Normal,
+            EventKind::LogCollected {
+                source: "sshd".into(),
+                message: "Accepted publickey for root from 203.0.113.9 port 22".into(),
+                format: "syslog".into(),
+            },
+        );
+        handle_event(&pipeline, &bus, &ev).await;
+
+        let alert = tokio::time::timeout(Duration::from_millis(200), server_rx.recv())
+            .await
+            .expect("expected IP IOC alert")
+            .expect("server_rx closed");
+        match alert.kind {
+            EventKind::LocalDetectionAlert {
+                rule_type, rule_id, ..
+            } => {
+                assert_eq!(rule_type, "ip");
+                assert_eq!(rule_id, "c2");
+            }
+            other => panic!("unexpected: {:?}", other),
+        }
     }
 
     #[test]

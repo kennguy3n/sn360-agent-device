@@ -131,37 +131,40 @@ impl YaraScanner {
 }
 
 /// Compile the provided rule paths into an optional [`yara::Rules`].
+///
+/// If a rule file fails to parse, the compiler is rebuilt from scratch
+/// and every previously-successful file is re-added so the operator
+/// never silently loses earlier rules.  `add_rules_file` consumes the
+/// compiler on every call (success or failure), hence the slot-based
+/// `Option<Compiler>` dance.
 fn compile_rules(rule_paths: &[PathBuf]) -> anyhow::Result<Option<yara::Rules>> {
     let mut compiler = Some(
         yara::Compiler::new()
             .map_err(|e| anyhow::anyhow!("failed to init yara compiler: {}", e))?,
     );
-    let mut added = 0usize;
+    let mut accepted: Vec<&PathBuf> = Vec::new();
     for path in rule_paths {
         if !path.exists() {
             warn!(path = %path.display(), "yara rule path does not exist, skipping");
             continue;
         }
-        // `add_rules_file` consumes the compiler and returns either a
-        // new one (on success) or an error that drops the old one —
-        // so we always have to reinstate a compiler before the next
-        // iteration can run.
         let c = compiler.take().expect("compiler slot always full");
         match c.add_rules_file(path) {
             Ok(next) => {
                 compiler = Some(next);
-                added += 1;
+                accepted.push(path);
             }
             Err(e) => {
-                warn!(path = %path.display(), error = %e, "failed to add yara rule file");
-                compiler = Some(
-                    yara::Compiler::new()
-                        .map_err(|e| anyhow::anyhow!("failed to re-init yara compiler: {}", e))?,
+                warn!(
+                    path = %path.display(),
+                    error = %e,
+                    "failed to add yara rule file; restoring previously-accepted rules"
                 );
+                compiler = Some(rebuild_compiler_with(&accepted)?);
             }
         }
     }
-    if added == 0 {
+    if accepted.is_empty() {
         return Ok(None);
     }
     let rules = compiler
@@ -169,6 +172,24 @@ fn compile_rules(rule_paths: &[PathBuf]) -> anyhow::Result<Option<yara::Rules>> 
         .compile_rules()
         .map_err(|e| anyhow::anyhow!("failed to compile yara rules: {}", e))?;
     Ok(Some(rules))
+}
+
+/// Fresh compiler pre-loaded with the given (previously-successful)
+/// rule paths.  Used to recover from a mid-stream `add_rules_file`
+/// failure without dropping rules we already validated.
+fn rebuild_compiler_with(paths: &[&PathBuf]) -> anyhow::Result<yara::Compiler> {
+    let mut compiler = yara::Compiler::new()
+        .map_err(|e| anyhow::anyhow!("failed to re-init yara compiler: {}", e))?;
+    for p in paths {
+        compiler = compiler.add_rules_file(p.as_path()).map_err(|e| {
+            anyhow::anyhow!(
+                "failed to re-add previously-accepted rule {}: {}",
+                p.display(),
+                e
+            )
+        })?;
+    }
+    Ok(compiler)
 }
 
 /// Simple 1-second sliding window rate limiter.

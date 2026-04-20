@@ -154,7 +154,7 @@ impl RuleBundle {
             .map_err(|e| anyhow::anyhow!("failed to write bundle {}: {}", path.display(), e))
     }
 
-    /// Returns whether `other` is strictly newer than `self`.
+    /// Returns whether `self` is strictly newer than `other`.
     pub fn is_newer_than(&self, other: &RuleBundle) -> bool {
         self.version > other.version
     }
