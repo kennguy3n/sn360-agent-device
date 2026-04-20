@@ -226,7 +226,7 @@ Do these first, before moving to Phase 4.
 | P1.3 | Investigate and fix macOS FIM burst test hang | Follow suggested steps in `docs/known-issues/fim-burst-workload-macos-ci.md`. Try `#[tokio::test(flavor = "multi_thread", worker_threads = 2)]` to rule out executor starvation. Re-enable on macOS CI once stable. |
 | P1.4 | Implement rootcheck content-based checks | Add content inspection for files like `/etc/ld.so.preload` (check for suspicious shared library entries), not just file-existence checks. |
 | P1.5 | Cross-platform rootcheck hidden-process detection | Extend hidden-process detection to macOS (compare `proc_listallpids` vs `/proc`) and Windows (compare `NtQuerySystemInformation` vs `EnumProcesses`). Currently no-op on non-Linux. |
-| P1.6 | Update `PHASE_STATUS.md` rootcheck status | Change Phase 2.9 Rootcheck from "Placeholder" to "Complete" with notes about PR #32 implementation (signatures, hidden-process, binary-integrity). |
+| P1.6 | Update `PROGRESS.md` rootcheck status | Change Phase 2.9 Rootcheck from "Placeholder" to "Complete" with notes about PR #32 implementation (signatures, hidden-process, binary-integrity). |
 
 #### Priority 2 — Phase 4: Edge Detection & Enhanced Inventory
 
