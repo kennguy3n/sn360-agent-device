@@ -48,7 +48,7 @@ pub fn drop_privileges(security: &SecurityConfig) -> Result<()> {
 #[cfg(unix)]
 mod unix {
     use anyhow::{anyhow, Context, Result};
-    use nix::unistd::{getuid, setgid, setgroups, setuid, Gid, Group, Uid, User};
+    use nix::unistd::{getuid, setgid, setuid, Gid, Group, Uid, User};
     use tracing::{info, warn};
     use wda_core::config::SecurityConfig;
 
@@ -103,7 +103,23 @@ mod unix {
 
     fn apply(uid: Uid, gid: Gid) -> Result<()> {
         // Empty supplementary-group list. Must run while still root.
-        if let Err(err) = setgroups(&[]) {
+        // `nix::unistd::setgroups` is only exposed on a subset of Unixes
+        // (Linux, FreeBSD, ...) — so we go through libc directly, which
+        // is universally available on the unix cfg.
+        clear_supplementary_groups();
+        setgid(gid).with_context(|| format!("setgid({})", gid.as_raw()))?;
+        setuid(uid).with_context(|| format!("setuid({})", uid.as_raw()))?;
+        Ok(())
+    }
+
+    #[cfg(unix)]
+    fn clear_supplementary_groups() {
+        extern crate libc;
+        // SAFETY: FFI call with a valid (null, count=0) tuple. The kernel
+        // accepts an empty list and no memory is dereferenced.
+        let rc = unsafe { libc::setgroups(0, std::ptr::null()) };
+        if rc != 0 {
+            let err = std::io::Error::last_os_error();
             warn!(
                 error = %err,
                 "setgroups([]) failed; continuing with whatever the kernel \
@@ -111,9 +127,6 @@ mod unix {
                  is 'deny'"
             );
         }
-        setgid(gid).with_context(|| format!("setgid({})", gid.as_raw()))?;
-        setuid(uid).with_context(|| format!("setuid({})", uid.as_raw()))?;
-        Ok(())
     }
 
     /// After `setuid(non-root)` the kernel clears saved-uid, so a
