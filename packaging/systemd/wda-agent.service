@@ -1,0 +1,47 @@
+[Unit]
+Description=Wazuh Desktop Agent
+Documentation=https://github.com/kennguy3n/sn360-agent-device
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=wda
+Group=wda
+ExecStart=/usr/bin/wda-agent --config /etc/wazuh-desktop-agent/config.yaml
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=30
+
+# State & logging directories (created by systemd if missing)
+StateDirectory=wazuh-desktop-agent
+StateDirectoryMode=0750
+LogsDirectory=wazuh-desktop-agent
+LogsDirectoryMode=0750
+
+# Read-only paths for config.
+ReadOnlyPaths=/etc/wazuh-desktop-agent
+
+# Sandboxing. These are deliberately conservative — the agent still
+# needs broad filesystem read access for FIM, rootcheck, and
+# inventory, so directory hardening is handled by file permissions
+# rather than systemd's private-mount primitives.
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=read-only
+PrivateTmp=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+RestrictRealtime=true
+LockPersonality=true
+MemoryDenyWriteExecute=true
+ReadWritePaths=/var/lib/wazuh-desktop-agent /var/log/wazuh-desktop-agent /etc/wazuh-desktop-agent
+
+# Capabilities needed by FIM real-time watchers and active response.
+AmbientCapabilities=CAP_DAC_READ_SEARCH CAP_NET_ADMIN
+CapabilityBoundingSet=CAP_DAC_READ_SEARCH CAP_NET_ADMIN
+
+[Install]
+WantedBy=multi-user.target

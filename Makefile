@@ -20,7 +20,8 @@ TARGETS := \
 	aarch64-apple-darwin \
 	x86_64-pc-windows-msvc
 
-.PHONY: build release test lint fmt clippy all-targets clean e2e e2e-macos e2e-windows security-e2e
+.PHONY: build release test lint fmt clippy all-targets clean e2e e2e-macos e2e-windows security-e2e \
+        deb rpm pkg msi
 
 build:
 	$(CARGO) build
@@ -58,3 +59,20 @@ security-e2e:
 
 clean:
 	$(CARGO) clean
+
+# ---------------------------------------------------------------------------
+# Packaging (P3.4). Each target compiles the release binary first, then
+# hands it to the platform-specific build script under packaging/. Run
+# the Windows target from a Windows host with WiX on PATH.
+# ---------------------------------------------------------------------------
+deb: release
+	bash packaging/debian/build-deb.sh
+
+rpm: release
+	bash packaging/rpm/build-rpm.sh
+
+pkg: release
+	bash packaging/macos/build-pkg.sh
+
+msi: release
+	pwsh packaging/windows/build-msi.ps1

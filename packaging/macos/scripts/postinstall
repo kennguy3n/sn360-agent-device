@@ -1,0 +1,30 @@
+#!/bin/bash
+# macOS postinstall script for wda-agent.
+#
+# Creates the state/log directories, loads the launchd daemon, and
+# kicks off the first run. Runs as root during installation.
+
+set -e
+
+LAUNCHD_LABEL="com.wazuh.desktop-agent"
+LAUNCHD_PLIST="/Library/LaunchDaemons/${LAUNCHD_LABEL}.plist"
+WDA_HOME="/var/lib/wazuh-desktop-agent"
+WDA_LOG="/var/log/wazuh-desktop-agent"
+WDA_CONF="/etc/wazuh-desktop-agent"
+
+mkdir -p "$WDA_HOME" "$WDA_LOG" "$WDA_CONF" "$WDA_CONF/sca"
+chown -R root:wheel "$WDA_HOME" "$WDA_LOG"
+chmod 0750 "$WDA_HOME" "$WDA_LOG"
+chmod 0755 "$WDA_CONF" "$WDA_CONF/sca"
+if [ -f "$WDA_CONF/config.yaml" ]; then
+    chmod 0644 "$WDA_CONF/config.yaml"
+fi
+
+# Unload any previous version before reloading, so upgrades pick up
+# plist changes immediately.
+if launchctl list "$LAUNCHD_LABEL" >/dev/null 2>&1; then
+    launchctl unload "$LAUNCHD_PLIST" >/dev/null 2>&1 || true
+fi
+launchctl load -w "$LAUNCHD_PLIST"
+
+exit 0
