@@ -1,8 +1,8 @@
-# WDA vs Wazuh Agent 4.9.2 Benchmark Results
+# SN360 Device Agent vs Wazuh Agent 4.9.2 Benchmark Results
 
 **Date:** 2026-04-19
 **Host:** Ubuntu Linux x86_64 (Docker in / sysstat installed)
-**WDA build:** `target/release/wda-agent` built with `cargo build --release`
+**SN360 Device Agent build:** `target/release/wda-agent` built with `cargo build --release`
 **Reference agent:** Wazuh Agent 4.9.2 (`wazuh-agent_4.9.2-1_amd64.deb`)
 **Reference manager:** `wazuh/wazuh-manager:4.9.2` running in Docker on `127.0.0.1:1514/1515`
 

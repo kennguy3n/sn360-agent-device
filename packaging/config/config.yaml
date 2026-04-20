@@ -1,6 +1,6 @@
-# Wazuh Desktop Agent — default configuration installed by packages.
+# SN360 Device Agent — default configuration installed by packages.
 #
-# See PROPOSAL.md §11 for the complete configuration reference.
+# See device-agent-proposal.md §11 for the complete configuration reference.
 
 server:
   address: "wazuh-server.example.com"
