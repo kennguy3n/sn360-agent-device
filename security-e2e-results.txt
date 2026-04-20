@@ -1,0 +1,518 @@
+==> Setup: Cleaning stale state...
+==> Setup: Starting Wazuh manager...
+ Network tests_default  Creating
+ Network tests_default  Created
+ Volume "tests_wazuh-logs"  Creating
+ Volume "tests_wazuh-logs"  Created
+ Volume "tests_wazuh-data"  Creating
+ Volume "tests_wazuh-data"  Created
+ Container tests-wazuh-manager-1  Creating
+ Container tests-wazuh-manager-1  Created
+ Container tests-wazuh-manager-1  Starting
+ Container tests-wazuh-manager-1  Started
+==> Setup: Setting enrollment password...
+2026/04/20 02:02:27 wazuh-modulesd:router: INFO: Loaded router module.
+2026/04/20 02:02:27 wazuh-modulesd:content_manager: INFO: Loaded content_manager module.
+wazuh-clusterd not running...
+Killing wazuh-modulesd...
+Killing wazuh-monitord...
+Killing wazuh-logcollector...
+Killing wazuh-remoted...
+Killing wazuh-syscheckd...
+Killing wazuh-analysisd...
+wazuh-maild not running...
+Killing wazuh-execd...
+Killing wazuh-db...
+Killing wazuh-authd...
+wazuh-agentlessd not running...
+wazuh-integratord not running...
+wazuh-dbd not running...
+wazuh-csyslogd not running...
+Killing wazuh-apid...
+Wazuh v4.9.2 Stopped
+Starting Wazuh v4.9.2...
+Started wazuh-apid...
+Started wazuh-csyslogd...
+Started wazuh-dbd...
+2026/04/20 02:02:33 wazuh-integratord: INFO: Remote integrations not configured. Clean exit.
+Started wazuh-integratord...
+Started wazuh-agentlessd...
+Started wazuh-authd...
+Started wazuh-db...
+Started wazuh-execd...
+Started wazuh-analysisd...
+Started wazuh-syscheckd...
+Started wazuh-remoted...
+Started wazuh-logcollector...
+Started wazuh-monitord...
+2026/04/20 02:02:37 wazuh-modulesd:router: INFO: Loaded router module.
+2026/04/20 02:02:37 wazuh-modulesd:content_manager: INFO: Loaded content_manager module.
+Started wazuh-modulesd...
+Completed.
+==> Setup: Building agent...
+    Finished `release` profile [optimized] target(s) in 0.11s
+==> Setup: Creating test directories...
+==> Setup: Starting agent...
+[2m2026-04-20T02:02:55.441291Z[0m [32m INFO[0m [2mwda_agent[0m[2m:[0m wazuh desktop agent starting
+[2m2026-04-20T02:02:55.441484Z[0m [32m INFO[0m [2mwda_core::config[0m[2m:[0m loaded configuration [3mpath[0m[2m=[0mtests/wazuh-test-config.yaml
+[2m2026-04-20T02:02:55.441604Z[0m [32m INFO[0m [2mwda_core::agent[0m[2m:[0m initializing agent
+[2m2026-04-20T02:02:55.441623Z[0m [32m INFO[0m [2mwda_agent[0m[2m:[0m no agent key found, enrolling with server
+[2m2026-04-20T02:02:55.441629Z[0m [32m INFO[0m [2mwda_comms::enrollment[0m[2m:[0m starting enrollment [3maddress[0m[2m=[0m127.0.0.1:1515 [3magent[0m[2m=[0mdevin-box
+[2m2026-04-20T02:02:55.445752Z[0m [32m INFO[0m [2mwda_comms::enrollment[0m[2m:[0m enrollment response received [3mresponse[0m[2m=[0mOSSEC K:'001 devin-box any 53a43f193e7d09038402c765ba68dce61056520d99f3c92b1a03d68c4d37daf5'
+[2m2026-04-20T02:02:55.445781Z[0m [32m INFO[0m [2mwda_comms::enrollment[0m[2m:[0m enrollment successful [3magent_id[0m[2m=[0m001 [3magent_name[0m[2m=[0mdevin-box
+[2m2026-04-20T02:02:55.445934Z[0m [32m INFO[0m [2mwda_comms::enrollment[0m[2m:[0m agent key saved [3mpath[0m[2m=[0m/etc/wazuh-desktop-agent/client.keys
+[2m2026-04-20T02:02:55.445960Z[0m [32m INFO[0m [2mwda_agent[0m[2m:[0m enrollment complete, key saved [3magent_id[0m[2m=[0m001
+[2m2026-04-20T02:02:55.445966Z[0m [32m INFO[0m [2mwda_agent[0m[2m:[0m waiting 15 s for remoted to load new agent key
+    Agent started (PID 38417).
+==> Test 1: Malware file drop...
+[2m2026-04-20T02:03:10.446906Z[0m [32m INFO[0m [2mwda_agent[0m[2m:[0m connecting to server
+[2m2026-04-20T02:03:10.446939Z[0m [32m INFO[0m [2mwda_comms::connection[0m[2m:[0m connecting to server [3maddress[0m[2m=[0m127.0.0.1:1514
+[2m2026-04-20T02:03:10.447250Z[0m [32m INFO[0m [2mwda_comms::connection[0m[2m:[0m connected to server [3maddress[0m[2m=[0m127.0.0.1:1514
+[2m2026-04-20T02:03:10.447626Z[0m [32m INFO[0m [2mwda_agent[0m[2m:[0m startup message sent
+[2m2026-04-20T02:03:10.447713Z[0m [32m INFO[0m [2mwda_agent[0m[2m:[0m starting FIM module
+[2m2026-04-20T02:03:10.447723Z[0m [32m INFO[0m [2mwda_core::agent[0m[2m:[0m registered module [3mmodule[0m[2m=[0m"fim"
+[2m2026-04-20T02:03:10.447731Z[0m [32m INFO[0m [2mwda_agent[0m[2m:[0m starting logcollector module
+[2m2026-04-20T02:03:10.447743Z[0m [32m INFO[0m [2mwda_core::agent[0m[2m:[0m registered module [3mmodule[0m[2m=[0m"logcollector"
+[2m2026-04-20T02:03:10.447748Z[0m [32m INFO[0m [2mwda_agent[0m[2m:[0m starting inventory module
+[2m2026-04-20T02:03:10.447755Z[0m [32m INFO[0m [2mwda_core::agent[0m[2m:[0m registered module [3mmodule[0m[2m=[0m"inventory"
+[2m2026-04-20T02:03:10.447760Z[0m [32m INFO[0m [2mwda_agent[0m[2m:[0m starting active response module
+[2m2026-04-20T02:03:10.447766Z[0m [32m INFO[0m [2mwda_core::agent[0m[2m:[0m registered module [3mmodule[0m[2m=[0m"active_response"
+[2m2026-04-20T02:03:10.447772Z[0m [32m INFO[0m [2mwda_agent[0m[2m:[0m starting SCA module
+[2m2026-04-20T02:03:10.447778Z[0m [32m INFO[0m [2mwda_core::agent[0m[2m:[0m registered module [3mmodule[0m[2m=[0m"sca"
+[2m2026-04-20T02:03:10.447783Z[0m [32m INFO[0m [2mwda_core::agent[0m[2m:[0m starting agent
+[2m2026-04-20T02:03:10.447787Z[0m [32m INFO[0m [2mwda_comms::keepalive[0m[2m:[0m starting keepalive loop [3minterval_secs[0m[2m=[0m10
+[2m2026-04-20T02:03:10.447800Z[0m [32m INFO[0m [2mwda_core::agent[0m[2m:[0m agent started [3mmodules[0m[2m=[0m5
+[2m2026-04-20T02:03:10.447805Z[0m [32m INFO[0m [2mwda_agent[0m[2m:[0m server receive loop started
+[2m2026-04-20T02:03:10.447819Z[0m [32m INFO[0m [2mwda_fim[0m[2m:[0m FIM module starting
+[2m2026-04-20T02:03:10.447875Z[0m [32m INFO[0m [2mwda_agent[0m[2m:[0m event forwarding loop started
+[2m2026-04-20T02:03:10.447908Z[0m [32m INFO[0m [2mwda_logcollector[0m[2m:[0m logcollector module starting
+[2m2026-04-20T02:03:10.447927Z[0m [32m INFO[0m [2mwda_logcollector[0m[2m:[0m logcollector module running
+[2m2026-04-20T02:03:10.448007Z[0m [32m INFO[0m [2mwda_logcollector::journal_reader[0m[2m:[0m journal reader starting
+[2m2026-04-20T02:03:10.448101Z[0m [32m INFO[0m [2mwda_inventory[0m[2m:[0m inventory module starting
+[2m2026-04-20T02:03:10.448111Z[0m [32m INFO[0m [2mwda_inventory[0m[2m:[0m inventory module running [3minterval_secs[0m[2m=[0m15
+[2m2026-04-20T02:03:10.448116Z[0m [32m INFO[0m [2mwda_active_response[0m[2m:[0m active response module starting
+[2m2026-04-20T02:03:10.448120Z[0m [32m INFO[0m [2mwda_inventory[0m[2m:[0m starting inventory collection
+[2m2026-04-20T02:03:10.448165Z[0m [32m INFO[0m [2mwda_active_response[0m[2m:[0m active response module running
+[2m2026-04-20T02:03:10.448201Z[0m [32m INFO[0m [2mwda_sca[0m[2m:[0m SCA module starting
+[2m2026-04-20T02:03:10.448217Z[0m [33m WARN[0m [2mwda_sca[0m[2m:[0m SCA policy directory does not exist; no policies loaded [3mpath[0m[2m=[0m/etc/wazuh-desktop-agent/sca
+[2m2026-04-20T02:03:10.448223Z[0m [32m INFO[0m [2mwda_sca[0m[2m:[0m SCA policies loaded [3mpolicies[0m[2m=[0m0 [3mpath[0m[2m=[0m/etc/wazuh-desktop-agent/sca
+[2m2026-04-20T02:03:10.449479Z[0m [32m INFO[0m [2mwda_logcollector::file_reader[0m[2m:[0m file reader running [3mfiles[0m[2m=[0m1
+[2m2026-04-20T02:03:10.451208Z[0m [32m INFO[0m [2mwda_logcollector::journal_reader[0m[2m:[0m journal reader running (event-driven via fd 12)
+[2m2026-04-20T02:03:10.453858Z[0m [32m INFO[0m [2mwda_fim[0m[2m:[0m opened FIM state database [3mpath[0m[2m=[0m/var/lib/wazuh-desktop-agent/fim.db
+[2m2026-04-20T02:03:10.453941Z[0m [32m INFO[0m [2mwda_pal::fs_watcher[0m[2m:[0m filesystem watcher initialized
+[2m2026-04-20T02:03:10.454080Z[0m [32m INFO[0m [2mwda_fim[0m[2m:[0m watching directory [3mpath[0m[2m=[0m/tmp/wda-e2e-fim [3mrecursive[0m[2m=[0mtrue
+[2m2026-04-20T02:03:10.454103Z[0m [32m INFO[0m [2mwda_fim[0m[2m:[0m FIM module running
+[2m2026-04-20T02:03:10.455833Z[0m [32m INFO[0m [2mwda_fim[0m[2m:[0m baseline scan complete [3mscanned[0m[2m=[0m1 [3mnew[0m[2m=[0m1 [3mmodified[0m[2m=[0m0 [3mdeleted[0m[2m=[0m0
+[2m2026-04-20T02:03:11.556022Z[0m [32m INFO[0m [2mwda_inventory[0m[2m:[0m inventory collection complete
+[2m2026-04-20T02:03:26.556955Z[0m [32m INFO[0m [2mwda_inventory[0m[2m:[0m starting inventory collection
+[2m2026-04-20T02:03:27.744185Z[0m [32m INFO[0m [2mwda_inventory[0m[2m:[0m inventory collection complete
+[2m2026-04-20T02:03:30.454585Z[0m [32m INFO[0m [2mwda_fim[0m[2m:[0m baseline scan timer fired
+[2m2026-04-20T02:03:30.455379Z[0m [32m INFO[0m [2mwda_fim[0m[2m:[0m baseline scan complete [3mscanned[0m[2m=[0m1 [3mnew[0m[2m=[0m0 [3mmodified[0m[2m=[0m0 [3mdeleted[0m[2m=[0m0
+==> Test 2: Brute-force SSH simulation...
+[2m2026-04-20T02:03:41.557341Z[0m [32m INFO[0m [2mwda_inventory[0m[2m:[0m starting inventory collection
+[2m2026-04-20T02:03:42.736152Z[0m [32m INFO[0m [2mwda_inventory[0m[2m:[0m inventory collection complete
+[2m2026-04-20T02:03:50.455510Z[0m [32m INFO[0m [2mwda_fim[0m[2m:[0m baseline scan timer fired
+[2m2026-04-20T02:03:50.456306Z[0m [32m INFO[0m [2mwda_fim[0m[2m:[0m baseline scan complete [3mscanned[0m[2m=[0m1 [3mnew[0m[2m=[0m0 [3mmodified[0m[2m=[0m0 [3mdeleted[0m[2m=[0m0
+==> Test 3: Privilege escalation simulation...
+[2m2026-04-20T02:03:56.557002Z[0m [32m INFO[0m [2mwda_inventory[0m[2m:[0m starting inventory collection
+[2m2026-04-20T02:03:57.720399Z[0m [32m INFO[0m [2mwda_inventory[0m[2m:[0m inventory collection complete
+[2m2026-04-20T02:04:10.455523Z[0m [32m INFO[0m [2mwda_fim[0m[2m:[0m baseline scan timer fired
+[2m2026-04-20T02:04:10.456338Z[0m [32m INFO[0m [2mwda_fim[0m[2m:[0m baseline scan complete [3mscanned[0m[2m=[0m1 [3mnew[0m[2m=[0m0 [3mmodified[0m[2m=[0m0 [3mdeleted[0m[2m=[0m0
+==> Test 4: Config file tampering...
+[2m2026-04-20T02:04:11.557316Z[0m [32m INFO[0m [2mwda_inventory[0m[2m:[0m starting inventory collection
+[2m2026-04-20T02:04:12.726685Z[0m [32m INFO[0m [2mwda_inventory[0m[2m:[0m inventory collection complete
+[2m2026-04-20T02:04:26.556882Z[0m [32m INFO[0m [2mwda_inventory[0m[2m:[0m starting inventory collection
+[2m2026-04-20T02:04:27.719534Z[0m [32m INFO[0m [2mwda_inventory[0m[2m:[0m inventory collection complete
+[2m2026-04-20T02:04:30.455426Z[0m [32m INFO[0m [2mwda_fim[0m[2m:[0m baseline scan timer fired
+[2m2026-04-20T02:04:30.456123Z[0m [32m INFO[0m [2mwda_fim[0m[2m:[0m baseline scan complete [3mscanned[0m[2m=[0m2 [3mnew[0m[2m=[0m0 [3mmodified[0m[2m=[0m0 [3mdeleted[0m[2m=[0m0
+==> Test 5: Ransomware simulation (bulk rename to .encrypted)...
+[2m2026-04-20T02:04:41.556672Z[0m [32m INFO[0m [2mwda_inventory[0m[2m:[0m starting inventory collection
+[2m2026-04-20T02:04:42.752064Z[0m [32m INFO[0m [2mwda_inventory[0m[2m:[0m inventory collection complete
+[2m2026-04-20T02:04:50.455233Z[0m [32m INFO[0m [2mwda_fim[0m[2m:[0m baseline scan timer fired
+[2m2026-04-20T02:04:50.468155Z[0m [32m INFO[0m [2mwda_fim[0m[2m:[0m baseline scan complete [3mscanned[0m[2m=[0m102 [3mnew[0m[2m=[0m0 [3mmodified[0m[2m=[0m0 [3mdeleted[0m[2m=[0m0
+[2m2026-04-20T02:04:56.557607Z[0m [32m INFO[0m [2mwda_inventory[0m[2m:[0m starting inventory collection
+[2m2026-04-20T02:04:57.724051Z[0m [32m INFO[0m [2mwda_inventory[0m[2m:[0m inventory collection complete
+[2m2026-04-20T02:05:10.454994Z[0m [32m INFO[0m [2mwda_fim[0m[2m:[0m baseline scan timer fired
+[2m2026-04-20T02:05:10.466145Z[0m [32m INFO[0m [2mwda_fim[0m[2m:[0m baseline scan complete [3mscanned[0m[2m=[0m102 [3mnew[0m[2m=[0m0 [3mmodified[0m[2m=[0m0 [3mdeleted[0m[2m=[0m0
+[2m2026-04-20T02:05:11.571021Z[0m [32m INFO[0m [2mwda_inventory[0m[2m:[0m starting inventory collection
+[2m2026-04-20T02:05:19.501258Z[0m [32m INFO[0m [2mwda_inventory[0m[2m:[0m inventory collection complete
+==> Test 6: Malicious process kill via active response...
+
+Wazuh agent_control: Running active response 'restart-wazuh0' on: 001
+[2m2026-04-20T02:05:26.556660Z[0m [32m INFO[0m [2mwda_inventory[0m[2m:[0m starting inventory collection
+[2m2026-04-20T02:05:27.743399Z[0m [32m INFO[0m [2mwda_inventory[0m[2m:[0m inventory collection complete
+[2m2026-04-20T02:05:30.454938Z[0m [32m INFO[0m [2mwda_fim[0m[2m:[0m baseline scan timer fired
+[2m2026-04-20T02:05:30.466965Z[0m [32m INFO[0m [2mwda_fim[0m[2m:[0m baseline scan complete [3mscanned[0m[2m=[0m102 [3mnew[0m[2m=[0m0 [3mmodified[0m[2m=[0m0 [3mdeleted[0m[2m=[0m0
+==> Test 7: IP blocking via active response (IPv4 + IPv6)...
+
+** Selected active response does not exist.
+[2m2026-04-20T02:05:41.557081Z[0m [32m INFO[0m [2mwda_inventory[0m[2m:[0m starting inventory collection
+
+** Selected active response does not exist.
+[2m2026-04-20T02:05:42.761360Z[0m [32m INFO[0m [2mwda_inventory[0m[2m:[0m inventory collection complete
+[2m2026-04-20T02:05:50.455313Z[0m [32m INFO[0m [2mwda_fim[0m[2m:[0m baseline scan timer fired
+[2m2026-04-20T02:05:50.466695Z[0m [32m INFO[0m [2mwda_fim[0m[2m:[0m baseline scan complete [3mscanned[0m[2m=[0m102 [3mnew[0m[2m=[0m0 [3mmodified[0m[2m=[0m0 [3mdeleted[0m[2m=[0m0
+==> Test 8: Unauthorized package install detection...
+Reading package lists...
+Building dependency tree...
+Reading state information...
+The following packages were automatically installed and are no longer required:
+  libev4 libuv1
+Use 'sudo apt autoremove' to remove them.
+Suggested packages:
+  filters cowsay-off
+The following NEW packages will be installed:
+  cowsay
+0 upgraded, 1 newly installed, 0 to remove and 155 not upgraded.
+Need to get 18.6 kB of archives.
+After this operation, 93.2 kB of additional disk space will be used.
+Get:1 http://archive.ubuntu.com/ubuntu jammy/universe amd64 cowsay all 3.03+dfsg2-8 [18.6 kB]
+Fetched 18.6 kB in 0s (73.4 kB/s)
+Selecting previously unselected package cowsay.
+(Reading database ... (Reading database ... 5%(Reading database ... 10%(Reading database ... 15%(Reading database ... 20%(Reading database ... 25%(Reading database ... 30%(Reading database ... 35%(Reading database ... 40%(Reading database ... 45%(Reading database ... 50%(Reading database ... 55%(Reading database ... 60%(Reading database ... 65%(Reading database ... 70%(Reading database ... 75%(Reading database ... 80%(Reading database ... 85%(Reading database ... 90%(Reading database ... 95%(Reading database ... 100%(Reading database ... 107288 files and directories currently installed.)
+Preparing to unpack .../cowsay_3.03+dfsg2-8_all.deb ...
+Unpacking cowsay (3.03+dfsg2-8) ...
+Setting up cowsay (3.03+dfsg2-8) ...
+[2m2026-04-20T02:05:56.557035Z[0m [32m INFO[0m [2mwda_inventory[0m[2m:[0m starting inventory collection
+[2m2026-04-20T02:05:57.730422Z[0m [32m INFO[0m [2mwda_inventory[0m[2m:[0m inventory collection complete
+[2m2026-04-20T02:06:10.455301Z[0m [32m INFO[0m [2mwda_fim[0m[2m:[0m baseline scan timer fired
+[2m2026-04-20T02:06:10.463422Z[0m [32m INFO[0m [2mwda_fim[0m[2m:[0m baseline scan complete [3mscanned[0m[2m=[0m102 [3mnew[0m[2m=[0m0 [3mmodified[0m[2m=[0m0 [3mdeleted[0m[2m=[0m0
+[2m2026-04-20T02:06:11.556858Z[0m [32m INFO[0m [2mwda_inventory[0m[2m:[0m starting inventory collection
+[2m2026-04-20T02:06:12.760894Z[0m [32m INFO[0m [2mwda_inventory[0m[2m:[0m inventory collection complete
+Reading package lists...
+Building dependency tree...[2m2026-04-20T02:06:26.557011Z[0m [32m INFO[0m [2mwda_inventory[0m[2m:[0m starting inventory collection
+
+Reading state information...
+The following packages were automatically installed and are no longer required:
+  libev4 libuv1
+Use 'sudo apt autoremove' to remove them.
+The following packages will be REMOVED:
+  cowsay
+0 upgraded, 0 newly installed, 1 to remove and 155 not upgraded.
+After this operation, 93.2 kB disk space will be freed.
+(Reading database ... (Reading database ... 5%(Reading database ... 10%(Reading database ... 15%(Reading database ... 20%(Reading database ... 25%(Reading database ... 30%(Reading database ... 35%(Reading database ... 40%(Reading database ... 45%(Reading database ... 50%(Reading database ... 55%(Reading database ... 60%(Reading database ... 65%(Reading database ... 70%(Reading database ... 75%(Reading database ... 80%(Reading database ... 85%(Reading database ... 90%(Reading database ... 95%(Reading database ... 100%(Reading database ... 107350 files and directories currently installed.)
+Removing cowsay (3.03+dfsg2-8) ...
+==> Test 9: System binary tampering simulation...
+[2m2026-04-20T02:06:27.738585Z[0m [32m INFO[0m [2mwda_inventory[0m[2m:[0m inventory collection complete
+[2m2026-04-20T02:06:30.455252Z[0m [32m INFO[0m [2mwda_fim[0m[2m:[0m baseline scan timer fired
+[2m2026-04-20T02:06:30.463605Z[0m [32m INFO[0m [2mwda_fim[0m[2m:[0m baseline scan complete [3mscanned[0m[2m=[0m103 [3mnew[0m[2m=[0m0 [3mmodified[0m[2m=[0m0 [3mdeleted[0m[2m=[0m0
+[2m2026-04-20T02:06:41.556864Z[0m [32m INFO[0m [2mwda_inventory[0m[2m:[0m starting inventory collection
+[2m2026-04-20T02:06:42.710430Z[0m [32m INFO[0m [2mwda_inventory[0m[2m:[0m inventory collection complete
+[2m2026-04-20T02:06:50.454723Z[0m [32m INFO[0m [2mwda_fim[0m[2m:[0m baseline scan timer fired
+[2m2026-04-20T02:06:50.462720Z[0m [32m INFO[0m [2mwda_fim[0m[2m:[0m baseline scan complete [3mscanned[0m[2m=[0m103 [3mnew[0m[2m=[0m0 [3mmodified[0m[2m=[0m0 [3mdeleted[0m[2m=[0m0
+[2m2026-04-20T02:06:56.556875Z[0m [32m INFO[0m [2mwda_inventory[0m[2m:[0m starting inventory collection
+==> Test 10: Account disable active response...
+
+** Selected active response does not exist.
+[2m2026-04-20T02:06:57.771435Z[0m [32m INFO[0m [2mwda_inventory[0m[2m:[0m inventory collection complete
+==> Security E2E tests complete.
+
+==============================
+  Security E2E Test Summary
+==============================
+  PASS: Malware file drop detected (syscheck alert for malware.exe)
+  PASS: Brute-force SSH simulation detected (10 alert(s))
+  PASS: Privilege escalation (sudo abuse) detected (5 alert(s))
+  PASS: Config file tampering detected (hash change alert)
+  PASS: Ransomware simulation detected (208 FIM alerts for .encrypted files)
+  PASS: Active response kill_process command sent (process still alive — expected without server-side rule)
+  PASS: IP blocking active response commands sent (IPv4 + IPv6)
+  PASS: Package inventory update detected after install
+  PASS: System binary tampering detected (SHA-256 change alert)
+  FAIL: Account disable active response not executed
+==============================
+  RESULT: SOME CHECKS FAILED
+==============================
+
+Cleaning up...
+[2m2026-04-20T02:07:10.455204Z[0m [32m INFO[0m [2mwda_fim[0m[2m:[0m baseline scan timer fired
+[2m2026-04-20T02:07:10.466487Z[0m [32m INFO[0m [2mwda_fim[0m[2m:[0m baseline scan complete [3mscanned[0m[2m=[0m103 [3mnew[0m[2m=[0m0 [3mmodified[0m[2m=[0m0 [3mdeleted[0m[2m=[0m0
+[2m2026-04-20T02:07:11.557184Z[0m [32m INFO[0m [2mwda_inventory[0m[2m:[0m starting inventory collection
+[2m2026-04-20T02:07:12.724756Z[0m [32m INFO[0m [2mwda_inventory[0m[2m:[0m inventory collection complete
+[2m2026-04-20T02:07:26.557332Z[0m [32m INFO[0m [2mwda_inventory[0m[2m:[0m starting inventory collection
+[2m2026-04-20T02:07:27.733533Z[0m [32m INFO[0m [2mwda_inventory[0m[2m:[0m inventory collection complete
+[2m2026-04-20T02:07:30.454614Z[0m [32m INFO[0m [2mwda_fim[0m[2m:[0m baseline scan timer fired
+[2m2026-04-20T02:07:30.462688Z[0m [32m INFO[0m [2mwda_fim[0m[2m:[0m baseline scan complete [3mscanned[0m[2m=[0m103 [3mnew[0m[2m=[0m0 [3mmodified[0m[2m=[0m0 [3mdeleted[0m[2m=[0m0
+[2m2026-04-20T02:07:41.557226Z[0m [32m INFO[0m [2mwda_inventory[0m[2m:[0m starting inventory collection
+[2m2026-04-20T02:07:42.730570Z[0m [32m INFO[0m [2mwda_inventory[0m[2m:[0m inventory collection complete
+[2m2026-04-20T02:07:50.454709Z[0m [32m INFO[0m [2mwda_fim[0m[2m:[0m baseline scan timer fired
+[2m2026-04-20T02:07:50.466220Z[0m [32m INFO[0m [2mwda_fim[0m[2m:[0m baseline scan complete [3mscanned[0m[2m=[0m103 [3mnew[0m[2m=[0m0 [3mmodified[0m[2m=[0m0 [3mdeleted[0m[2m=[0m0
+[2m2026-04-20T02:07:56.557332Z[0m [32m INFO[0m [2mwda_inventory[0m[2m:[0m starting inventory collection
+[2m2026-04-20T02:07:57.723161Z[0m [32m INFO[0m [2mwda_inventory[0m[2m:[0m inventory collection complete
+[2m2026-04-20T02:08:10.454652Z[0m [32m INFO[0m [2mwda_fim[0m[2m:[0m baseline scan timer fired
+[2m2026-04-20T02:08:10.467994Z[0m [32m INFO[0m [2mwda_fim[0m[2m:[0m baseline scan complete [3mscanned[0m[2m=[0m103 [3mnew[0m[2m=[0m0 [3mmodified[0m[2m=[0m0 [3mdeleted[0m[2m=[0m0
+[2m2026-04-20T02:08:11.557502Z[0m [32m INFO[0m [2mwda_inventory[0m[2m:[0m starting inventory collection
+[2m2026-04-20T02:08:12.725788Z[0m [32m INFO[0m [2mwda_inventory[0m[2m:[0m inventory collection complete
+[2m2026-04-20T02:08:26.557817Z[0m [32m INFO[0m [2mwda_inventory[0m[2m:[0m starting inventory collection
+[2m2026-04-20T02:08:27.748324Z[0m [32m INFO[0m [2mwda_inventory[0m[2m:[0m inventory collection complete
+[2m2026-04-20T02:08:30.455296Z[0m [32m INFO[0m [2mwda_fim[0m[2m:[0m baseline scan timer fired
+[2m2026-04-20T02:08:30.481528Z[0m [32m INFO[0m [2mwda_fim[0m[2m:[0m baseline scan complete [3mscanned[0m[2m=[0m103 [3mnew[0m[2m=[0m0 [3mmodified[0m[2m=[0m0 [3mdeleted[0m[2m=[0m0
+[2m2026-04-20T02:08:41.556882Z[0m [32m INFO[0m [2mwda_inventory[0m[2m:[0m starting inventory collection
+[2m2026-04-20T02:08:42.769683Z[0m [32m INFO[0m [2mwda_inventory[0m[2m:[0m inventory collection complete
+[2m2026-04-20T02:08:50.455408Z[0m [32m INFO[0m [2mwda_fim[0m[2m:[0m baseline scan timer fired
+[2m2026-04-20T02:08:50.465262Z[0m [32m INFO[0m [2mwda_fim[0m[2m:[0m baseline scan complete [3mscanned[0m[2m=[0m103 [3mnew[0m[2m=[0m0 [3mmodified[0m[2m=[0m0 [3mdeleted[0m[2m=[0m0
+[2m2026-04-20T02:08:56.557401Z[0m [32m INFO[0m [2mwda_inventory[0m[2m:[0m starting inventory collection
+[2m2026-04-20T02:08:57.709168Z[0m [32m INFO[0m [2mwda_inventory[0m[2m:[0m inventory collection complete
+[2m2026-04-20T02:09:10.455093Z[0m [32m INFO[0m [2mwda_fim[0m[2m:[0m baseline scan timer fired
+[2m2026-04-20T02:09:10.464149Z[0m [32m INFO[0m [2mwda_fim[0m[2m:[0m baseline scan complete [3mscanned[0m[2m=[0m103 [3mnew[0m[2m=[0m0 [3mmodified[0m[2m=[0m0 [3mdeleted[0m[2m=[0m0
+[2m2026-04-20T02:09:11.557075Z[0m [32m INFO[0m [2mwda_inventory[0m[2m:[0m starting inventory collection
+[2m2026-04-20T02:09:12.719388Z[0m [32m INFO[0m [2mwda_inventory[0m[2m:[0m inventory collection complete
+[2m2026-04-20T02:09:26.557612Z[0m [32m INFO[0m [2mwda_inventory[0m[2m:[0m starting inventory collection
+[2m2026-04-20T02:09:27.728796Z[0m [32m INFO[0m [2mwda_inventory[0m[2m:[0m inventory collection complete
+[2m2026-04-20T02:09:30.454627Z[0m [32m INFO[0m [2mwda_fim[0m[2m:[0m baseline scan timer fired
+[2m2026-04-20T02:09:30.464340Z[0m [32m INFO[0m [2mwda_fim[0m[2m:[0m baseline scan complete [3mscanned[0m[2m=[0m103 [3mnew[0m[2m=[0m0 [3mmodified[0m[2m=[0m0 [3mdeleted[0m[2m=[0m0
+[2m2026-04-20T02:09:41.557003Z[0m [32m INFO[0m [2mwda_inventory[0m[2m:[0m starting inventory collection
+[2m2026-04-20T02:09:42.714402Z[0m [32m INFO[0m [2mwda_inventory[0m[2m:[0m inventory collection complete
+[2m2026-04-20T02:09:50.455502Z[0m [32m INFO[0m [2mwda_fim[0m[2m:[0m baseline scan timer fired
+[2m2026-04-20T02:09:50.464724Z[0m [32m INFO[0m [2mwda_fim[0m[2m:[0m baseline scan complete [3mscanned[0m[2m=[0m103 [3mnew[0m[2m=[0m0 [3mmodified[0m[2m=[0m0 [3mdeleted[0m[2m=[0m0
+[2m2026-04-20T02:09:56.557168Z[0m [32m INFO[0m [2mwda_inventory[0m[2m:[0m starting inventory collection
+[2m2026-04-20T02:09:57.709118Z[0m [32m INFO[0m [2mwda_inventory[0m[2m:[0m inventory collection complete
+[2m2026-04-20T02:10:10.454568Z[0m [32m INFO[0m [2mwda_fim[0m[2m:[0m baseline scan timer fired
+[2m2026-04-20T02:10:10.463854Z[0m [32m INFO[0m [2mwda_fim[0m[2m:[0m baseline scan complete [3mscanned[0m[2m=[0m103 [3mnew[0m[2m=[0m0 [3mmodified[0m[2m=[0m0 [3mdeleted[0m[2m=[0m0
+[2m2026-04-20T02:10:11.557463Z[0m [32m INFO[0m [2mwda_inventory[0m[2m:[0m starting inventory collection
+[2m2026-04-20T02:10:12.746215Z[0m [32m INFO[0m [2mwda_inventory[0m[2m:[0m inventory collection complete
+[2m2026-04-20T02:10:26.557424Z[0m [32m INFO[0m [2mwda_inventory[0m[2m:[0m starting inventory collection
+[2m2026-04-20T02:10:27.713107Z[0m [32m INFO[0m [2mwda_inventory[0m[2m:[0m inventory collection complete
+[2m2026-04-20T02:10:30.455367Z[0m [32m INFO[0m [2mwda_fim[0m[2m:[0m baseline scan timer fired
+[2m2026-04-20T02:10:30.464067Z[0m [32m INFO[0m [2mwda_fim[0m[2m:[0m baseline scan complete [3mscanned[0m[2m=[0m103 [3mnew[0m[2m=[0m0 [3mmodified[0m[2m=[0m0 [3mdeleted[0m[2m=[0m0
+[2m2026-04-20T02:10:41.557498Z[0m [32m INFO[0m [2mwda_inventory[0m[2m:[0m starting inventory collection
+[2m2026-04-20T02:10:42.725128Z[0m [32m INFO[0m [2mwda_inventory[0m[2m:[0m inventory collection complete
+[2m2026-04-20T02:10:50.454711Z[0m [32m INFO[0m [2mwda_fim[0m[2m:[0m baseline scan timer fired
+[2m2026-04-20T02:10:50.463661Z[0m [32m INFO[0m [2mwda_fim[0m[2m:[0m baseline scan complete [3mscanned[0m[2m=[0m103 [3mnew[0m[2m=[0m0 [3mmodified[0m[2m=[0m0 [3mdeleted[0m[2m=[0m0
+[2m2026-04-20T02:10:56.557226Z[0m [32m INFO[0m [2mwda_inventory[0m[2m:[0m starting inventory collection
+[2m2026-04-20T02:10:57.696710Z[0m [32m INFO[0m [2mwda_inventory[0m[2m:[0m inventory collection complete
+[2m2026-04-20T02:11:10.455160Z[0m [32m INFO[0m [2mwda_fim[0m[2m:[0m baseline scan timer fired
+[2m2026-04-20T02:11:10.466812Z[0m [32m INFO[0m [2mwda_fim[0m[2m:[0m baseline scan complete [3mscanned[0m[2m=[0m103 [3mnew[0m[2m=[0m0 [3mmodified[0m[2m=[0m0 [3mdeleted[0m[2m=[0m0
+[2m2026-04-20T02:11:11.557291Z[0m [32m INFO[0m [2mwda_inventory[0m[2m:[0m starting inventory collection
+[2m2026-04-20T02:11:12.700334Z[0m [32m INFO[0m [2mwda_inventory[0m[2m:[0m inventory collection complete
+[2m2026-04-20T02:11:26.557586Z[0m [32m INFO[0m [2mwda_inventory[0m[2m:[0m starting inventory collection
+[2m2026-04-20T02:11:27.712414Z[0m [32m INFO[0m [2mwda_inventory[0m[2m:[0m inventory collection complete
+[2m2026-04-20T02:11:30.455397Z[0m [32m INFO[0m [2mwda_fim[0m[2m:[0m baseline scan timer fired
+[2m2026-04-20T02:11:30.467656Z[0m [32m INFO[0m [2mwda_fim[0m[2m:[0m baseline scan complete [3mscanned[0m[2m=[0m103 [3mnew[0m[2m=[0m0 [3mmodified[0m[2m=[0m0 [3mdeleted[0m[2m=[0m0
+[2m2026-04-20T02:11:41.556960Z[0m [32m INFO[0m [2mwda_inventory[0m[2m:[0m starting inventory collection
+[2m2026-04-20T02:11:42.736228Z[0m [32m INFO[0m [2mwda_inventory[0m[2m:[0m inventory collection complete
+[2m2026-04-20T02:11:50.455379Z[0m [32m INFO[0m [2mwda_fim[0m[2m:[0m baseline scan timer fired
+[2m2026-04-20T02:11:50.463745Z[0m [32m INFO[0m [2mwda_fim[0m[2m:[0m baseline scan complete [3mscanned[0m[2m=[0m103 [3mnew[0m[2m=[0m0 [3mmodified[0m[2m=[0m0 [3mdeleted[0m[2m=[0m0
+[2m2026-04-20T02:11:56.557005Z[0m [32m INFO[0m [2mwda_inventory[0m[2m:[0m starting inventory collection
+[2m2026-04-20T02:11:57.699883Z[0m [32m INFO[0m [2mwda_inventory[0m[2m:[0m inventory collection complete
+[2m2026-04-20T02:12:10.454953Z[0m [32m INFO[0m [2mwda_fim[0m[2m:[0m baseline scan timer fired
+[2m2026-04-20T02:12:10.463865Z[0m [32m INFO[0m [2mwda_fim[0m[2m:[0m baseline scan complete [3mscanned[0m[2m=[0m103 [3mnew[0m[2m=[0m0 [3mmodified[0m[2m=[0m0 [3mdeleted[0m[2m=[0m0
+[2m2026-04-20T02:12:11.556700Z[0m [32m INFO[0m [2mwda_inventory[0m[2m:[0m starting inventory collection
+[2m2026-04-20T02:12:12.740196Z[0m [32m INFO[0m [2mwda_inventory[0m[2m:[0m inventory collection complete
+[2m2026-04-20T02:12:26.556953Z[0m [32m INFO[0m [2mwda_inventory[0m[2m:[0m starting inventory collection
+[2m2026-04-20T02:12:27.716889Z[0m [32m INFO[0m [2mwda_inventory[0m[2m:[0m inventory collection complete
+[2m2026-04-20T02:12:30.455499Z[0m [32m INFO[0m [2mwda_fim[0m[2m:[0m baseline scan timer fired
+[2m2026-04-20T02:12:30.463738Z[0m [32m INFO[0m [2mwda_fim[0m[2m:[0m baseline scan complete [3mscanned[0m[2m=[0m103 [3mnew[0m[2m=[0m0 [3mmodified[0m[2m=[0m0 [3mdeleted[0m[2m=[0m0
+[2m2026-04-20T02:12:41.557225Z[0m [32m INFO[0m [2mwda_inventory[0m[2m:[0m starting inventory collection
+[2m2026-04-20T02:12:42.757450Z[0m [32m INFO[0m [2mwda_inventory[0m[2m:[0m inventory collection complete
+[2m2026-04-20T02:12:50.455156Z[0m [32m INFO[0m [2mwda_fim[0m[2m:[0m baseline scan timer fired
+[2m2026-04-20T02:12:50.463412Z[0m [32m INFO[0m [2mwda_fim[0m[2m:[0m baseline scan complete [3mscanned[0m[2m=[0m103 [3mnew[0m[2m=[0m0 [3mmodified[0m[2m=[0m0 [3mdeleted[0m[2m=[0m0
+[2m2026-04-20T02:12:56.556686Z[0m [32m INFO[0m [2mwda_inventory[0m[2m:[0m starting inventory collection
+[2m2026-04-20T02:12:57.701287Z[0m [32m INFO[0m [2mwda_inventory[0m[2m:[0m inventory collection complete
+[2m2026-04-20T02:13:10.455177Z[0m [32m INFO[0m [2mwda_fim[0m[2m:[0m baseline scan timer fired
+[2m2026-04-20T02:13:10.466714Z[0m [32m INFO[0m [2mwda_fim[0m[2m:[0m baseline scan complete [3mscanned[0m[2m=[0m103 [3mnew[0m[2m=[0m0 [3mmodified[0m[2m=[0m0 [3mdeleted[0m[2m=[0m0
+[2m2026-04-20T02:13:11.557074Z[0m [32m INFO[0m [2mwda_inventory[0m[2m:[0m starting inventory collection
+[2m2026-04-20T02:13:12.723869Z[0m [32m INFO[0m [2mwda_inventory[0m[2m:[0m inventory collection complete
+[2m2026-04-20T02:13:26.557405Z[0m [32m INFO[0m [2mwda_inventory[0m[2m:[0m starting inventory collection
+[2m2026-04-20T02:13:27.701707Z[0m [32m INFO[0m [2mwda_inventory[0m[2m:[0m inventory collection complete
+[2m2026-04-20T02:13:30.455470Z[0m [32m INFO[0m [2mwda_fim[0m[2m:[0m baseline scan timer fired
+[2m2026-04-20T02:13:30.463901Z[0m [32m INFO[0m [2mwda_fim[0m[2m:[0m baseline scan complete [3mscanned[0m[2m=[0m103 [3mnew[0m[2m=[0m0 [3mmodified[0m[2m=[0m0 [3mdeleted[0m[2m=[0m0
+[2m2026-04-20T02:13:41.556684Z[0m [32m INFO[0m [2mwda_inventory[0m[2m:[0m starting inventory collection
+[2m2026-04-20T02:13:42.701058Z[0m [32m INFO[0m [2mwda_inventory[0m[2m:[0m inventory collection complete
+[2m2026-04-20T02:13:50.454711Z[0m [32m INFO[0m [2mwda_fim[0m[2m:[0m baseline scan timer fired
+[2m2026-04-20T02:13:50.463155Z[0m [32m INFO[0m [2mwda_fim[0m[2m:[0m baseline scan complete [3mscanned[0m[2m=[0m103 [3mnew[0m[2m=[0m0 [3mmodified[0m[2m=[0m0 [3mdeleted[0m[2m=[0m0
+[2m2026-04-20T02:13:56.557240Z[0m [32m INFO[0m [2mwda_inventory[0m[2m:[0m starting inventory collection
+[2m2026-04-20T02:13:57.715577Z[0m [32m INFO[0m [2mwda_inventory[0m[2m:[0m inventory collection complete
+[2m2026-04-20T02:14:10.455383Z[0m [32m INFO[0m [2mwda_fim[0m[2m:[0m baseline scan timer fired
+[2m2026-04-20T02:14:10.466606Z[0m [32m INFO[0m [2mwda_fim[0m[2m:[0m baseline scan complete [3mscanned[0m[2m=[0m103 [3mnew[0m[2m=[0m0 [3mmodified[0m[2m=[0m0 [3mdeleted[0m[2m=[0m0
+[2m2026-04-20T02:14:11.557637Z[0m [32m INFO[0m [2mwda_inventory[0m[2m:[0m starting inventory collection
+[2m2026-04-20T02:14:12.742907Z[0m [32m INFO[0m [2mwda_inventory[0m[2m:[0m inventory collection complete
+[2m2026-04-20T02:14:26.556865Z[0m [32m INFO[0m [2mwda_inventory[0m[2m:[0m starting inventory collection
+[2m2026-04-20T02:14:27.721582Z[0m [32m INFO[0m [2mwda_inventory[0m[2m:[0m inventory collection complete
+[2m2026-04-20T02:14:30.455301Z[0m [32m INFO[0m [2mwda_fim[0m[2m:[0m baseline scan timer fired
+[2m2026-04-20T02:14:30.463607Z[0m [32m INFO[0m [2mwda_fim[0m[2m:[0m baseline scan complete [3mscanned[0m[2m=[0m103 [3mnew[0m[2m=[0m0 [3mmodified[0m[2m=[0m0 [3mdeleted[0m[2m=[0m0
+[2m2026-04-20T02:14:41.556968Z[0m [32m INFO[0m [2mwda_inventory[0m[2m:[0m starting inventory collection
+[2m2026-04-20T02:14:42.721984Z[0m [32m INFO[0m [2mwda_inventory[0m[2m:[0m inventory collection complete
+[2m2026-04-20T02:14:50.455054Z[0m [32m INFO[0m [2mwda_fim[0m[2m:[0m baseline scan timer fired
+[2m2026-04-20T02:14:50.487039Z[0m [32m INFO[0m [2mwda_fim[0m[2m:[0m baseline scan complete [3mscanned[0m[2m=[0m103 [3mnew[0m[2m=[0m0 [3mmodified[0m[2m=[0m0 [3mdeleted[0m[2m=[0m0
+[2m2026-04-20T02:14:56.557102Z[0m [32m INFO[0m [2mwda_inventory[0m[2m:[0m starting inventory collection
+[2m2026-04-20T02:14:57.705229Z[0m [32m INFO[0m [2mwda_inventory[0m[2m:[0m inventory collection complete
+[2m2026-04-20T02:15:10.455099Z[0m [32m INFO[0m [2mwda_fim[0m[2m:[0m baseline scan timer fired
+[2m2026-04-20T02:15:10.466612Z[0m [32m INFO[0m [2mwda_fim[0m[2m:[0m baseline scan complete [3mscanned[0m[2m=[0m103 [3mnew[0m[2m=[0m0 [3mmodified[0m[2m=[0m0 [3mdeleted[0m[2m=[0m0
+[2m2026-04-20T02:15:11.557366Z[0m [32m INFO[0m [2mwda_inventory[0m[2m:[0m starting inventory collection
+[2m2026-04-20T02:15:12.711715Z[0m [32m INFO[0m [2mwda_inventory[0m[2m:[0m inventory collection complete
+[2m2026-04-20T02:15:26.557276Z[0m [32m INFO[0m [2mwda_inventory[0m[2m:[0m starting inventory collection
+[2m2026-04-20T02:15:27.710255Z[0m [32m INFO[0m [2mwda_inventory[0m[2m:[0m inventory collection complete
+[2m2026-04-20T02:15:30.454669Z[0m [32m INFO[0m [2mwda_fim[0m[2m:[0m baseline scan timer fired
+[2m2026-04-20T02:15:30.466754Z[0m [32m INFO[0m [2mwda_fim[0m[2m:[0m baseline scan complete [3mscanned[0m[2m=[0m103 [3mnew[0m[2m=[0m0 [3mmodified[0m[2m=[0m0 [3mdeleted[0m[2m=[0m0
+[2m2026-04-20T02:15:41.556901Z[0m [32m INFO[0m [2mwda_inventory[0m[2m:[0m starting inventory collection
+[2m2026-04-20T02:15:42.698850Z[0m [32m INFO[0m [2mwda_inventory[0m[2m:[0m inventory collection complete
+[2m2026-04-20T02:15:50.454967Z[0m [32m INFO[0m [2mwda_fim[0m[2m:[0m baseline scan timer fired
+[2m2026-04-20T02:15:50.463097Z[0m [32m INFO[0m [2mwda_fim[0m[2m:[0m baseline scan complete [3mscanned[0m[2m=[0m103 [3mnew[0m[2m=[0m0 [3mmodified[0m[2m=[0m0 [3mdeleted[0m[2m=[0m0
+[2m2026-04-20T02:15:56.557542Z[0m [32m INFO[0m [2mwda_inventory[0m[2m:[0m starting inventory collection
+[2m2026-04-20T02:15:57.724701Z[0m [32m INFO[0m [2mwda_inventory[0m[2m:[0m inventory collection complete
+[2m2026-04-20T02:16:10.454904Z[0m [32m INFO[0m [2mwda_fim[0m[2m:[0m baseline scan timer fired
+[2m2026-04-20T02:16:10.474196Z[0m [32m INFO[0m [2mwda_fim[0m[2m:[0m baseline scan complete [3mscanned[0m[2m=[0m103 [3mnew[0m[2m=[0m0 [3mmodified[0m[2m=[0m0 [3mdeleted[0m[2m=[0m0
+[2m2026-04-20T02:16:11.557097Z[0m [32m INFO[0m [2mwda_inventory[0m[2m:[0m starting inventory collection
+[2m2026-04-20T02:16:12.801090Z[0m [32m INFO[0m [2mwda_inventory[0m[2m:[0m inventory collection complete
+[2m2026-04-20T02:16:26.556960Z[0m [32m INFO[0m [2mwda_inventory[0m[2m:[0m starting inventory collection
+[2m2026-04-20T02:16:27.708047Z[0m [32m INFO[0m [2mwda_inventory[0m[2m:[0m inventory collection complete
+[2m2026-04-20T02:16:30.455338Z[0m [32m INFO[0m [2mwda_fim[0m[2m:[0m baseline scan timer fired
+[2m2026-04-20T02:16:30.463807Z[0m [32m INFO[0m [2mwda_fim[0m[2m:[0m baseline scan complete [3mscanned[0m[2m=[0m103 [3mnew[0m[2m=[0m0 [3mmodified[0m[2m=[0m0 [3mdeleted[0m[2m=[0m0
+[2m2026-04-20T02:16:41.556868Z[0m [32m INFO[0m [2mwda_inventory[0m[2m:[0m starting inventory collection
+[2m2026-04-20T02:16:42.736660Z[0m [32m INFO[0m [2mwda_inventory[0m[2m:[0m inventory collection complete
+[2m2026-04-20T02:16:50.454602Z[0m [32m INFO[0m [2mwda_fim[0m[2m:[0m baseline scan timer fired
+[2m2026-04-20T02:16:50.465282Z[0m [32m INFO[0m [2mwda_fim[0m[2m:[0m baseline scan complete [3mscanned[0m[2m=[0m103 [3mnew[0m[2m=[0m0 [3mmodified[0m[2m=[0m0 [3mdeleted[0m[2m=[0m0
+[2m2026-04-20T02:16:56.556993Z[0m [32m INFO[0m [2mwda_inventory[0m[2m:[0m starting inventory collection
+[2m2026-04-20T02:16:57.712837Z[0m [32m INFO[0m [2mwda_inventory[0m[2m:[0m inventory collection complete
+[2m2026-04-20T02:17:10.454585Z[0m [32m INFO[0m [2mwda_fim[0m[2m:[0m baseline scan timer fired
+[2m2026-04-20T02:17:10.463456Z[0m [32m INFO[0m [2mwda_fim[0m[2m:[0m baseline scan complete [3mscanned[0m[2m=[0m103 [3mnew[0m[2m=[0m0 [3mmodified[0m[2m=[0m0 [3mdeleted[0m[2m=[0m0
+[2m2026-04-20T02:17:11.557627Z[0m [32m INFO[0m [2mwda_inventory[0m[2m:[0m starting inventory collection
+[2m2026-04-20T02:17:12.716169Z[0m [32m INFO[0m [2mwda_inventory[0m[2m:[0m inventory collection complete
+[2m2026-04-20T02:17:26.557165Z[0m [32m INFO[0m [2mwda_inventory[0m[2m:[0m starting inventory collection
+[2m2026-04-20T02:17:27.735576Z[0m [32m INFO[0m [2mwda_inventory[0m[2m:[0m inventory collection complete
+[2m2026-04-20T02:17:30.455308Z[0m [32m INFO[0m [2mwda_fim[0m[2m:[0m baseline scan timer fired
+[2m2026-04-20T02:17:30.467975Z[0m [32m INFO[0m [2mwda_fim[0m[2m:[0m baseline scan complete [3mscanned[0m[2m=[0m103 [3mnew[0m[2m=[0m0 [3mmodified[0m[2m=[0m0 [3mdeleted[0m[2m=[0m0
+[2m2026-04-20T02:17:41.560823Z[0m [32m INFO[0m [2mwda_inventory[0m[2m:[0m starting inventory collection
+[2m2026-04-20T02:17:45.662330Z[0m [32m INFO[0m [2mwda_inventory[0m[2m:[0m inventory collection complete
+[2m2026-04-20T02:17:50.454831Z[0m [32m INFO[0m [2mwda_fim[0m[2m:[0m baseline scan timer fired
+[2m2026-04-20T02:17:50.466266Z[0m [32m INFO[0m [2mwda_fim[0m[2m:[0m baseline scan complete [3mscanned[0m[2m=[0m103 [3mnew[0m[2m=[0m0 [3mmodified[0m[2m=[0m0 [3mdeleted[0m[2m=[0m0
+[2m2026-04-20T02:17:56.557528Z[0m [32m INFO[0m [2mwda_inventory[0m[2m:[0m starting inventory collection
+[2m2026-04-20T02:17:57.718794Z[0m [32m INFO[0m [2mwda_inventory[0m[2m:[0m inventory collection complete
+[2m2026-04-20T02:18:10.455161Z[0m [32m INFO[0m [2mwda_fim[0m[2m:[0m baseline scan timer fired
+[2m2026-04-20T02:18:10.464127Z[0m [32m INFO[0m [2mwda_fim[0m[2m:[0m baseline scan complete [3mscanned[0m[2m=[0m103 [3mnew[0m[2m=[0m0 [3mmodified[0m[2m=[0m0 [3mdeleted[0m[2m=[0m0
+[2m2026-04-20T02:18:11.557518Z[0m [32m INFO[0m [2mwda_inventory[0m[2m:[0m starting inventory collection
+[2m2026-04-20T02:18:12.733446Z[0m [32m INFO[0m [2mwda_inventory[0m[2m:[0m inventory collection complete
+[2m2026-04-20T02:18:26.557263Z[0m [32m INFO[0m [2mwda_inventory[0m[2m:[0m starting inventory collection
+[2m2026-04-20T02:18:27.693971Z[0m [32m INFO[0m [2mwda_inventory[0m[2m:[0m inventory collection complete
+[2m2026-04-20T02:18:30.455402Z[0m [32m INFO[0m [2mwda_fim[0m[2m:[0m baseline scan timer fired
+[2m2026-04-20T02:18:30.464043Z[0m [32m INFO[0m [2mwda_fim[0m[2m:[0m baseline scan complete [3mscanned[0m[2m=[0m103 [3mnew[0m[2m=[0m0 [3mmodified[0m[2m=[0m0 [3mdeleted[0m[2m=[0m0
+[2m2026-04-20T02:18:41.610456Z[0m [32m INFO[0m [2mwda_inventory[0m[2m:[0m starting inventory collection
+[2m2026-04-20T02:18:50.158802Z[0m [32m INFO[0m [2mwda_inventory[0m[2m:[0m inventory collection complete
+[2m2026-04-20T02:18:50.484148Z[0m [32m INFO[0m [2mwda_fim[0m[2m:[0m baseline scan timer fired
+[2m2026-04-20T02:18:50.484359Z[0m [32m INFO[0m [2mwda_fim::scanner[0m[2m:[0m system busy, deferring baseline scan [3mattempt[0m[2m=[0m1 [3mmax_retries[0m[2m=[0m3
+[2m2026-04-20T02:18:56.618354Z[0m [32m INFO[0m [2mwda_inventory[0m[2m:[0m starting inventory collection
+[2m2026-04-20T02:19:04.589444Z[0m [32m INFO[0m [2mwda_inventory[0m[2m:[0m inventory collection complete
+[2m2026-04-20T02:19:10.455185Z[0m [32m INFO[0m [2mwda_fim[0m[2m:[0m baseline scan timer fired
+[2m2026-04-20T02:19:10.455673Z[0m [32m INFO[0m [2mwda_fim::scanner[0m[2m:[0m system busy, deferring baseline scan [3mattempt[0m[2m=[0m1 [3mmax_retries[0m[2m=[0m3
+[2m2026-04-20T02:19:11.557188Z[0m [32m INFO[0m [2mwda_inventory[0m[2m:[0m starting inventory collection
+[2m2026-04-20T02:19:12.726535Z[0m [32m INFO[0m [2mwda_inventory[0m[2m:[0m inventory collection complete
+[2m2026-04-20T02:19:26.557277Z[0m [32m INFO[0m [2mwda_inventory[0m[2m:[0m starting inventory collection
+[2m2026-04-20T02:19:27.701523Z[0m [32m INFO[0m [2mwda_inventory[0m[2m:[0m inventory collection complete
+[2m2026-04-20T02:19:30.454745Z[0m [32m INFO[0m [2mwda_fim[0m[2m:[0m baseline scan timer fired
+[2m2026-04-20T02:19:30.454906Z[0m [32m INFO[0m [2mwda_fim::scanner[0m[2m:[0m system busy, deferring baseline scan [3mattempt[0m[2m=[0m1 [3mmax_retries[0m[2m=[0m3
+[2m2026-04-20T02:19:41.556978Z[0m [32m INFO[0m [2mwda_inventory[0m[2m:[0m starting inventory collection
+[2m2026-04-20T02:19:42.743872Z[0m [32m INFO[0m [2mwda_inventory[0m[2m:[0m inventory collection complete
+[2m2026-04-20T02:19:50.455186Z[0m [32m INFO[0m [2mwda_fim[0m[2m:[0m baseline scan timer fired
+[2m2026-04-20T02:19:50.455342Z[0m [32m INFO[0m [2mwda_fim::scanner[0m[2m:[0m system busy, deferring baseline scan [3mattempt[0m[2m=[0m1 [3mmax_retries[0m[2m=[0m3
+[2m2026-04-20T02:19:50.484555Z[0m [32m INFO[0m [2mwda_fim::scanner[0m[2m:[0m system busy, deferring baseline scan [3mattempt[0m[2m=[0m2 [3mmax_retries[0m[2m=[0m3
+[2m2026-04-20T02:19:56.557148Z[0m [32m INFO[0m [2mwda_inventory[0m[2m:[0m starting inventory collection
+[2m2026-04-20T02:19:57.706537Z[0m [32m INFO[0m [2mwda_inventory[0m[2m:[0m inventory collection complete
+[2m2026-04-20T02:20:10.454991Z[0m [32m INFO[0m [2mwda_fim[0m[2m:[0m baseline scan timer fired
+[2m2026-04-20T02:20:10.455234Z[0m [32m INFO[0m [2mwda_fim::scanner[0m[2m:[0m system busy, deferring baseline scan [3mattempt[0m[2m=[0m1 [3mmax_retries[0m[2m=[0m3
+[2m2026-04-20T02:20:10.455811Z[0m [32m INFO[0m [2mwda_fim::scanner[0m[2m:[0m system busy, deferring baseline scan [3mattempt[0m[2m=[0m2 [3mmax_retries[0m[2m=[0m3
+[2m2026-04-20T02:20:11.557135Z[0m [32m INFO[0m [2mwda_inventory[0m[2m:[0m starting inventory collection
+[2m2026-04-20T02:20:12.764719Z[0m [32m INFO[0m [2mwda_inventory[0m[2m:[0m inventory collection complete
+[2m2026-04-20T02:20:26.557314Z[0m [32m INFO[0m [2mwda_inventory[0m[2m:[0m starting inventory collection
+[2m2026-04-20T02:20:27.712195Z[0m [32m INFO[0m [2mwda_inventory[0m[2m:[0m inventory collection complete
+[2m2026-04-20T02:20:30.454697Z[0m [32m INFO[0m [2mwda_fim[0m[2m:[0m baseline scan timer fired
+[2m2026-04-20T02:20:30.466178Z[0m [32m INFO[0m [2mwda_fim[0m[2m:[0m baseline scan complete [3mscanned[0m[2m=[0m103 [3mnew[0m[2m=[0m0 [3mmodified[0m[2m=[0m0 [3mdeleted[0m[2m=[0m0
+[2m2026-04-20T02:20:30.473107Z[0m [32m INFO[0m [2mwda_fim[0m[2m:[0m baseline scan complete [3mscanned[0m[2m=[0m103 [3mnew[0m[2m=[0m0 [3mmodified[0m[2m=[0m0 [3mdeleted[0m[2m=[0m0
+[2m2026-04-20T02:20:41.556522Z[0m [32m INFO[0m [2mwda_inventory[0m[2m:[0m starting inventory collection
+[2m2026-04-20T02:20:42.731782Z[0m [32m INFO[0m [2mwda_inventory[0m[2m:[0m inventory collection complete
+[2m2026-04-20T02:20:50.454853Z[0m [32m INFO[0m [2mwda_fim[0m[2m:[0m baseline scan timer fired
+[2m2026-04-20T02:20:50.468839Z[0m [32m INFO[0m [2mwda_fim[0m[2m:[0m baseline scan complete [3mscanned[0m[2m=[0m103 [3mnew[0m[2m=[0m0 [3mmodified[0m[2m=[0m0 [3mdeleted[0m[2m=[0m33
+[2m2026-04-20T02:20:50.476946Z[0m [32m INFO[0m [2mwda_fim[0m[2m:[0m baseline scan complete [3mscanned[0m[2m=[0m103 [3mnew[0m[2m=[0m0 [3mmodified[0m[2m=[0m0 [3mdeleted[0m[2m=[0m0
+[2m2026-04-20T02:20:50.494628Z[0m [32m INFO[0m [2mwda_fim[0m[2m:[0m baseline scan complete [3mscanned[0m[2m=[0m103 [3mnew[0m[2m=[0m33 [3mmodified[0m[2m=[0m0 [3mdeleted[0m[2m=[0m0
+[2m2026-04-20T02:20:56.556860Z[0m [32m INFO[0m [2mwda_inventory[0m[2m:[0m starting inventory collection
+[2m2026-04-20T02:20:57.717942Z[0m [32m INFO[0m [2mwda_inventory[0m[2m:[0m inventory collection complete
+[2m2026-04-20T02:21:10.455091Z[0m [32m INFO[0m [2mwda_fim[0m[2m:[0m baseline scan timer fired
+[2m2026-04-20T02:21:10.483257Z[0m [32m INFO[0m [2mwda_fim[0m[2m:[0m baseline scan complete [3mscanned[0m[2m=[0m103 [3mnew[0m[2m=[0m0 [3mmodified[0m[2m=[0m0 [3mdeleted[0m[2m=[0m0
+[2m2026-04-20T02:21:10.499997Z[0m [32m INFO[0m [2mwda_fim[0m[2m:[0m baseline scan complete [3mscanned[0m[2m=[0m103 [3mnew[0m[2m=[0m0 [3mmodified[0m[2m=[0m0 [3mdeleted[0m[2m=[0m80
+[2m2026-04-20T02:21:10.504763Z[0m [32m INFO[0m [2mwda_fim[0m[2m:[0m baseline scan complete [3mscanned[0m[2m=[0m103 [3mnew[0m[2m=[0m41 [3mmodified[0m[2m=[0m0 [3mdeleted[0m[2m=[0m0
+[2m2026-04-20T02:21:11.556657Z[0m [32m INFO[0m [2mwda_inventory[0m[2m:[0m starting inventory collection
+[2m2026-04-20T02:21:12.725455Z[0m [32m INFO[0m [2mwda_inventory[0m[2m:[0m inventory collection complete
+[2m2026-04-20T02:21:26.557092Z[0m [32m INFO[0m [2mwda_inventory[0m[2m:[0m starting inventory collection
+[2m2026-04-20T02:21:27.710722Z[0m [32m INFO[0m [2mwda_inventory[0m[2m:[0m inventory collection complete
+[2m2026-04-20T02:21:30.455368Z[0m [32m INFO[0m [2mwda_fim[0m[2m:[0m baseline scan timer fired
+[2m2026-04-20T02:21:30.467528Z[0m [32m INFO[0m [2mwda_fim[0m[2m:[0m baseline scan complete [3mscanned[0m[2m=[0m103 [3mnew[0m[2m=[0m39 [3mmodified[0m[2m=[0m0 [3mdeleted[0m[2m=[0m0
+[2m2026-04-20T02:21:41.557364Z[0m [32m INFO[0m [2mwda_inventory[0m[2m:[0m starting inventory collection
+[2m2026-04-20T02:21:42.717260Z[0m [32m INFO[0m [2mwda_inventory[0m[2m:[0m inventory collection complete
+[2m2026-04-20T02:21:50.454586Z[0m [32m INFO[0m [2mwda_fim[0m[2m:[0m baseline scan timer fired
+[2m2026-04-20T02:21:50.463952Z[0m [32m INFO[0m [2mwda_fim[0m[2m:[0m baseline scan complete [3mscanned[0m[2m=[0m103 [3mnew[0m[2m=[0m0 [3mmodified[0m[2m=[0m0 [3mdeleted[0m[2m=[0m0
+[2m2026-04-20T02:21:56.556829Z[0m [32m INFO[0m [2mwda_inventory[0m[2m:[0m starting inventory collection
+[2m2026-04-20T02:21:57.694005Z[0m [32m INFO[0m [2mwda_inventory[0m[2m:[0m inventory collection complete
+[2m2026-04-20T02:22:10.454903Z[0m [32m INFO[0m [2mwda_fim[0m[2m:[0m baseline scan timer fired
+[2m2026-04-20T02:22:10.463170Z[0m [32m INFO[0m [2mwda_fim[0m[2m:[0m baseline scan complete [3mscanned[0m[2m=[0m103 [3mnew[0m[2m=[0m0 [3mmodified[0m[2m=[0m0 [3mdeleted[0m[2m=[0m0
+[2m2026-04-20T02:22:11.556752Z[0m [32m INFO[0m [2mwda_inventory[0m[2m:[0m starting inventory collection
+[2m2026-04-20T02:22:12.730403Z[0m [32m INFO[0m [2mwda_inventory[0m[2m:[0m inventory collection complete
+[2m2026-04-20T02:22:26.557149Z[0m [32m INFO[0m [2mwda_inventory[0m[2m:[0m starting inventory collection
+[2m2026-04-20T02:22:27.709100Z[0m [32m INFO[0m [2mwda_inventory[0m[2m:[0m inventory collection complete
+[2m2026-04-20T02:22:30.455460Z[0m [32m INFO[0m [2mwda_fim[0m[2m:[0m baseline scan timer fired
+[2m2026-04-20T02:22:30.464201Z[0m [32m INFO[0m [2mwda_fim[0m[2m:[0m baseline scan complete [3mscanned[0m[2m=[0m103 [3mnew[0m[2m=[0m0 [3mmodified[0m[2m=[0m0 [3mdeleted[0m[2m=[0m0
+[2m2026-04-20T02:22:41.556890Z[0m [32m INFO[0m [2mwda_inventory[0m[2m:[0m starting inventory collection
+[2m2026-04-20T02:22:42.750373Z[0m [32m INFO[0m [2mwda_inventory[0m[2m:[0m inventory collection complete
+[2m2026-04-20T02:22:50.454592Z[0m [32m INFO[0m [2mwda_fim[0m[2m:[0m baseline scan timer fired
+[2m2026-04-20T02:22:50.462907Z[0m [32m INFO[0m [2mwda_fim[0m[2m:[0m baseline scan complete [3mscanned[0m[2m=[0m103 [3mnew[0m[2m=[0m0 [3mmodified[0m[2m=[0m0 [3mdeleted[0m[2m=[0m0
+[2m2026-04-20T02:22:56.557294Z[0m [32m INFO[0m [2mwda_inventory[0m[2m:[0m starting inventory collection
+[2m2026-04-20T02:22:57.712811Z[0m [32m INFO[0m [2mwda_inventory[0m[2m:[0m inventory collection complete
+[2m2026-04-20T02:23:10.455087Z[0m [32m INFO[0m [2mwda_fim[0m[2m:[0m baseline scan timer fired
+[2m2026-04-20T02:23:10.466704Z[0m [32m INFO[0m [2mwda_fim[0m[2m:[0m baseline scan complete [3mscanned[0m[2m=[0m103 [3mnew[0m[2m=[0m0 [3mmodified[0m[2m=[0m0 [3mdeleted[0m[2m=[0m0
+[2m2026-04-20T02:23:11.557427Z[0m [32m INFO[0m [2mwda_inventory[0m[2m:[0m starting inventory collection
+[2m2026-04-20T02:23:12.714769Z[0m [32m INFO[0m [2mwda_inventory[0m[2m:[0m inventory collection complete
+[2m2026-04-20T02:23:26.557315Z[0m [32m INFO[0m [2mwda_inventory[0m[2m:[0m starting inventory collection
+[2m2026-04-20T02:23:27.712961Z[0m [32m INFO[0m [2mwda_inventory[0m[2m:[0m inventory collection complete
+[2m2026-04-20T02:23:30.454909Z[0m [32m INFO[0m [2mwda_fim[0m[2m:[0m baseline scan timer fired
+[2m2026-04-20T02:23:30.463139Z[0m [32m INFO[0m [2mwda_fim[0m[2m:[0m baseline scan complete [3mscanned[0m[2m=[0m103 [3mnew[0m[2m=[0m0 [3mmodified[0m[2m=[0m0 [3mdeleted[0m[2m=[0m0
+[2m2026-04-20T02:23:41.557030Z[0m [32m INFO[0m [2mwda_inventory[0m[2m:[0m starting inventory collection
+[2m2026-04-20T02:23:42.719007Z[0m [32m INFO[0m [2mwda_inventory[0m[2m:[0m inventory collection complete
+[2m2026-04-20T02:23:50.454880Z[0m [32m INFO[0m [2mwda_fim[0m[2m:[0m baseline scan timer fired
+[2m2026-04-20T02:23:50.466408Z[0m [32m INFO[0m [2mwda_fim[0m[2m:[0m baseline scan complete [3mscanned[0m[2m=[0m103 [3mnew[0m[2m=[0m0 [3mmodified[0m[2m=[0m0 [3mdeleted[0m[2m=[0m0
+[2m2026-04-20T02:23:56.556827Z[0m [32m INFO[0m [2mwda_inventory[0m[2m:[0m starting inventory collection
+[2m2026-04-20T02:23:57.720620Z[0m [32m INFO[0m [2mwda_inventory[0m[2m:[0m inventory collection complete
+[2m2026-04-20T02:24:10.455112Z[0m [32m INFO[0m [2mwda_fim[0m[2m:[0m baseline scan timer fired
+[2m2026-04-20T02:24:10.463973Z[0m [32m INFO[0m [2mwda_fim[0m[2m:[0m baseline scan complete [3mscanned[0m[2m=[0m103 [3mnew[0m[2m=[0m0 [3mmodified[0m[2m=[0m0 [3mdeleted[0m[2m=[0m0
+[2m2026-04-20T02:24:11.557201Z[0m [32m INFO[0m [2mwda_inventory[0m[2m:[0m starting inventory collection
+[2m2026-04-20T02:24:12.733537Z[0m [32m INFO[0m [2mwda_inventory[0m[2m:[0m inventory collection complete
+[2m2026-04-20T02:24:26.557506Z[0m [32m INFO[0m [2mwda_inventory[0m[2m:[0m starting inventory collection
+[2m2026-04-20T02:24:27.706220Z[0m [32m INFO[0m [2mwda_inventory[0m[2m:[0m inventory collection complete
+[2m2026-04-20T02:24:30.455298Z[0m [32m INFO[0m [2mwda_fim[0m[2m:[0m baseline scan timer fired
+[2m2026-04-20T02:24:30.467731Z[0m [32m INFO[0m [2mwda_fim[0m[2m:[0m baseline scan complete [3mscanned[0m[2m=[0m103 [3mnew[0m[2m=[0m0 [3mmodified[0m[2m=[0m0 [3mdeleted[0m[2m=[0m0
+[2m2026-04-20T02:24:41.557533Z[0m [32m INFO[0m [2mwda_inventory[0m[2m:[0m starting inventory collection
+[2m2026-04-20T02:24:42.741306Z[0m [32m INFO[0m [2mwda_inventory[0m[2m:[0m inventory collection complete
+[2m2026-04-20T02:24:50.455389Z[0m [32m INFO[0m [2mwda_fim[0m[2m:[0m baseline scan timer fired
+[2m2026-04-20T02:24:50.464124Z[0m [32m INFO[0m [2mwda_fim[0m[2m:[0m baseline scan complete [3mscanned[0m[2m=[0m103 [3mnew[0m[2m=[0m0 [3mmodified[0m[2m=[0m0 [3mdeleted[0m[2m=[0m0
+[2m2026-04-20T02:24:56.557247Z[0m [32m INFO[0m [2mwda_inventory[0m[2m:[0m starting inventory collection
+[2m2026-04-20T02:24:57.709186Z[0m [32m INFO[0m [2mwda_inventory[0m[2m:[0m inventory collection complete
+[2m2026-04-20T02:25:10.455535Z[0m [32m INFO[0m [2mwda_fim[0m[2m:[0m baseline scan timer fired
+[2m2026-04-20T02:25:10.464601Z[0m [32m INFO[0m [2mwda_fim[0m[2m:[0m baseline scan complete [3mscanned[0m[2m=[0m103 [3mnew[0m[2m=[0m0 [3mmodified[0m[2m=[0m0 [3mdeleted[0m[2m=[0m0
+[2m2026-04-20T02:25:11.556931Z[0m [32m INFO[0m [2mwda_inventory[0m[2m:[0m starting inventory collection
+[2m2026-04-20T02:25:12.739781Z[0m [32m INFO[0m [2mwda_inventory[0m[2m:[0m inventory collection complete
+[2m2026-04-20T02:25:26.556699Z[0m [32m INFO[0m [2mwda_inventory[0m[2m:[0m starting inventory collection
+[2m2026-04-20T02:25:27.720057Z[0m [32m INFO[0m [2mwda_inventory[0m[2m:[0m inventory collection complete
+[2m2026-04-20T02:25:30.455151Z[0m [32m INFO[0m [2mwda_fim[0m[2m:[0m baseline scan timer fired
+[2m2026-04-20T02:25:30.463581Z[0m [32m INFO[0m [2mwda_fim[0m[2m:[0m baseline scan complete [3mscanned[0m[2m=[0m103 [3mnew[0m[2m=[0m0 [3mmodified[0m[2m=[0m0 [3mdeleted[0m[2m=[0m0
+[2m2026-04-20T02:25:41.557465Z[0m [32m INFO[0m [2mwda_inventory[0m[2m:[0m starting inventory collection
+[2m2026-04-20T02:25:42.726955Z[0m [32m INFO[0m [2mwda_inventory[0m[2m:[0m inventory collection complete
+[2m2026-04-20T02:25:50.454865Z[0m [32m INFO[0m [2mwda_fim[0m[2m:[0m baseline scan timer fired
+[2m2026-04-20T02:25:50.467208Z[0m [32m INFO[0m [2mwda_fim[0m[2m:[0m baseline scan complete [3mscanned[0m[2m=[0m103 [3mnew[0m[2m=[0m0 [3mmodified[0m[2m=[0m0 [3mdeleted[0m[2m=[0m0
+[2m2026-04-20T02:25:56.557304Z[0m [32m INFO[0m [2mwda_inventory[0m[2m:[0m starting inventory collection
+[2m2026-04-20T02:25:57.711691Z[0m [32m INFO[0m [2mwda_inventory[0m[2m:[0m inventory collection complete
+[2m2026-04-20T02:26:10.454678Z[0m [32m INFO[0m [2mwda_fim[0m[2m:[0m baseline scan timer fired
+[2m2026-04-20T02:26:10.463422Z[0m [32m INFO[0m [2mwda_fim[0m[2m:[0m baseline scan complete [3mscanned[0m[2m=[0m103 [3mnew[0m[2m=[0m0 [3mmodified[0m[2m=[0m0 [3mdeleted[0m[2m=[0m0
+[2m2026-04-20T02:26:11.556892Z[0m [32m INFO[0m [2mwda_inventory[0m[2m:[0m starting inventory collection
+[2m2026-04-20T02:26:12.774991Z[0m [32m INFO[0m [2mwda_inventory[0m[2m:[0m inventory collection complete
+[2m2026-04-20T02:26:26.556765Z[0m [32m INFO[0m [2mwda_inventory[0m[2m:[0m starting inventory collection
+[2m2026-04-20T02:26:27.711094Z[0m [32m INFO[0m [2mwda_inventory[0m[2m:[0m inventory collection complete
+[2m2026-04-20T02:26:30.455560Z[0m [32m INFO[0m [2mwda_fim[0m[2m:[0m baseline scan timer fired
+[2m2026-04-20T02:26:30.463636Z[0m [32m INFO[0m [2mwda_fim[0m[2m:[0m baseline scan complete [3mscanned[0m[2m=[0m103 [3mnew[0m[2m=[0m0 [3mmodified[0m[2m=[0m0 [3mdeleted[0m[2m=[0m0
+[2m2026-04-20T02:26:41.557559Z[0m [32m INFO[0m [2mwda_inventory[0m[2m:[0m starting inventory collection
+[2m2026-04-20T02:26:42.712204Z[0m [32m INFO[0m [2mwda_inventory[0m[2m:[0m inventory collection complete
+[2m2026-04-20T02:26:50.454658Z[0m [32m INFO[0m [2mwda_fim[0m[2m:[0m baseline scan timer fired
+[2m2026-04-20T02:26:50.462879Z[0m [32m INFO[0m [2mwda_fim[0m[2m:[0m baseline scan complete [3mscanned[0m[2m=[0m103 [3mnew[0m[2m=[0m0 [3mmodified[0m[2m=[0m0 [3mdeleted[0m[2m=[0m0
+[2m2026-04-20T02:26:56.557018Z[0m [32m INFO[0m [2mwda_inventory[0m[2m:[0m starting inventory collection
+[2m2026-04-20T02:26:57.711786Z[0m [32m INFO[0m [2mwda_inventory[0m[2m:[0m inventory collection complete
+[2m2026-04-20T02:27:10.454990Z[0m [32m INFO[0m [2mwda_fim[0m[2m:[0m baseline scan timer fired
+[2m2026-04-20T02:27:10.463199Z[0m [32m INFO[0m [2mwda_fim[0m[2m:[0m baseline scan complete [3mscanned[0m[2m=[0m103 [3mnew[0m[2m=[0m0 [3mmodified[0m[2m=[0m0 [3mdeleted[0m[2m=[0m0
+[2m2026-04-20T02:27:11.557391Z[0m [32m INFO[0m [2mwda_inventory[0m[2m:[0m starting inventory collection
+[2m2026-04-20T02:27:12.752370Z[0m [32m INFO[0m [2mwda_inventory[0m[2m:[0m inventory collection complete

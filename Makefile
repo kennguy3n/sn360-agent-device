@@ -20,7 +20,7 @@ TARGETS := \
 	aarch64-apple-darwin \
 	x86_64-pc-windows-msvc
 
-.PHONY: build release test lint fmt clippy all-targets clean e2e e2e-macos e2e-windows
+.PHONY: build release test lint fmt clippy all-targets clean e2e e2e-macos e2e-windows security-e2e
 
 build:
 	$(CARGO) build
@@ -52,6 +52,9 @@ e2e-macos:
 
 e2e-windows:
 	pwsh tests/scripts/run-e2e-windows.ps1
+
+security-e2e:
+	bash tests/scripts/run-security-e2e.sh
 
 clean:
 	$(CARGO) clean

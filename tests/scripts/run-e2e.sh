@@ -11,6 +11,16 @@ REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 
 cd "$REPO_ROOT"
 
+echo "==> Docker version:"
+docker --version || true
+docker compose version || true
+echo ""
+
+if ! docker info >/dev/null 2>&1; then
+  echo "ERROR: Docker daemon not reachable"
+  exit 1
+fi
+
 AGENT_PID=""
 RESULTS=()     # accumulate PASS/FAIL lines
 EXIT_CODE=0
@@ -44,6 +54,17 @@ cleanup() {
   fi
   echo "=============================="
   echo ""
+
+  echo "--- Agent log (last 50 lines) ---"
+  tail -50 /tmp/wda-agent-e2e.log 2>/dev/null || true
+  echo "--- End agent log ---"
+
+  if [ "$EXIT_CODE" -ne 0 ]; then
+    echo "--- Wazuh manager ossec.log (last 100 lines) ---"
+    docker compose -f tests/docker-compose.yml exec -T wazuh-manager \
+      tail -100 /var/ossec/logs/ossec.log 2>/dev/null || true
+    echo "--- End ossec.log ---"
+  fi
 
   echo "Cleaning up..."
   [ -n "$AGENT_PID" ] && kill "$AGENT_PID" 2>/dev/null || true
@@ -103,7 +124,7 @@ docker compose -f tests/docker-compose.yml exec -T wazuh-manager bash -c \
    sed -i 's|<logall>no</logall>|<logall>yes</logall>|;s|<logall_json>no</logall_json>|<logall_json>yes</logall_json>|' /var/ossec/etc/ossec.conf && \
    /var/ossec/bin/wazuh-control restart"
 # Wait for restart.
-sleep 15
+sleep 20
 AUTHD_READY=false
 for i in $(seq 1 30); do
   AUTHD_STATUS=$(docker compose -f tests/docker-compose.yml exec -T wazuh-manager \
@@ -139,10 +160,10 @@ echo "    Test directories ready."
 # ── Step 5: Run the agent ───────────────────────────────────────────
 echo "==> Step 5: Starting agent..."
 sudo mkdir -p /etc/wazuh-desktop-agent
-timeout 120 sudo ./target/release/wda-agent tests/wazuh-test-config.yaml &
+timeout 300 sudo ./target/release/wda-agent tests/wazuh-test-config.yaml > /tmp/wda-agent-e2e.log 2>&1 &
 AGENT_PID=$!
 # Give the agent time to enrol and send first keepalive.
-sleep 15
+sleep 20
 echo "    Agent started (PID $AGENT_PID)."
 
 # ── Step 6: Verify enrollment ───────────────────────────────────────
@@ -185,8 +206,8 @@ fi
 # ── Step 8: Trigger FIM event ───────────────────────────────────────
 echo "==> Step 8: Triggering FIM event..."
 touch /tmp/wda-e2e-fim/testfile.txt
-echo "    Waiting 30s for syscheck alert..."
-sleep 30
+echo "    Waiting 40s for syscheck alert..."
+sleep 40
 
 SYSCHECK_ALERTS=$(docker compose -f tests/docker-compose.yml exec -T wazuh-manager \
   cat /var/ossec/logs/alerts/alerts.json 2>/dev/null | grep -c "syscheck" || true)
@@ -208,7 +229,7 @@ echo "content2" > /tmp/wda-e2e-fim/scan-test-2.txt
 echo "content3" > /tmp/wda-e2e-fim/scan-test-3.txt
 
 echo "    Waiting for baseline scan cycle..."
-sleep 30
+sleep 40
 
 SCAN_ALERTS=$(docker compose -f tests/docker-compose.yml exec -T wazuh-manager \
   cat /var/ossec/logs/alerts/alerts.json 2>/dev/null | grep -c "scan-test" || true)
@@ -226,7 +247,7 @@ fi
 echo "==> Step 8c: Verifying deletion detection..."
 rm /tmp/wda-e2e-fim/scan-test-2.txt
 echo "    Waiting for next scan cycle to detect deletion..."
-sleep 30
+sleep 40
 
 DELETE_ALERTS=$(docker compose -f tests/docker-compose.yml exec -T wazuh-manager \
   cat /var/ossec/logs/alerts/alerts.json 2>/dev/null | grep -c "deleted" || true)
@@ -239,7 +260,7 @@ fi
 
 # ── Step 9b: Verify inventory data ──────────────────────────────────
 echo "==> Step 9b: Verifying inventory data..."
-sleep 20  # Give agent time to send initial inventory
+sleep 30  # Give agent time to send initial inventory
 
 INVENTORY_DATA=$(docker compose -f tests/docker-compose.yml exec -T wazuh-manager \
   cat /var/ossec/logs/archives/archives.json 2>/dev/null | grep -c "syscollector" || true)

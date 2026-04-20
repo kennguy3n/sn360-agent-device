@@ -16,6 +16,23 @@
 
 $ErrorActionPreference = 'Stop'
 
+# Docker Desktop with Linux containers is required. GitHub-hosted Windows
+# runners only support Windows containers, so exit cleanly there.
+try {
+    $dockerInfo = & docker info 2>&1
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host "Docker not available; skipping Windows E2E."
+        exit 0
+    }
+    if (-not (($dockerInfo | Out-String) -match 'linux')) {
+        Write-Host "Docker is not in Linux containers mode; skipping Windows E2E."
+        exit 0
+    }
+} catch {
+    Write-Host "Docker not available; skipping Windows E2E."
+    exit 0
+}
+
 $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Definition
 $RepoRoot  = Resolve-Path (Join-Path $ScriptDir '..\..')
 Set-Location $RepoRoot

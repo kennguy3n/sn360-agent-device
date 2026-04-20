@@ -1,4 +1,3 @@
-version: '3.8'
 services:
   wazuh-manager:
     image: wazuh/wazuh-manager:4.9.2

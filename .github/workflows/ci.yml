@@ -106,17 +106,17 @@ jobs:
             artifact: wda-agent-linux
             binary: wda-agent
             profile_dir: release
-          - os: windows-latest
-            script: pwsh tests/scripts/run-e2e-windows.ps1
-            deps: echo "No extra deps needed"
-            artifact: wda-agent-windows
-            binary: wda-agent.exe
-            profile_dir: release
           # macos-latest is intentionally excluded: GitHub-hosted macOS runners
           # do not have Docker, which `run-e2e-macos.sh` requires to bring up
           # a Wazuh manager. The script itself also short-circuits when Docker
           # is unavailable, but skipping the job entirely avoids burning runner
           # minutes on a guaranteed no-op.
+          #
+          # windows-latest is intentionally excluded: the Wazuh manager Docker
+          # image (wazuh/wazuh-manager:4.9.2) is Linux-only and cannot run on
+          # GitHub-hosted Windows runners which only support Windows containers.
+          # Windows E2E validation happens on self-hosted runners or local dev
+          # machines with Docker Desktop configured for Linux containers.
     steps:
       - uses: actions/checkout@v4
       - name: Install system dependencies
@@ -131,7 +131,7 @@ jobs:
         run: chmod +x target/${{ matrix.profile_dir }}/${{ matrix.binary }}
       - name: Run E2E tests
         run: ${{ matrix.script }}
-        timeout-minutes: 15
+        timeout-minutes: 20
 
   nightly-benchmark:
     name: Nightly Benchmark
