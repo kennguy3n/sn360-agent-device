@@ -1,4 +1,4 @@
-# Wazuh Lightweight Desktop Agent: Architecture & Implementation Proposal
+# SN360 Device Agent (WDA): Architecture & Implementation Proposal
 
 > **Version:** 1.0 | **Date:** April 2026 | **Status:** Draft Proposal
 > **Target Platforms:** Windows 10/11, macOS 12+, Linux (Ubuntu/Fedora/Arch)
