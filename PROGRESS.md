@@ -7,7 +7,7 @@
 ### Phase 1 — Core Plumbing (7/7 complete)
 - Workspace + crate skeleton
 - Structured config loading (AgentConfig) with YAML
-- Enrollment against authd (port 1615) with password auth
+- Enrollment against authd (port 1515) with password auth
 - Connection manager with TCP + UDP + Blowfish crypto
 - Keepalive loop
 - Event bus with priority queues and back-pressure
