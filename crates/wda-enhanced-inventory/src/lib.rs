@@ -397,7 +397,8 @@ async fn run(
                         }
                     }
                     None => {
-                        debug!("enhanced-inventory bus subscriber closed; on-demand SBOM disabled");
+                        warn!("event bus closed, stopping enhanced inventory module");
+                        break;
                     }
                 }
             }

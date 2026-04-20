@@ -596,11 +596,14 @@ fn build_purl(ty: &str, namespace: Option<&str>, name: &str, version: Option<&st
 ///
 /// The purl spec says the type, namespace, name, and version are
 /// percent-encoded the same way URL path segments are. A full
-/// implementation would pull in `percent-encoding`; here we only
-/// escape characters that actually collide with the purl grammar
-/// (`/`, `?`, `#`, `@`, `%`, space). Everything else passes through
-/// unchanged, which is adequate for package names we see in practice.
+/// implementation would pull in `percent-encoding`; here we escape
+/// characters that actually collide with the purl grammar (`/`, `?`,
+/// `#`, `@`, `%`, space) and percent-encode every non-ASCII byte so
+/// multi-byte UTF-8 sequences round-trip correctly (e.g. a package
+/// name `"café"` becomes `caf%C3%A9`, not mojibake). ASCII bytes that
+/// aren't part of the purl grammar pass through unchanged.
 fn purl_encode(s: &str) -> String {
+    const HEX: &[u8; 16] = b"0123456789ABCDEF";
     let mut out = String::with_capacity(s.len());
     for b in s.bytes() {
         match b {
@@ -610,6 +613,11 @@ fn purl_encode(s: &str) -> String {
             b'@' => out.push_str("%40"),
             b'%' => out.push_str("%25"),
             b' ' => out.push_str("%20"),
+            0x80..=0xFF => {
+                out.push('%');
+                out.push(HEX[(b >> 4) as usize] as char);
+                out.push(HEX[(b & 0x0F) as usize] as char);
+            }
             _ => out.push(b as char),
         }
     }
