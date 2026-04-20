@@ -447,9 +447,11 @@ mod tests {
 
     #[test]
     fn test_process_entry_has_required_fields() {
+        // PID 0 is a real kernel-level entry on Windows ("[System Process]")
+        // and also appears as the swapper task on some Unix snapshots, so the
+        // invariant we care about is only that the name is populated.
         let processes = enumerate_processes();
         for p in &processes {
-            assert!(p.pid > 0, "pid must be non-zero: {:?}", p);
             assert!(!p.name.is_empty(), "name must be non-empty: {:?}", p);
         }
     }
