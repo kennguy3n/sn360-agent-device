@@ -286,14 +286,19 @@ mod macos_impl {
         let line = line.trim_start();
         let mut it = line.splitn(2, char::is_whitespace);
         let pid: u32 = it.next()?.parse().ok()?;
-        let rest = it.next()?.trim_start();
-        // `comm` on macOS `ps` is the absolute path to the executable,
-        // optionally truncated.  It never contains whitespace unless
-        // the binary path itself does — which is extremely rare — so
-        // split on the first whitespace for the remainder.
-        let mut it = rest.splitn(2, char::is_whitespace);
-        let comm = it.next()?.to_string();
-        let lstart_raw = it.next().map(|s| s.trim().to_string());
+        let rest = it.next()?.trim();
+        if rest.is_empty() {
+            return None;
+        }
+
+        // `lstart` always emits exactly 5 whitespace-separated tokens
+        // (weekday, month, day, HH:MM:SS, year). Peel them off the tail
+        // only if the tail actually parses as a valid date, so that
+        // executables with spaces in their absolute path — which is
+        // routine on macOS ("/Applications/Google Chrome.app/Contents/
+        // MacOS/Google Chrome") — still get the whole bundle path back
+        // as `comm` instead of a truncated prefix.
+        let (comm, started_at) = split_comm_and_lstart(rest);
 
         let path_opt = if comm.starts_with('/') {
             Some(comm.clone())
@@ -306,11 +311,6 @@ mod macos_impl {
             .unwrap_or(&comm)
             .to_string();
 
-        let started_at = lstart_raw
-            .as_deref()
-            .filter(|s| !s.is_empty())
-            .and_then(lstart_to_rfc3339);
-
         Some(ProcessEntry {
             pid,
             name,
@@ -318,6 +318,26 @@ mod macos_impl {
             started_at,
             publisher: None,
         })
+    }
+
+    /// Split the `comm lstart` tail of a `ps` line.
+    ///
+    /// `lstart` is always 5 whitespace-delimited tokens, so we rsplit
+    /// from the end and check whether the last 5 parse as an RFC 3339
+    /// timestamp. When they don't (e.g. `ps` was invoked without the
+    /// `lstart=` column), the whole tail is treated as `comm` so a
+    /// bundle path like "/Applications/Google Chrome.app/..." round-
+    /// trips verbatim.
+    fn split_comm_and_lstart(rest: &str) -> (String, Option<String>) {
+        let tokens: Vec<&str> = rest.split_whitespace().collect();
+        if tokens.len() >= 6 {
+            let lstart_start = tokens.len() - 5;
+            let candidate = tokens[lstart_start..].join(" ");
+            if let Some(ts) = lstart_to_rfc3339(&candidate) {
+                return (tokens[..lstart_start].join(" "), Some(ts));
+            }
+        }
+        (tokens.join(" "), None)
     }
 
     /// Convert the `ps -o lstart=` string ("Mon Apr 20 06:30:00 2026",
@@ -372,6 +392,43 @@ mod macos_impl {
                 .started_at
                 .expect("started_at must be populated after whitespace normalisation");
             assert!(chrono::DateTime::parse_from_rfc3339(&started).is_ok());
+        }
+
+        #[test]
+        fn test_parse_line_absolute_path_with_spaces_and_lstart() {
+            // macOS app bundles routinely live at paths with spaces.
+            // `ps` does NOT quote `comm`, so the parser must peel the
+            // 5 lstart tokens off the tail rather than splitting on
+            // the first whitespace.
+            let line =
+                "999 /Applications/Google Chrome.app/Contents/MacOS/Google Chrome Mon Apr 20 06:30:00 2026";
+            let p = parse_line(line).expect("parse_line should succeed");
+            assert_eq!(p.pid, 999);
+            assert_eq!(p.name, "Google Chrome");
+            assert_eq!(
+                p.path.as_deref(),
+                Some("/Applications/Google Chrome.app/Contents/MacOS/Google Chrome")
+            );
+            let started = p.started_at.expect("started_at must be populated");
+            assert!(
+                chrono::DateTime::parse_from_rfc3339(&started).is_ok(),
+                "started_at must be RFC 3339: {started}"
+            );
+        }
+
+        #[test]
+        fn test_parse_line_path_with_spaces_no_lstart() {
+            // When `ps` is invoked without the `lstart=` column the
+            // whole tail — spaces and all — must land in `path`.
+            let line = "42 /Applications/Visual Studio Code.app/Contents/MacOS/Electron";
+            let p = parse_line(line).expect("parse_line should succeed");
+            assert_eq!(p.pid, 42);
+            assert_eq!(p.name, "Electron");
+            assert_eq!(
+                p.path.as_deref(),
+                Some("/Applications/Visual Studio Code.app/Contents/MacOS/Electron")
+            );
+            assert!(p.started_at.is_none());
         }
 
         #[test]
