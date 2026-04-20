@@ -202,10 +202,11 @@ async fn publish_alert(bus: &EventBus, alert: &LocalAlert, offline: &OfflineQueu
 }
 
 /// Replay up to `batch` detection payloads from the offline queue back
-/// to the server.  Stops as soon as a publish fails — the remaining
-/// items stay on disk and the next drain tick will try again.  A
-/// payload that fails to republish is re-enqueued so it's not lost if
-/// the server is merely slow.
+/// to the server.  `OfflineQueue::drain` removes the selected rows from
+/// disk up front, so on a publish failure every still-unsent item in the
+/// batch — including the one that just failed — must be re-enqueued to
+/// avoid data loss.  After the first failure we stop trying so the next
+/// drain tick can retry in FIFO order.
 async fn drain_offline_queue(offline: &OfflineQueue, bus: &EventBus, batch: usize) {
     let empty = match offline.is_empty() {
         Ok(b) => b,
@@ -230,7 +231,8 @@ async fn drain_offline_queue(offline: &OfflineQueue, bus: &EventBus, batch: usiz
     let drained = items.len();
     let mut replayed = 0usize;
     let mut requeued = 0usize;
-    for item in items {
+    let mut failure_idx: Option<usize> = None;
+    for (idx, item) in items.iter().enumerate() {
         let kind: EventKind = match serde_json::from_str(&item.payload) {
             Ok(k) => k,
             Err(e) => {
@@ -242,17 +244,25 @@ async fn drain_offline_queue(offline: &OfflineQueue, bus: &EventBus, batch: usiz
         if let Err(e) = bus.publish_to_server(event).await {
             warn!(
                 error = %e,
-                remaining_drained = drained - replayed,
-                "offline replay failed; re-queuing and deferring to next tick"
+                requeue_count = drained - idx,
+                "offline replay failed; re-queuing remaining batch and deferring to next tick"
             );
-            if let Err(qe) = offline.enqueue(&item.payload) {
+            failure_idx = Some(idx);
+            break;
+        }
+        replayed += 1;
+    }
+    // drain() already removed every row in `items` from the SQLite queue.
+    // If publish failed mid-batch, re-enqueue the offending payload plus
+    // every untouched remainder so nothing is silently dropped.
+    if let Some(start) = failure_idx {
+        for leftover in &items[start..] {
+            if let Err(qe) = offline.enqueue(&leftover.payload) {
                 warn!(error = %qe, "offline queue re-enqueue failed after replay error");
             } else {
                 requeued += 1;
             }
-            break;
         }
-        replayed += 1;
     }
     if replayed > 0 || requeued > 0 {
         debug!(
@@ -1032,5 +1042,50 @@ mod tests {
         drain_offline_queue(&q, &bus, 10).await;
         let nothing = tokio::time::timeout(Duration::from_millis(50), server_rx.recv()).await;
         assert!(nothing.is_err(), "no events expected from empty queue");
+    }
+
+    #[tokio::test]
+    async fn test_drain_offline_queue_requeues_remainder_on_publish_failure() {
+        // Regression — drain() removes items from disk up front, so on a
+        // publish failure every still-unsent item (not just the failing
+        // one) must be re-enqueued.  We force failures by dropping the
+        // server receiver so bus.publish_to_server() errors, seed the
+        // queue with three payloads, and confirm all three end up back on
+        // disk.
+        let q = OfflineQueue::in_memory(100).unwrap();
+        for id in ["a", "b", "c"] {
+            let kind = EventKind::LocalDetectionAlert {
+                rule_id: id.into(),
+                rule_type: "string".into(),
+                severity: "high".into(),
+                description: "".into(),
+                matched_value: id.into(),
+            };
+            q.enqueue(&serde_json::to_string(&kind).unwrap()).unwrap();
+        }
+        assert_eq!(q.len().unwrap(), 3);
+
+        let (bus, server_rx) = EventBus::new(4, 4);
+        drop(server_rx);
+
+        drain_offline_queue(&q, &bus, 10).await;
+
+        assert_eq!(
+            q.len().unwrap(),
+            3,
+            "all three payloads must be re-enqueued when publish fails mid-batch"
+        );
+        let drained = q.drain(10).unwrap();
+        let ids: Vec<String> = drained
+            .iter()
+            .map(|d| {
+                let kind: EventKind = serde_json::from_str(&d.payload).unwrap();
+                match kind {
+                    EventKind::LocalDetectionAlert { rule_id, .. } => rule_id,
+                    other => panic!("unexpected kind: {:?}", other),
+                }
+            })
+            .collect();
+        assert_eq!(ids, vec!["a".to_string(), "b".to_string(), "c".to_string()]);
     }
 }
