@@ -114,7 +114,6 @@ mod unix {
 
     #[cfg(unix)]
     fn clear_supplementary_groups() {
-        extern crate libc;
         // SAFETY: FFI call with a valid (null, count=0) tuple. The kernel
         // accepts an empty list and no memory is dereferenced.
         let rc = unsafe { libc::setgroups(0, std::ptr::null()) };
