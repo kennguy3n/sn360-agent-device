@@ -434,7 +434,7 @@ fn parse_wmic(output: &str) -> Vec<Component> {
                 Some(v.to_string())
             }
         };
-        let purl = Some(build_purl_generic("nuget", &name, version.as_deref()));
+        let purl = Some(build_purl_generic("generic", &name, version.as_deref()));
         out.push(Component {
             kind: "library",
             name,
