@@ -517,13 +517,10 @@ fn extract_ipv4s(text: &str) -> Vec<String> {
             if valid && octets == 3 && digits > 0 {
                 // Reject candidates that are actually a prefix of a longer
                 // dotted sequence (e.g. "1.2.3.4.5") — those aren't IPv4.
-                let followed_by_dot_digit = i + 1 < bytes.len()
-                    && bytes[i] == b'.'
-                    && bytes[i + 1].is_ascii_digit();
+                let followed_by_dot_digit =
+                    i + 1 < bytes.len() && bytes[i] == b'.' && bytes[i + 1].is_ascii_digit();
                 let candidate = &text[start..i];
-                if !followed_by_dot_digit
-                    && candidate.split('.').all(|o| o.parse::<u8>().is_ok())
-                {
+                if !followed_by_dot_digit && candidate.split('.').all(|o| o.parse::<u8>().is_ok()) {
                     out.push(candidate.to_string());
                     continue;
                 }
