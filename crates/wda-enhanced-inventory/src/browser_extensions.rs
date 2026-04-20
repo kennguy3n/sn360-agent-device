@@ -149,11 +149,15 @@ fn scan_chromium(browser: &str, base: &Path) -> Vec<BrowserExtension> {
     out
 }
 
-/// Chromium puts user profiles in `Default` and `Profile N`; other
-/// siblings (`Crashpad`, `GrShaderCache`, etc.) are caches and
-/// filtering them out keeps the scan focused on real profiles.
+/// Chromium puts user profiles in `Default`, `Profile N`,
+/// `Guest Profile`, and `System Profile`; other siblings (`Crashpad`,
+/// `GrShaderCache`, etc.) are caches and filtering them out keeps the
+/// scan focused on real profiles.
 fn is_chromium_profile_dir(name: &str) -> bool {
-    name == "Default" || name.starts_with("Profile ") || name.starts_with("Guest Profile")
+    name == "Default"
+        || name == "System Profile"
+        || name.starts_with("Profile ")
+        || name.starts_with("Guest Profile")
 }
 
 fn scan_chromium_profile(browser: &str, profile: &str, ext_root: &Path) -> Vec<BrowserExtension> {
@@ -202,12 +206,14 @@ fn read_chromium_extension(
         }
     };
 
+    let default_locale = manifest.get("default_locale").and_then(|v| v.as_str());
+
     let raw_name = manifest
         .get("name")
         .and_then(|v| v.as_str())
         .unwrap_or(ext_id);
-    let name =
-        resolve_chromium_message(raw_name, &version_dir).unwrap_or_else(|| raw_name.to_string());
+    let name = resolve_chromium_message(raw_name, &version_dir, default_locale)
+        .unwrap_or_else(|| raw_name.to_string());
 
     let version = manifest
         .get("version")
@@ -218,7 +224,10 @@ fn read_chromium_extension(
     let description = manifest
         .get("description")
         .and_then(|v| v.as_str())
-        .map(|s| resolve_chromium_message(s, &version_dir).unwrap_or_else(|| s.to_string()));
+        .map(|s| {
+            resolve_chromium_message(s, &version_dir, default_locale)
+                .unwrap_or_else(|| s.to_string())
+        });
 
     Some(BrowserExtension {
         browser: browser.to_string(),
@@ -233,15 +242,35 @@ fn read_chromium_extension(
 }
 
 /// Resolve `__MSG_key__` references in Chromium manifests against
-/// `_locales/<locale>/messages.json`. Falls back through a small list
-/// of likely locales so an extension shipped in English always
-/// resolves on an English host regardless of its `default_locale`.
+/// `_locales/<locale>/messages.json`. The manifest's `default_locale`
+/// (if any) is tried first, then a short English fallback chain so an
+/// extension shipped in English still resolves on a host where the
+/// authoring locale happens to be absent.
 ///
 /// Returns `Some` only when the passthrough text actually wrapped a
 /// `__MSG_…__` reference; callers treat `None` as "not a reference".
-fn resolve_chromium_message(raw: &str, ext_dir: &Path) -> Option<String> {
+fn resolve_chromium_message(
+    raw: &str,
+    ext_dir: &Path,
+    default_locale: Option<&str>,
+) -> Option<String> {
     let key = raw.strip_prefix("__MSG_")?.strip_suffix("__")?;
-    for locale in ["en", "en_US", "en_GB"] {
+    // Candidate locale chain: manifest-declared default first, then a
+    // short English fallback. Deduplicate while preserving order.
+    let mut locales: Vec<String> = Vec::new();
+    let mut push = |loc: &str| {
+        if !loc.is_empty() && !locales.iter().any(|existing| existing == loc) {
+            locales.push(loc.to_string());
+        }
+    };
+    if let Some(loc) = default_locale {
+        push(loc);
+    }
+    push("en");
+    push("en_US");
+    push("en_GB");
+
+    for locale in &locales {
         let path = ext_dir.join("_locales").join(locale).join("messages.json");
         let Ok(text) = fs::read_to_string(&path) else {
             continue;
@@ -264,7 +293,7 @@ fn resolve_chromium_message(raw: &str, ext_dir: &Path) -> Option<String> {
 
 fn latest_version_dir(ext_dir: &Path) -> Option<(PathBuf, String)> {
     let entries = fs::read_dir(ext_dir).ok()?;
-    let mut best: Option<(PathBuf, String)> = None;
+    let mut best: Option<(PathBuf, String, Vec<u64>)> = None;
     for entry in entries.flatten() {
         if !entry.file_type().map(|t| t.is_dir()).unwrap_or(false) {
             continue;
@@ -283,12 +312,26 @@ fn latest_version_dir(ext_dir: &Path) -> Option<(PathBuf, String)> {
         {
             continue;
         }
+        let parts = parse_chromium_version_dir(&name);
         match &best {
-            Some((_, current)) if *current >= name => {}
-            _ => best = Some((entry.path(), name)),
+            Some((_, _, current)) if current >= &parts => {}
+            _ => best = Some((entry.path(), name, parts)),
         }
     }
-    best
+    best.map(|(path, name, _)| (path, name))
+}
+
+/// Convert a Chromium version-directory name (e.g. `1.50.0_0`) into a
+/// tuple of numeric components for component-wise comparison. This
+/// avoids the classic lexicographic trap where `"9.0.0_0"` sorts after
+/// `"10.0.0_0"`. Non-numeric characters are treated as separators;
+/// any parse failure per component drops to 0, which keeps the order
+/// stable and non-panicking on unexpected inputs.
+fn parse_chromium_version_dir(name: &str) -> Vec<u64> {
+    name.split(|c: char| !c.is_ascii_digit())
+        .filter(|s| !s.is_empty())
+        .map(|s| s.parse::<u64>().unwrap_or(0))
+        .collect()
 }
 
 /// Firefox profile directories on this host, filtered to those that
@@ -689,14 +732,62 @@ mod tests {
         let messages = r#"{"app_name":{"message":"My App"}}"#;
         fs::write(ext_dir.join("_locales/en/messages.json"), messages).unwrap();
 
-        let resolved = resolve_chromium_message("__MSG_app_name__", &ext_dir);
+        let resolved = resolve_chromium_message("__MSG_app_name__", &ext_dir, None);
         assert_eq!(resolved.as_deref(), Some("My App"));
     }
 
     #[test]
     fn test_resolve_chromium_message_returns_none_for_non_reference() {
         let tmp = tempdir();
-        assert!(resolve_chromium_message("Plain Name", &tmp).is_none());
+        assert!(resolve_chromium_message("Plain Name", &tmp, None).is_none());
+    }
+
+    #[test]
+    fn test_resolve_chromium_message_prefers_manifest_default_locale() {
+        // When the manifest declares `"default_locale": "de"`, German
+        // messages should resolve even when no `_locales/en` directory
+        // exists on disk.
+        let tmp = tempdir();
+        let ext_dir = tmp.join("ext/1.0.0");
+        fs::create_dir_all(ext_dir.join("_locales/de")).unwrap();
+        fs::write(
+            ext_dir.join("_locales/de/messages.json"),
+            r#"{"app_name":{"message":"Meine App"}}"#,
+        )
+        .unwrap();
+
+        let resolved = resolve_chromium_message("__MSG_app_name__", &ext_dir, Some("de"));
+        assert_eq!(resolved.as_deref(), Some("Meine App"));
+    }
+
+    #[test]
+    fn test_parse_chromium_version_dir_orders_numerically() {
+        // Regression: lexicographic ordering would place "9.0.0_0"
+        // after "10.0.0_0"; numeric ordering must not.
+        let v9 = parse_chromium_version_dir("9.0.0_0");
+        let v10 = parse_chromium_version_dir("10.0.0_0");
+        assert!(
+            v10 > v9,
+            "10.0.0_0 ({v10:?}) must sort after 9.0.0_0 ({v9:?})"
+        );
+        assert_eq!(parse_chromium_version_dir("1.50.0_0"), vec![1, 50, 0, 0]);
+    }
+
+    #[test]
+    fn test_scan_chromium_picks_numerically_latest_version_dir() {
+        // Regression for the lexicographic-sort bug: with both
+        // `9.0.0_0` and `10.0.0_0` on disk, the scanner must pick
+        // 10.x as the installed version.
+        let tmp = tempdir();
+        let ext_id = "ffffffffffffffffffffffffffffffff";
+        let manifest = |v: &str| format!(r#"{{"name":"E","version":"{}"}}"#, v);
+        write_chromium_extension(&tmp, "Default", ext_id, "9.0.0_0", &manifest("9.0.0"));
+        write_chromium_extension(&tmp, "Default", ext_id, "10.0.0_0", &manifest("10.0.0"));
+
+        let out = scan_chromium("chrome", &tmp);
+        assert_eq!(out.len(), 1);
+        assert_eq!(out[0].version, "10.0.0");
+        assert!(out[0].path.contains("10.0.0_0"));
     }
 
     #[test]
@@ -792,6 +883,7 @@ mod tests {
         assert!(is_chromium_profile_dir("Profile 1"));
         assert!(is_chromium_profile_dir("Profile 14"));
         assert!(is_chromium_profile_dir("Guest Profile"));
+        assert!(is_chromium_profile_dir("System Profile"));
         assert!(!is_chromium_profile_dir("Crashpad"));
         assert!(!is_chromium_profile_dir("GrShaderCache"));
         assert!(!is_chromium_profile_dir("Local State"));

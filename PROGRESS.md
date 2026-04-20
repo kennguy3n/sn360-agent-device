@@ -312,7 +312,7 @@ bandwidth allows.
 | P1.8 | Linux user-idle detection | Implement `PowerMonitor::user_idle_duration()` on Linux via XScreenSaver (`XScreenSaverQueryInfo`) or D-Bus `org.freedesktop.ScreenSaver` / `logind`, so `PowerProfile::IdleAC` / `PowerProfile::BatteryIdle` are reachable on Linux. |
 | P1.9 | Re-run FIM burst benchmark on the merged pipeline | After the Phase 3 pipeline changes (lazy hashing, `RateLimiter`, `EventBatcher`) — reproduce with `bash tests/scripts/fim-burst-bench.sh` and update `benchmark-results.md` to confirm the strict < 3 % peak target. |
 | P1.10 | Tune FIM defaults for burst-heavy environments | Sweep `max_hashes_per_sec` / `batch_size` / `batch_timeout_ms` against representative workloads and pick config defaults that keep sampled peak comfortably under 3 % without degrading event latency. |
-| P1.11 | Regenerate `unit-test-results.txt` and add E2E coverage for enhanced inventory | `unit-test-results.txt` is kept in sync in each Enhanced Inventory PR; after PR #44 it records **329 passing** (313 post-PR-#42 + 16 new `wda-enhanced-inventory` tests — 13 `browser_extensions` unit tests plus 3 integration tests). Still outstanding: extend `tests/scripts/run-e2e.sh` with an enhanced-inventory assertion path that toggles `modules.enhanced_inventory.enabled=true`, spawns a short-lived process on the agent host, and verifies the running-software baseline + delta (and a browser-extensions snapshot) reach the manager as `MessageType::Syscollector` events. |
+| P1.11 | Regenerate `unit-test-results.txt` and add E2E coverage for enhanced inventory | `unit-test-results.txt` is kept in sync in each Enhanced Inventory PR; after PR #44 it records **332 passing** (313 post-PR-#42 + 19 new `wda-enhanced-inventory` tests — 16 `browser_extensions` unit tests plus 3 integration tests). Still outstanding: extend `tests/scripts/run-e2e.sh` with an enhanced-inventory assertion path that toggles `modules.enhanced_inventory.enabled=true`, spawns a short-lived process on the agent host, and verifies the running-software baseline + delta (and a browser-extensions snapshot) reach the manager as `MessageType::Syscollector` events. |
 
 ### Priority 2 — Phase 4: Edge Detection & Enhanced Inventory
 
@@ -501,15 +501,24 @@ the scanner cannot fail the enhanced-inventory run loop on a host
 that merely lacks a given browser.
 
 The unit-test count for `wda-enhanced-inventory` grew from 19 to
-**35** with this PR — 13 new `browser_extensions` unit tests
-(manifest parsing, locale-message resolution, version-dir
-selection, malformed-manifest handling, Firefox addon-type
-filtering, profile-directory filtering, Safari `pluginkit` parse,
-JSON round-trip, empty-host smoke test) plus 3 integration tests
-in `tests/browser_extensions_integration.rs` that build a
-synthetic Chrome extension layout under a temp `HOME`, a
-synthetic Firefox profile with `extensions.json`, and an
-empty-home negative test.
+**38** with this PR — 16 new `browser_extensions` unit tests
+(manifest parsing, locale-message resolution with manifest
+`default_locale` precedence, numeric version-directory ordering,
+version-dir selection, malformed-manifest handling, Firefox
+addon-type filtering, profile-directory filtering including
+`System Profile`, Safari `pluginkit` parse, JSON round-trip,
+empty-host smoke test) plus 3 integration tests in
+`tests/browser_extensions_integration.rs` that build a synthetic
+Chrome extension layout under a temp `HOME`, a synthetic Firefox
+profile with `extensions.json`, and an empty-home negative test.
+Post-review fixups in the same PR addressed three Devin-Review
+findings: `is_chromium_profile_dir` now accepts `System Profile`
+(matching the doc string), `resolve_chromium_message` tries the
+manifest-declared `default_locale` before the hardcoded English
+fallback chain, and `latest_version_dir` compares version
+directories numerically (splitting on non-digit characters) so
+`10.x` beats `9.x` instead of losing to a lexicographic
+tie-breaker.
 
 The remaining agent-side Phase 4 Enhanced Inventory task is
 **4.9 (CycloneDX SBOM generator)**. It is the sole outstanding
