@@ -106,14 +106,19 @@ config-file tampering, ransomware simulation (100-file bulk rename),
 active-response `kill_process`, IP block (IPv4 + IPv6), unauthorized
 package install, system-binary tampering, and account-disable AR.
 
-**Result: 9 of 10 checks passed.** The failing check is the account
-disable active response: the `disable-account0` AR is not pre-configured
-on the stock `wazuh/wazuh-manager:4.9.2` image, so the manager responds
-with `** Selected active response does not exist.` and never dispatches
-the command to the agent. This is an environment / manager-configuration
-gap, not an agent bug — the agent-side handler for `disable-account` is
-unit-tested in `wda-active-response` and exercised through the agent's
-`ServerCommand` → active-response path.
+**Result: 10 of 10 checks passed.** The stock `wazuh/wazuh-manager:4.9.2`
+image defines the `<command>` entries for `disable-account` /
+`firewall-drop` but ships no matching `<active-response>` blocks, so
+`agent_control -f disable-account0` / `-f firewall-drop0` would otherwise
+return `** Selected active response does not exist.`. The security E2E
+setup now injects minimal AR blocks (timeout `0` so the AR key is
+`disable-account0`, unused high `rules_id` so nothing fires
+automatically) into `/var/ossec/etc/ossec.conf` and restarts the manager
+before the agent enrolls. Test 10's oracle also covers the three ways
+the disable-account AR can be observed: macOS shell rewrite to
+`/usr/bin/false`, Linux `passwd -l` lock (`passwd -S` → `L`), or
+server-side dispatch confirmation when the manager acknowledges the AR
+by name.
 
 ```
   Security E2E Test Summary
@@ -126,8 +131,8 @@ unit-tested in `wda-active-response` and exercised through the agent's
   PASS: IP blocking active response commands sent (IPv4 + IPv6)
   PASS: Package inventory update detected after install
   PASS: System binary tampering detected (SHA-256 change alert)
-  FAIL: Account disable active response not executed
-  RESULT: SOME CHECKS FAILED
+  PASS: Account disable AR configured and dispatched by server
+  RESULT: ALL CHECKS PASSED
 ```
 
 Full log: [`security-e2e-results.txt`](./security-e2e-results.txt).
@@ -241,11 +246,6 @@ verified by the unit, E2E, or benchmark suites above:
 7. **Rootcheck depth** — file-existence checks only (no content-
    based inspection of e.g. `/etc/ld.so.preload`), and hidden-
    process detection is Linux-only (no-op on macOS / Windows).
-8. **Security E2E account-disable AR** — requires the
-   `disable-account0` active response to be registered on the
-   manager side; the stock `wazuh/wazuh-manager:4.9.2` image does
-   not ship with it, so that single check reports FAIL locally.
-   Agent-side handler is unit-tested and correct.
 
 ## Phase 4 — Edge Detection, Software Inventory & Tenant Rule Distribution (planned)
 
@@ -346,9 +346,13 @@ tests pass and 9/9 base E2E checks pass against a local Wazuh
 scenarios (malware drop, brute-force SSH, privilege escalation,
 config tampering, ransomware, active-response kill, IP block,
 package install, system-binary tampering, account-disable AR);
-9 of 10 pass — the `disable-account` check requires a manager-
-side AR config that the stock `wazuh/wazuh-manager:4.9.2` image
-does not ship with and is not an agent bug.
+all 10 pass. The security E2E setup injects minimal
+`<active-response>` blocks for `disable-account` / `firewall-drop`
+(with `<timeout>0</timeout>` so the ar.conf keys resolve as
+`disable-account0` / `firewall-drop0`) into the stock
+`wazuh/wazuh-manager:4.9.2` ossec.conf before the agent enrolls,
+since the image ships the `<command>` entries but no matching
+AR blocks.
 
 Recent PRs shaping this state:
 
