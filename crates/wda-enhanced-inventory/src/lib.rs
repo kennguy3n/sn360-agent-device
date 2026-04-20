@@ -121,7 +121,11 @@ fn same_process(a: &ProcessEntry, b: &ProcessEntry) -> bool {
 async fn publish_update(bus: &EventBus, category: &str, data: serde_json::Value) -> bool {
     let event = Event::new(
         "enhanced_inventory",
-        Priority::Normal,
+        // Match `wda-inventory::publish_inventory_event` — inventory
+        // snapshots are background telemetry and should queue behind
+        // latency-sensitive events once the bus starts scheduling by
+        // priority.
+        Priority::Low,
         EventKind::EnhancedInventoryUpdate {
             category: category.to_string(),
             data,
