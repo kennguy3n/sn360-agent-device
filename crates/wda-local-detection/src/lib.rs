@@ -202,41 +202,33 @@ async fn publish_alert(bus: &EventBus, alert: &LocalAlert, offline: &OfflineQueu
 }
 
 /// Replay up to `batch` detection payloads from the offline queue back
-/// to the server.  `OfflineQueue::drain` removes the selected rows from
-/// disk up front, so on a publish failure every still-unsent item in the
-/// batch — including the one that just failed — must be re-enqueued to
-/// avoid data loss.  After the first failure we stop trying so the next
-/// drain tick can retry in FIFO order.
+/// to the server.  Uses `peek_batch` + `ack` rather than a destructive
+/// `drain`: rows remain on disk with their original ids until a publish
+/// succeeds, so a mid-batch failure leaves every unsent payload at the
+/// head of the queue in its original order.  On the first publish error
+/// we stop and return — the next tick retries from where this one left
+/// off with strict FIFO semantics preserved across batches.
 async fn drain_offline_queue(offline: &OfflineQueue, bus: &EventBus, batch: usize) {
-    let empty = match offline.is_empty() {
-        Ok(b) => b,
-        Err(e) => {
-            warn!(error = %e, "offline queue len check failed");
-            return;
-        }
-    };
-    if empty {
-        return;
-    }
-    let items = match offline.drain(batch) {
+    let items = match offline.peek_batch(batch) {
         Ok(v) => v,
         Err(e) => {
-            warn!(error = %e, "offline queue drain failed");
+            warn!(error = %e, "offline queue peek failed");
             return;
         }
     };
     if items.is_empty() {
         return;
     }
-    let drained = items.len();
+    let peeked = items.len();
     let mut replayed = 0usize;
-    let mut requeued = 0usize;
-    let mut failure_idx: Option<usize> = None;
-    for (idx, item) in items.iter().enumerate() {
+    for item in items {
         let kind: EventKind = match serde_json::from_str(&item.payload) {
             Ok(k) => k,
             Err(e) => {
-                warn!(error = %e, "discarding corrupt offline payload");
+                warn!(error = %e, id = item.id, "discarding corrupt offline payload");
+                if let Err(ae) = offline.ack(item.id) {
+                    warn!(error = %ae, id = item.id, "offline queue ack failed");
+                }
                 continue;
             }
         };
@@ -244,31 +236,21 @@ async fn drain_offline_queue(offline: &OfflineQueue, bus: &EventBus, batch: usiz
         if let Err(e) = bus.publish_to_server(event).await {
             warn!(
                 error = %e,
-                requeue_count = drained - idx,
-                "offline replay failed; re-queuing remaining batch and deferring to next tick"
+                unsent = peeked - replayed,
+                "offline replay failed; leaving remaining batch on disk for the next tick"
             );
-            failure_idx = Some(idx);
             break;
+        }
+        // Ack only after the publish succeeds.  If ack itself fails the
+        // row stays on disk and will be replayed next tick (duplicate
+        // delivery is strictly preferable to silent loss here).
+        if let Err(ae) = offline.ack(item.id) {
+            warn!(error = %ae, id = item.id, "offline queue ack failed after replay");
         }
         replayed += 1;
     }
-    // drain() already removed every row in `items` from the SQLite queue.
-    // If publish failed mid-batch, re-enqueue the offending payload plus
-    // every untouched remainder so nothing is silently dropped.
-    if let Some(start) = failure_idx {
-        for leftover in &items[start..] {
-            if let Err(qe) = offline.enqueue(&leftover.payload) {
-                warn!(error = %qe, "offline queue re-enqueue failed after replay error");
-            } else {
-                requeued += 1;
-            }
-        }
-    }
-    if replayed > 0 || requeued > 0 {
-        debug!(
-            drained,
-            replayed, requeued, "offline queue drain tick completed"
-        );
+    if replayed > 0 {
+        debug!(peeked, replayed, "offline queue drain tick completed");
     }
 }
 
@@ -1044,24 +1026,40 @@ mod tests {
         assert!(nothing.is_err(), "no events expected from empty queue");
     }
 
+    fn seed_alert(q: &OfflineQueue, id: &str) {
+        let kind = EventKind::LocalDetectionAlert {
+            rule_id: id.into(),
+            rule_type: "string".into(),
+            severity: "high".into(),
+            description: "".into(),
+            matched_value: id.into(),
+        };
+        q.enqueue(&serde_json::to_string(&kind).unwrap()).unwrap();
+    }
+
+    fn rule_ids_on_disk(q: &OfflineQueue) -> Vec<String> {
+        q.peek_batch(usize::MAX)
+            .unwrap()
+            .into_iter()
+            .map(|d| {
+                let kind: EventKind = serde_json::from_str(&d.payload).unwrap();
+                match kind {
+                    EventKind::LocalDetectionAlert { rule_id, .. } => rule_id,
+                    other => panic!("unexpected kind: {:?}", other),
+                }
+            })
+            .collect()
+    }
+
     #[tokio::test]
-    async fn test_drain_offline_queue_requeues_remainder_on_publish_failure() {
-        // Regression — drain() removes items from disk up front, so on a
-        // publish failure every still-unsent item (not just the failing
-        // one) must be re-enqueued.  We force failures by dropping the
-        // server receiver so bus.publish_to_server() errors, seed the
-        // queue with three payloads, and confirm all three end up back on
-        // disk.
+    async fn test_drain_offline_queue_preserves_batch_on_publish_failure() {
+        // Regression — on a publish failure every unsent payload must stay
+        // on disk (at the head of the queue, with original ids) so it's
+        // retried in order on the next tick.  We force failures by dropping
+        // the server receiver so bus.publish_to_server() errors.
         let q = OfflineQueue::in_memory(100).unwrap();
         for id in ["a", "b", "c"] {
-            let kind = EventKind::LocalDetectionAlert {
-                rule_id: id.into(),
-                rule_type: "string".into(),
-                severity: "high".into(),
-                description: "".into(),
-                matched_value: id.into(),
-            };
-            q.enqueue(&serde_json::to_string(&kind).unwrap()).unwrap();
+            seed_alert(&q, id);
         }
         assert_eq!(q.len().unwrap(), 3);
 
@@ -1073,19 +1071,46 @@ mod tests {
         assert_eq!(
             q.len().unwrap(),
             3,
-            "all three payloads must be re-enqueued when publish fails mid-batch"
+            "all three payloads must stay on disk when publish fails"
         );
-        let drained = q.drain(10).unwrap();
-        let ids: Vec<String> = drained
-            .iter()
-            .map(|d| {
-                let kind: EventKind = serde_json::from_str(&d.payload).unwrap();
-                match kind {
-                    EventKind::LocalDetectionAlert { rule_id, .. } => rule_id,
-                    other => panic!("unexpected kind: {:?}", other),
-                }
-            })
-            .collect();
-        assert_eq!(ids, vec!["a".to_string(), "b".to_string(), "c".to_string()]);
+        assert_eq!(
+            rule_ids_on_disk(&q),
+            vec!["a".to_string(), "b".to_string(), "c".to_string()]
+        );
+    }
+
+    #[tokio::test]
+    async fn test_drain_offline_queue_preserves_fifo_across_batches() {
+        // Regression — with a bulk drain+re-enqueue strategy, items
+        // beyond the batch could overtake items from inside the failing
+        // batch (re-enqueued rows get fresh AUTOINCREMENT ids).  We
+        // verify that peek/ack keeps strict FIFO across batches: the
+        // queue holds five items, we drain with batch=2 against an
+        // unreachable server, and every original item must still be at
+        // its original position afterwards.
+        let q = OfflineQueue::in_memory(100).unwrap();
+        for id in ["a", "b", "c", "d", "e"] {
+            seed_alert(&q, id);
+        }
+
+        let (bus, server_rx) = EventBus::new(4, 4);
+        drop(server_rx);
+
+        drain_offline_queue(&q, &bus, 2).await;
+        drain_offline_queue(&q, &bus, 2).await;
+        drain_offline_queue(&q, &bus, 2).await;
+
+        assert_eq!(q.len().unwrap(), 5);
+        assert_eq!(
+            rule_ids_on_disk(&q),
+            vec![
+                "a".to_string(),
+                "b".to_string(),
+                "c".to_string(),
+                "d".to_string(),
+                "e".to_string()
+            ],
+            "FIFO order must be preserved across failed drain ticks"
+        );
     }
 }
