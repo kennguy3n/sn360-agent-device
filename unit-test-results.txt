@@ -1,34 +1,34 @@
    Compiling wda-enhanced-inventory v0.1.0 (/home/ubuntu/repos/sn360-agent-device/crates/wda-enhanced-inventory)
    Compiling wda-agent v0.1.0 (/home/ubuntu/repos/sn360-agent-device/crates/wda-agent)
-    Finished `test` profile [unoptimized + debuginfo] target(s) in 1.41s
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1.35s
      Running unittests src/lib.rs (target/debug/deps/wda_active_response-6771a3ee136659bc)
 
 running 29 tests
 test actions::disable_account::tests::test_valid_username ... ok
-test actions::disable_account::tests::test_missing_user ... ok
 test actions::firewall_drop::tests::test_is_ipv6 ... ok
+test actions::disable_account::tests::test_missing_user ... ok
+test actions::disable_account::tests::test_invalid_username ... ok
 test actions::firewall_drop::tests::test_valid_ipv4 ... ok
 test actions::disable_account::tests::test_refuse_root ... ok
-test actions::firewall_drop::tests::test_missing_ip_parameter ... ok
-test actions::firewall_drop::tests::test_valid_ipv6 ... ok
-test actions::kill_process::tests::test_missing_pid ... ok
-test actions::disable_account::tests::test_invalid_username ... ok
 test actions::firewall_drop::tests::test_invalid_ip ... ok
-test actions::kill_process::tests::test_refuse_pid_1 ... ok
+test actions::firewall_drop::tests::test_valid_ipv6 ... ok
 test actions::firewall_drop::tests::test_invalid_ip_undo ... ok
+test actions::kill_process::tests::test_missing_pid ... ok
+test actions::firewall_drop::tests::test_missing_ip_parameter ... ok
+test actions::kill_process::tests::test_refuse_pid_1 ... ok
 test actions::tests::test_registry_unknown_action ... ok
-test tests::test_extract_action_name ... ok
 test executor::tests::test_execute_nonexistent_command ... ok
-test executor::tests::test_execute_failing_command ... ok
+test tests::test_extract_action_name ... ok
 test executor::tests::test_execute_successful_command ... ok
 test actions::tests::test_registry_registers_allowed_actions ... ok
+test executor::tests::test_execute_failing_command ... ok
 test executor::tests::test_combined_output ... ok
 test actions::kill_process::tests::test_kill_nonexistent_pid ... ok
-test tests::test_parse_ar_json_command ... ok
 test tests::test_parse_ar_execd_prefix ... ok
-test tests::test_parse_ar_legacy_disable_account ... ok
-test tests::test_parse_ar_legacy_format ... ok
 test tests::test_parse_ar_undo_command ... ok
+test tests::test_parse_ar_json_command ... ok
+test tests::test_parse_ar_legacy_format ... ok
+test tests::test_parse_ar_legacy_disable_account ... ok
 test tests::test_module_starts_and_stops ... ok
 test tests::test_module_processes_server_command ... ok
 test tests::test_module_processes_ar_request ... ok
@@ -39,61 +39,61 @@ test result: ok. 29 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; fin
      Running unittests src/main.rs (target/debug/deps/wda_agent-f506f1191b77369c)
 
 running 18 tests
-test tests::test_active_response_maps_to_active_response ... ok
 test tests::test_config_reloaded_not_forwarded ... ok
+test tests::test_active_response_maps_to_active_response ... ok
 test tests::test_file_created_maps_to_syscheck_with_payload ... ok
+test tests::test_file_created_without_syscheck_payload_falls_back ... ok
 test tests::test_file_deleted_maps_to_syscheck_with_payload ... ok
 test tests::test_file_metadata_changed_maps_to_syscheck_with_payload ... ok
-test tests::test_file_created_without_syscheck_payload_falls_back ... ok
+test tests::test_keepalive_not_forwarded ... ok
+test tests::test_event_forwarding_via_bus ... ok
+test tests::test_parse_server_command_execd ... ok
+test tests::test_log_collected_maps_to_log_wire_format ... ok
+test tests::test_parse_server_command_generic ... ok
+test tests::test_parse_server_command_strips_trailing_nulls ... ok
 test tests::test_file_modified_maps_to_syscheck_with_payload ... ok
 test tests::test_inventory_maps_to_syscollector ... ok
-test tests::test_keepalive_not_forwarded ... ok
-test tests::test_parse_server_command_execd ... ok
-test tests::test_parse_server_command_generic ... ok
-test tests::test_parse_server_command_request ... ok
-test tests::test_log_collected_maps_to_log_wire_format ... ok
-test tests::test_parse_server_command_strips_trailing_nulls ... ok
-test tests::test_event_forwarding_via_bus ... ok
 test tests::test_sca_maps_to_sca ... ok
-test tests::test_server_message_maps_to_generic ... ok
+test tests::test_parse_server_command_request ... ok
 test tests::test_shutdown_not_forwarded ... ok
+test tests::test_server_message_maps_to_generic ... ok
 
 test result: ok. 18 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
 
      Running unittests src/lib.rs (target/debug/deps/wda_comms-200d6f37d6f9c44c)
 
 running 31 tests
-test blowfish_wazuh::tests::test_64_byte_key ... ok
 test blowfish_wazuh::tests::test_cbc_block_aligned ... ok
+test blowfish_wazuh::tests::test_64_byte_key ... ok
 test blowfish_wazuh::tests::test_cbc_empty ... ok
-test blowfish_wazuh::tests::test_known_vector ... ok
 test blowfish_wazuh::tests::test_cbc_roundtrip ... ok
-test crypto::tests::test_key_derivation_matches_wazuh ... ok
+test blowfish_wazuh::tests::test_known_vector ... ok
 test crypto::tests::test_crypto_token ... ok
+test crypto::tests::test_key_derivation_matches_wazuh ... ok
 test crypto::tests::test_message_framing_format ... ok
 test crypto::tests::test_strip_trailing_nulls ... ok
-test enrollment::tests::test_agent_key_roundtrip ... ok
+test crypto::tests::test_aes_roundtrip ... ok
 test enrollment::tests::test_agent_key_parse_invalid ... ok
+test enrollment::tests::test_agent_key_roundtrip ... ok
 test protocol::tests::test_encode_body_active_response_prefix ... ok
 test protocol::tests::test_encode_body_control_messages_pass_through ... ok
-test protocol::tests::test_encode_body_local_detection_prefix ... ok
-test crypto::tests::test_aes_roundtrip ... ok
-test crypto::tests::test_blowfish_roundtrip ... ok
 test protocol::tests::test_encode_body_log_prefix ... ok
+test protocol::tests::test_encode_body_local_detection_prefix ... ok
 test protocol::tests::test_encode_body_sca_prefix ... ok
 test protocol::tests::test_encode_body_rootcheck_prefix ... ok
+test crypto::tests::test_blowfish_roundtrip ... ok
 test protocol::tests::test_encode_body_syscheck_prefix ... ok
-test protocol::tests::test_encode_body_syscollector_prefix ... ok
 test protocol::tests::test_message_decode ... ok
+test protocol::tests::test_keepalive_message ... ok
+test protocol::tests::test_encode_body_syscollector_prefix ... ok
+test crypto::tests::test_different_keys_fail_aes ... ok
+test protocol::tests::test_compress_decompress ... ok
 test protocol::tests::test_message_encode ... ok
 test protocol::tests::test_message_type_roundtrip ... ok
-test protocol::tests::test_keepalive_message ... ok
-test crypto::tests::test_different_keys_fail_blowfish ... ok
 test protocol::tests::test_startup_message ... ok
-test protocol::tests::test_compress_decompress ... ok
-test crypto::tests::test_different_keys_fail_aes ... ok
-test crypto::tests::test_large_message_blowfish ... ok
+test crypto::tests::test_different_keys_fail_blowfish ... ok
 test crypto::tests::test_large_message_aes ... ok
+test crypto::tests::test_large_message_blowfish ... ok
 
 test result: ok. 31 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
 
@@ -105,44 +105,57 @@ test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; fini
 
      Running unittests src/lib.rs (target/debug/deps/wda_enhanced_inventory-d1d57ce9809758db)
 
-running 35 tests
-test browser_extensions::tests::test_chromium_profile_dir_filter ... ok
+running 48 tests
 test browser_extensions::tests::test_browser_extension_json_roundtrips ... ok
-test browser_extensions::tests::test_parse_chromium_version_dir_orders_numerically ... ok
-test browser_extensions::tests::test_enumerate_browser_extensions_does_not_error_on_clean_host ... ok
+test browser_extensions::tests::test_chromium_profile_dir_filter ... ok
+test browser_extensions::tests::test_resolve_chromium_message_prefers_manifest_default_locale ... ok
 test browser_extensions::tests::test_resolve_chromium_message_returns_none_for_non_reference ... ok
 test browser_extensions::tests::test_resolve_chromium_message_resolves_locale_reference ... ok
-test browser_extensions::tests::test_resolve_chromium_message_prefers_manifest_default_locale ... ok
-test browser_extensions::tests::test_scan_chromium_picks_numerically_latest_version_dir ... ok
-test browser_extensions::tests::test_scan_chromium_picks_latest_version_dir ... ok
-test browser_extensions::tests::test_scan_chromium_reads_manifest_fields ... ok
-test browser_extensions::tests::test_scan_firefox_missing_extensions_json_yields_empty ... ok
+test browser_extensions::tests::test_parse_chromium_version_dir_orders_numerically ... ok
+test browser_extensions::tests::test_enumerate_browser_extensions_does_not_error_on_clean_host ... ok
+test browser_extensions::tests::test_scan_chromium_returns_empty_for_missing_user_data ... ok
 test browser_extensions::tests::test_scan_chromium_skips_non_profile_directories ... ok
-test browser_extensions::tests::test_scan_firefox_malformed_json_yields_empty ... ok
+test browser_extensions::tests::test_scan_chromium_picks_latest_version_dir ... ok
+test browser_extensions::tests::test_scan_chromium_picks_numerically_latest_version_dir ... ok
+test browser_extensions::tests::test_scan_chromium_reads_manifest_fields ... ok
 test browser_extensions::tests::test_scan_chromium_skips_malformed_manifest ... ok
 test running_software::linux_impl::tests::test_clock_ticks_positive ... ok
-test browser_extensions::tests::test_scan_chromium_returns_empty_for_missing_user_data ... ok
 test running_software::linux_impl::tests::test_first_cmdline_arg_empty_yields_none ... ok
 test running_software::linux_impl::tests::test_first_cmdline_arg_handles_absolute_path ... ok
-test browser_extensions::tests::test_scan_firefox_parses_extensions_json ... ok
+test browser_extensions::tests::test_scan_firefox_missing_extensions_json_yields_empty ... ok
 test running_software::linux_impl::tests::test_parse_stat_handles_parens_and_whitespace ... ok
 test running_software::linux_impl::tests::test_parse_stat_rejects_short_input ... ok
+test browser_extensions::tests::test_scan_firefox_parses_extensions_json ... ok
 test running_software::tests::test_process_entry_serializes_to_json_object ... ok
-test running_software::tests::test_enumerate_running_processes_returns_results ... ok
-test running_software::tests::test_process_entry_has_required_fields ... ok
+test sbom::tests::test_browser_extension_purl_scheme_per_browser ... ok
+test sbom::tests::test_build_purl_encodes_reserved_characters ... ok
+test sbom::tests::test_collect_browser_extension_components_omits_purl_for_unknown_browser ... ok
+test sbom::tests::test_collect_process_components_deduplicates_by_name_and_path ... ok
+test sbom::tests::test_empty_host_still_produces_valid_document ... ok
+test browser_extensions::tests::test_scan_firefox_malformed_json_yields_empty ... ok
+test sbom::tests::test_build_sbom_from_parts_represents_every_category ... ok
+test sbom::tests::test_parse_dpkg_skips_empty_lines ... ok
+test sbom::tests::test_parse_dpkg_builds_deb_purls ... ok
+test sbom::tests::test_parse_rpm_builds_rpm_purls ... ok
+test sbom::tests::test_purl_builders_attach_arch_qualifier ... ok
 test running_software::tests::test_enumerate_includes_current_pid ... ok
+test running_software::tests::test_enumerate_running_processes_returns_results ... ok
+test tests::test_delta_detects_pid_reuse ... ok
+test running_software::tests::test_process_entry_has_required_fields ... ok
+test tests::test_baseline_retries_when_publish_fails ... ok
+test tests::test_delta_emits_only_on_change ... ok
 test tests::test_same_process_rejects_differing_name ... ok
 test tests::test_same_process_rejects_differing_path ... ok
 test tests::test_same_process_treats_matching_name_and_path_as_equal ... ok
-test tests::test_delta_detects_pid_reuse ... ok
-test tests::test_publishes_inventory_event ... ok
-test tests::test_delta_emits_only_on_change ... ok
-test tests::test_baseline_retries_when_publish_fails ... ok
 test tests::test_delta_retries_when_publish_fails ... ok
+test tests::test_publishes_inventory_event ... ok
+test sbom::tests::test_generate_sbom_does_not_panic_on_host ... ok
+test sbom::tests::test_metadata_timestamp_is_rfc3339 ... ok
+test sbom::tests::test_generate_sbom_returns_valid_cyclonedx_shape ... ok
 test tests::test_module_lifecycle_starts_and_stops ... ok
 test tests::test_module_lifecycle_with_running_software_disabled ... ok
 
-test result: ok. 35 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.12s
+test result: ok. 48 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.12s
 
      Running tests/browser_extensions_integration.rs (target/debug/deps/browser_extensions_integration-67b5d99589f0b2c8)
 
@@ -152,6 +165,15 @@ test scan_firefox_against_synthetic_profile ... ok
 test enumerate_finds_synthetic_chrome_extension ... ok
 
 test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/sbom_integration.rs (target/debug/deps/sbom_integration-1a7834a97941ba6c)
+
+running 3 tests
+test module_lifecycle_publishes_sbom_snapshot ... ok
+test generate_sbom_produces_parseable_cyclonedx_document ... ok
+test module_lifecycle_with_sbom_disabled_does_not_publish_sbom ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.20s
 
      Running unittests src/lib.rs (target/debug/deps/wda_event_bus-117a3a4a40a4ab87)
 
@@ -166,28 +188,28 @@ test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; fini
      Running unittests src/lib.rs (target/debug/deps/wda_fim-79466ccec1706e93)
 
 running 53 tests
-test batcher::tests::test_deadline_returns_none_when_empty ... ok
 test batcher::tests::test_deadline_advances_after_push ... ok
 test batcher::tests::test_flush_on_empty_is_noop ... ok
 test batcher::tests::test_zero_batch_size_flushes_each_push ... ok
+test batcher::tests::test_deadline_returns_none_when_empty ... ok
 test batcher::tests::test_is_full_triggers_at_threshold ... ok
-test db::tests::test_get_all_entries ... ok
+test db::tests::test_get_nonexistent ... ok
+test db::tests::test_delete_nonexistent_is_ok ... ok
+test db::tests::test_insert_and_get ... ok
 test db::tests::test_delete ... ok
 test db::tests::test_entry_with_null_sha256 ... ok
-test db::tests::test_insert_and_get ... ok
-test db::tests::test_delete_nonexistent_is_ok ... ok
+test db::tests::test_get_all_entries ... ok
 test db::tests::test_get_entries_with_old_scan ... ok
-test db::tests::test_get_nonexistent ... ok
 test db::tests::test_open_in_memory ... ok
 test debounce::tests::test_is_empty ... ok
-test db::tests::test_update_last_scan ... ok
 test db::tests::test_upsert_updates_existing ... ok
-test db::tests::test_open_creates_parent_dirs ... ok
+test db::tests::test_update_last_scan ... ok
 test debounce::tests::test_next_deadline_empty ... ok
+test db::tests::test_open_creates_parent_dirs ... ok
 test event_format::tests::test_format_added_event ... ok
 test event_format::tests::test_format_deleted_event ... ok
-test event_format::tests::test_format_with_special_chars_in_path ... ok
 test event_format::tests::test_format_modified_event ... ok
+test event_format::tests::test_format_with_special_chars_in_path ... ok
 test db::tests::test_open_on_disk_and_reopen ... ok
 test event_format::tests::test_permissions_format ... ok
 test hasher::tests::test_hash_empty_file ... ok
@@ -261,33 +283,33 @@ test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; fini
      Running unittests src/lib.rs (target/debug/deps/wda_inventory-4490cb02c217c3f6)
 
 running 30 tests
-test hardware::tests::test_parse_cpuinfo_content ... ok
 test hardware::tests::test_parse_cpuinfo_empty ... ok
+test hardware::tests::test_parse_cpuinfo_content ... ok
 test hardware::tests::test_parse_meminfo_empty ... ok
-test hardware::tests::test_parse_meminfo_content ... ok
-test hardware::tests::test_parse_kb_value ... ok
-test network::unix_impl::tests::test_read_interface_state_loopback ... ok
-test hardware::tests::test_collect_hardware_info_returns_valid_json ... ok
-test network::unix_impl::tests::test_read_mac_address_nonexistent ... ok
 test network::unix_impl::tests::test_read_interface_mtu_loopback ... ok
+test hardware::tests::test_collect_hardware_info_returns_valid_json ... ok
+test network::unix_impl::tests::test_read_mac_address_loopback ... ok
+test network::unix_impl::tests::test_read_interface_state_loopback ... ok
+test network::unix_impl::tests::test_read_mac_address_nonexistent ... ok
+test os_info::tests::test_parse_os_release_comments_and_blanks ... ok
 test os_info::tests::test_collect_os_info_returns_valid_json ... ok
 test os_info::tests::test_parse_os_release_empty ... ok
-test network::unix_impl::tests::test_read_mac_address_loopback ... ok
 test os_info::tests::test_parse_os_release_fedora ... ok
-test os_info::tests::test_parse_os_release_comments_and_blanks ... ok
-test packages::tests::test_parse_dpkg_output_empty ... ok
 test os_info::tests::test_parse_os_release_ubuntu ... ok
+test network::unix_impl::tests::test_collect_network_info_returns_results ... ok
 test packages::tests::test_parse_dpkg_output ... ok
+test packages::tests::test_parse_dpkg_output_empty ... ok
 test packages::tests::test_parse_dpkg_output_partial_fields ... ok
+test syscollector_format::tests::test_build_netaddr ... ok
+test hardware::tests::test_parse_meminfo_content ... ok
 test packages::tests::test_parse_rpm_output_empty ... ok
 test packages::tests::test_parse_rpm_output ... ok
-test network::unix_impl::tests::test_collect_network_info_returns_results ... ok
-test syscollector_format::tests::test_build_hwinfo ... ok
 test syscollector_format::tests::test_build_netiface ... ok
-test syscollector_format::tests::test_build_netaddr ... ok
-test syscollector_format::tests::test_build_packages ... ok
+test syscollector_format::tests::test_build_hwinfo ... ok
 test syscollector_format::tests::test_build_osinfo ... ok
+test hardware::tests::test_parse_kb_value ... ok
 test syscollector_format::tests::test_wrap_syscollector_format ... ok
+test syscollector_format::tests::test_build_packages ... ok
 test tests::test_collect_and_publish_os_only ... ok
 test tests::test_inventory_module_lifecycle ... ok
 test packages::tests::test_collect_packages_runs_without_panic ... ok
@@ -297,49 +319,49 @@ test result: ok. 30 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; fin
      Running unittests src/lib.rs (target/debug/deps/wda_local_detection-6acc1b2eba87eb31)
 
 running 56 tests
-test behavioral::tests::test_eviction_drops_oldest_inserted_first ... ok
-test behavioral::tests::test_sequence_detection_in_order ... ok
-test behavioral::tests::test_sequence_resets_after_window_expiry ... ok
-test behavioral::tests::test_threshold_fires_after_min_count ... ok
 test behavioral::tests::test_source_filter_ignores_other_sources ... ok
+test behavioral::tests::test_sequence_resets_after_window_expiry ... ok
+test behavioral::tests::test_sequence_detection_in_order ... ok
+test behavioral::tests::test_eviction_drops_oldest_inserted_first ... ok
 test behavioral::tests::test_threshold_window_expiry_resets_count ... ok
+test behavioral::tests::test_threshold_fires_after_min_count ... ok
 test behavioral::tests::test_tracked_entities_cap_evicts ... ok
 test ioc_matcher::tests::test_empty_bundle_matches_nothing ... ok
-test ioc_matcher::tests::test_rule_count_sums_backends ... ok
-test ioc_matcher::tests::test_hash_bloom_reports_true_positive ... ok
-test ioc_matcher::tests::test_aho_corasick_matches_string_fields ... ok
-test ioc_matcher::tests::test_aho_corasick_matches_multiple_iocs ... ok
 test ioc_matcher::tests::test_hash_bloom_rejects_unknown ... ok
 test ioc_matcher::tests::test_ip_bloom_true_and_false_paths ... ok
+test ioc_matcher::tests::test_aho_corasick_matches_string_fields ... ok
+test ioc_matcher::tests::test_aho_corasick_matches_multiple_iocs ... ok
+test ioc_matcher::tests::test_hash_bloom_reports_true_positive ... ok
+test ioc_matcher::tests::test_rule_count_sums_backends ... ok
 test ioc_matcher::tests::test_string_match_misses_cleanly ... ok
-test offline_queue::tests::test_capacity_enforced_fifo_eviction ... ok
 test response::tests::test_kill_process_disabled_is_skipped ... ok
 test response::tests::test_quarantine_disabled_is_skipped ... ok
 test response::tests::test_block_ip_disabled_is_skipped ... ok
 test rule_store::tests::test_default_is_empty ... ok
 test response::tests::test_quarantine_missing_source_fails ... ok
 test rule_store::tests::test_is_newer_than ... ok
-test rule_store::tests::test_msgpack_roundtrip ... ok
-test rule_store::tests::test_load_and_save_roundtrip ... ok
-test rule_store::tests::test_load_missing_file_errors ... ok
-test offline_queue::tests::test_drain_partial_keeps_remaining ... ok
 test response::tests::test_quarantine_moves_file ... ok
+test rule_store::tests::test_load_missing_file_errors ... ok
+test rule_store::tests::test_load_and_save_roundtrip ... ok
+test offline_queue::tests::test_capacity_enforced_fifo_eviction ... ok
+test rule_store::tests::test_msgpack_roundtrip ... ok
 test offline_queue::tests::test_enqueue_stores_timestamp ... ok
-test offline_queue::tests::test_enqueue_and_drain_fifo_order ... ok
+test offline_queue::tests::test_drain_partial_keeps_remaining ... ok
 test tests::test_extract_ipv4s_finds_all_dotted_quads ... ok
 test tests::test_extract_ipv4s_rejects_invalid_octets_and_malformed ... ok
+test offline_queue::tests::test_enqueue_and_drain_fifo_order ... ok
 test tests::test_extract_sha256_from_syscheck_nested ... ok
-test tests::test_extract_sha256_from_syscheck_top_level ... ok
 test tests::test_extract_sha256_rejects_wrong_length_or_garbage ... ok
+test tests::test_extract_sha256_from_syscheck_top_level ... ok
+test tests::test_drain_offline_queue_preserves_fifo_across_batches ... ok
 test tests::test_drain_offline_queue_preserves_batch_on_publish_failure ... ok
 test tests::test_drain_offline_queue_replays_to_server ... ok
-test tests::test_drain_offline_queue_preserves_fifo_across_batches ... ok
-test tests::test_local_alert_from_yara_uses_file_path ... ok
-test tests::test_load_initial_bundle_missing_is_empty ... ok
 test offline_queue::tests::test_on_disk_roundtrip ... ok
-test tests::test_behavioral_threshold_produces_alert ... ok
+test tests::test_load_initial_bundle_missing_is_empty ... ok
+test tests::test_local_alert_from_yara_uses_file_path ... ok
 test tests::test_hash_ioc_match_via_syscheck_payload ... ok
 test tests::test_hash_and_ip_ioc_build_ok ... ok
+test tests::test_behavioral_threshold_produces_alert ... ok
 test yara_scanner::tests::test_empty_rule_list_has_no_rules ... ok
 test yara_scanner::tests::test_rate_limiter_blocks_after_budget_exhausted ... ok
 test yara_scanner::tests::test_rate_limiter_refills_after_window ... ok
@@ -360,38 +382,38 @@ test result: ok. 56 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; fin
 
 running 31 tests
 test journal_reader::tests::test_journal_entry_display_with_identifier ... ok
-test journal_reader::tests::test_journal_entry_display_without_identifier ... ok
-test state::tests::test_corrupt_state_file ... ok
-test state::tests::test_load_empty_state ... ok
 test journal_reader::tests::test_journal_reader_construction ... ok
-test windows_eventlog_parser::tests::cdata_content_is_not_entity_decoded_in_system_field ... ok
+test journal_reader::tests::test_journal_entry_display_without_identifier ... ok
+test state::tests::test_load_empty_state ... ok
+test state::tests::test_corrupt_state_file ... ok
 test state::tests::test_save_and_reload ... ok
-test windows_eventlog_parser::tests::decode_entities_preserves_multibyte_utf8 ... ok
 test state::tests::test_set_and_get_offset ... ok
+test windows_eventlog_parser::tests::cdata_content_is_not_entity_decoded_in_system_field ... ok
+test windows_eventlog_parser::tests::decode_entities_preserves_multibyte_utf8 ... ok
 test windows_eventlog_parser::tests::decodes_numeric_character_references ... ok
-test windows_eventlog_parser::tests::decodes_predefined_xml_entities_in_data_values ... ok
-test windows_eventlog_parser::tests::handles_unnamed_data_elements ... ok
-test windows_eventlog_parser::tests::handles_self_closing_data_elements ... ok
 test windows_eventlog_parser::tests::handles_missing_optional_fields ... ok
+test windows_eventlog_parser::tests::decodes_predefined_xml_entities_in_data_values ... ok
+test windows_eventlog_parser::tests::handles_self_closing_data_elements ... ok
 test windows_eventlog_parser::tests::ignores_prefix_matches_for_event_id ... ok
-test windows_eventlog_parser::tests::parses_event_id_text ... ok
+test windows_eventlog_parser::tests::handles_unnamed_data_elements ... ok
 test windows_eventlog_parser::tests::parses_channel_and_computer ... ok
+test windows_eventlog_parser::tests::parses_event_id_text ... ok
 test windows_eventlog_parser::tests::parses_level_text ... ok
-test windows_eventlog_parser::tests::parses_named_data_elements ... ok
 test windows_eventlog_parser::tests::parses_provider_attribute ... ok
+test windows_eventlog_parser::tests::parses_named_data_elements ... ok
 test windows_eventlog_parser::tests::parses_time_created_attribute ... ok
 test windows_eventlog_parser::tests::preserves_unknown_entities_verbatim ... ok
 test windows_eventlog_parser::tests::returns_raw_xml_when_no_fields_match ... ok
 test windows_eventlog_parser::tests::unwraps_cdata_in_system_field ... ok
 test windows_eventlog_parser::tests::unwraps_cdata_sections_in_data_elements ... ok
 test windows_eventlog_parser::tests::iterative_prefix_match_does_not_stack_overflow ... ok
-test journal_reader::tests::test_journal_reader_opens_and_shuts_down ... ok
 test journal_reader::tests::test_journal_reader_with_unit_filters ... ok
+test journal_reader::tests::test_journal_reader_opens_and_shuts_down ... ok
 test file_reader::tests::test_file_reader_detects_new_lines ... ok
 test file_reader::tests::test_file_reader_handles_file_rotation ... ok
 test journal_reader::tests::test_journal_reader_receives_events ... ok
 
-test result: ok. 31 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.85s
+test result: ok. 31 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.96s
 
      Running unittests src/lib.rs (target/debug/deps/wda_pal-f9112d9135ff1285)
 
@@ -407,34 +429,34 @@ test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; fini
      Running unittests src/lib.rs (target/debug/deps/wda_rootcheck-0d48219356aed89f)
 
 running 20 tests
-test binary_integrity::tests::test_baseline_load_missing_returns_empty ... ok
-test binary_integrity::tests::test_compare_detects_hash_change ... ok
-test binary_integrity::tests::test_baseline_save_and_load_roundtrip ... ok
-test binary_integrity::tests::test_compare_detects_missing_binary ... ok
-test binary_integrity::tests::test_compare_stable_when_no_changes ... ok
-test binary_integrity::tests::test_hash_known_content ... ok
 test binary_integrity::tests::test_compare_first_run_has_no_drift_but_records_baseline ... ok
-test signatures::tests::test_builtin_signatures_are_absolute_paths ... ok
-test signatures::tests::test_extra_path_hit_reported ... ok
-test signatures::tests::test_missing_extra_path_not_reported ... ok
+test binary_integrity::tests::test_baseline_load_missing_returns_empty ... ok
+test binary_integrity::tests::test_hash_known_content ... ok
+test binary_integrity::tests::test_compare_detects_missing_binary ... ok
+test binary_integrity::tests::test_compare_detects_hash_change ... ok
+test binary_integrity::tests::test_compare_stable_when_no_changes ... ok
+test binary_integrity::tests::test_baseline_save_and_load_roundtrip ... ok
 test signatures::tests::test_clean_system_returns_no_hits ... ok
+test signatures::tests::test_extra_path_hit_reported ... ok
+test signatures::tests::test_builtin_signatures_are_absolute_paths ... ok
+test signatures::tests::test_missing_extra_path_not_reported ... ok
 test hidden_process::tests::test_scan_handles_max_pid_zero ... ok
-test tests::test_effective_binary_paths_falls_back_to_defaults_when_empty ... ok
 test tests::test_effective_binary_paths_honors_override ... ok
+test tests::test_effective_binary_paths_falls_back_to_defaults_when_empty ... ok
 test tests::test_sweep_publishes_signature_hit_for_extra_path ... ok
 test hidden_process::tests::test_scan_runs_to_completion_on_clean_system ... ok
 test hidden_process::tests::test_own_pid_is_visible_and_not_reported_hidden ... ok
 test tests::test_module_lifecycle_starts_and_stops ... ok
-test tests::test_sweep_emits_nothing_on_clean_system ... ok
 test tests::test_binary_integrity_baseline_created_then_detects_tamper ... ok
+test tests::test_sweep_emits_nothing_on_clean_system ... ok
 
-test result: ok. 20 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.11s
+test result: ok. 20 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.10s
 
      Running unittests src/lib.rs (target/debug/deps/wda_sca-439150242c57a95a)
 
 running 5 tests
-test tests::test_file_exists_check ... ok
 test tests::test_file_not_exists_check ... ok
+test tests::test_file_exists_check ... ok
 test tests::test_load_policy ... ok
 test tests::test_command_check ... ok
 test tests::test_evaluate_all ... ok
