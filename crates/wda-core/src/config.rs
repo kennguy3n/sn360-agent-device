@@ -328,6 +328,9 @@ pub struct EnhancedInventoryConfig {
     /// Browser-extension inventory settings.
     #[serde(default)]
     pub browser_extensions: BrowserExtensionsConfig,
+    /// CycloneDX SBOM generator settings.
+    #[serde(default)]
+    pub sbom: SbomConfig,
 }
 
 /// Running-software monitor configuration.
@@ -356,6 +359,32 @@ pub struct BrowserExtensionsConfig {
     /// Interval in seconds between extension snapshots.
     #[serde(default = "default_browser_extensions_interval")]
     pub interval: u64,
+}
+
+/// CycloneDX SBOM generator configuration.
+///
+/// Produces a full Software Bill of Materials (CycloneDX 1.5 JSON)
+/// covering installed OS packages, running processes, and browser
+/// extensions. See [`wda_enhanced_inventory::sbom`] for the concrete
+/// collection and serialization logic.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SbomConfig {
+    /// Whether the SBOM generator is enabled when the enhanced
+    /// inventory module itself is active.
+    #[serde(default = "default_true")]
+    pub enabled: bool,
+    /// Interval in seconds between full SBOM generations. Defaults to
+    /// 86 400 (once per day) — the SBOM is comparatively expensive
+    /// (shells out to `dpkg-query` / `rpm` / `brew`) and rarely
+    /// changes more often than that.
+    #[serde(default = "default_sbom_interval")]
+    pub interval: u64,
+    /// Whether to also honour explicit server-pushed requests for an
+    /// immediate SBOM. When enabled, a `ServerCommand` whose payload
+    /// contains `"sbom"` (case-insensitive) triggers an out-of-band
+    /// generation independent of the periodic timer.
+    #[serde(default = "default_true")]
+    pub on_demand: bool,
 }
 
 /// SCA (Security Configuration Assessment) module configuration.
@@ -564,6 +593,9 @@ fn default_running_software_interval() -> u64 {
 fn default_browser_extensions_interval() -> u64 {
     3600
 }
+fn default_sbom_interval() -> u64 {
+    86_400 // once per day
+}
 fn default_lde_rule_pull_interval() -> u64 {
     300
 }
@@ -746,6 +778,16 @@ impl Default for BrowserExtensionsConfig {
         Self {
             enabled: true,
             interval: default_browser_extensions_interval(),
+        }
+    }
+}
+
+impl Default for SbomConfig {
+    fn default() -> Self {
+        Self {
+            enabled: true,
+            interval: default_sbom_interval(),
+            on_demand: true,
         }
     }
 }

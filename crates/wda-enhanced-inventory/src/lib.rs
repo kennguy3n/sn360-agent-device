@@ -8,7 +8,10 @@
 //! * **Browser extensions** (task 4.8) — enumerates installed Chrome,
 //!   Firefox, Edge, and Safari extensions per user profile (see
 //!   [`browser_extensions`]).
-//! * **CycloneDX SBOM** (task 4.9) — not yet implemented.
+//! * **CycloneDX SBOM** (task 4.9) — generates a full Software Bill
+//!   of Materials (CycloneDX 1.5 JSON) combining OS packages, running
+//!   processes, and browser extensions (see [`sbom`]). Publishes on
+//!   its own timer and on explicit server-pushed requests.
 //!
 //! The module publishes
 //! [`EventKind::EnhancedInventoryUpdate`](wda_event_bus::EventKind::EnhancedInventoryUpdate)
@@ -18,6 +21,7 @@
 
 pub mod browser_extensions;
 pub mod running_software;
+pub mod sbom;
 
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicU8, Ordering};
@@ -30,7 +34,7 @@ use tracing::{debug, error, info, warn};
 use wda_core::config::{AgentConfig, EnhancedInventoryConfig};
 use wda_core::module::{AgentModule, ModuleHandle, ModuleHealth, ModuleStatus};
 use wda_core::signal::ShutdownSignal;
-use wda_event_bus::{Event, EventBus, EventKind, Priority};
+use wda_event_bus::{Event, EventBus, EventKind, EventReceiver, Priority};
 
 use crate::browser_extensions::{enumerate_browser_extensions, BrowserExtension};
 use crate::running_software::{enumerate_processes, ProcessEntry};
@@ -232,6 +236,47 @@ async fn run_running_software_tick(bus: &EventBus, state: &mut RunningSoftwareSt
     state.previous = current;
 }
 
+/// Take one SBOM snapshot and emit it as a full CycloneDX document
+/// on the bus. The document is always a full snapshot — SBOMs are
+/// generated infrequently (default: once per day) and the cost of a
+/// delta encoding is not worth the bookkeeping.
+async fn run_sbom_tick(bus: &EventBus) {
+    let bom = match tokio::task::spawn_blocking(sbom::generate_sbom).await {
+        Ok(v) => v,
+        Err(e) => {
+            warn!(error = %e, "sbom generation task panicked");
+            return;
+        }
+    };
+
+    let component_count = bom
+        .get("components")
+        .and_then(|c| c.as_array())
+        .map(|a| a.len())
+        .unwrap_or(0);
+    debug!(components = component_count, "sbom snapshot");
+    publish_update(
+        bus,
+        "sbom",
+        json!({
+            "type": "snapshot",
+            "components": component_count,
+            "bom": bom,
+        }),
+    )
+    .await;
+}
+
+/// Detect a server-pushed command that should trigger an out-of-band
+/// SBOM generation. Kept intentionally lenient — the Wazuh manager
+/// has historically sent command names in a few different shapes
+/// (raw `"sbom"`, `#!-sbom`, `execd`-wrapped JSON, …) — so we accept
+/// any payload that mentions `"sbom"` case-insensitively.
+fn is_sbom_request(command: &str, payload: &str) -> bool {
+    let needle = "sbom";
+    command.to_ascii_lowercase().contains(needle) || payload.to_ascii_lowercase().contains(needle)
+}
+
 /// Take one browser-extensions snapshot and emit it as a full list
 /// on the bus. Unlike running-software, extensions churn slowly
 /// enough that a flat snapshot is both cheap and easier to reconcile
@@ -271,6 +316,9 @@ async fn run(
         running_software_interval = ei_config.running_software.interval,
         browser_extensions_enabled = ei_config.browser_extensions.enabled,
         browser_extensions_interval = ei_config.browser_extensions.interval,
+        sbom_enabled = ei_config.sbom.enabled,
+        sbom_interval = ei_config.sbom.interval,
+        sbom_on_demand = ei_config.sbom.on_demand,
         "enhanced inventory module starting"
     );
 
@@ -283,6 +331,16 @@ async fn run(
     let be_enabled = ei_config.browser_extensions.enabled;
     let be_interval = Duration::from_secs(ei_config.browser_extensions.interval.max(1));
 
+    let sbom_enabled = ei_config.sbom.enabled;
+    let sbom_interval = Duration::from_secs(ei_config.sbom.interval.max(1));
+    let sbom_on_demand = ei_config.sbom.on_demand;
+
+    // Subscribe to the event bus so we can pick up server-pushed
+    // commands that request an out-of-band SBOM. The subscription is
+    // taken unconditionally (it's cheap) but messages are only acted
+    // on when `sbom_on_demand` is true.
+    let mut bus_rx: EventReceiver = bus.subscribe();
+
     if rs_enabled {
         // Emit the baseline snapshot immediately on startup so the
         // manager has a fresh inventory without waiting a full cycle.
@@ -291,13 +349,18 @@ async fn run(
     if be_enabled {
         run_browser_extensions_tick(&bus).await;
     }
+    if sbom_enabled {
+        run_sbom_tick(&bus).await;
+    }
 
     let mut rs_timer = tokio::time::interval(rs_interval);
     let mut be_timer = tokio::time::interval(be_interval);
+    let mut sbom_timer = tokio::time::interval(sbom_interval);
     // Consume the immediate first tick on each timer — the baselines
     // above already handled the initial snapshot.
     rs_timer.tick().await;
     be_timer.tick().await;
+    sbom_timer.tick().await;
 
     loop {
         tokio::select! {
@@ -317,6 +380,27 @@ async fn run(
                 debug!("browser-extensions scan timer fired");
                 run_browser_extensions_tick(&bus).await;
             }
+
+            _ = sbom_timer.tick(), if sbom_enabled => {
+                debug!("sbom scan timer fired");
+                run_sbom_tick(&bus).await;
+            }
+
+            result = bus_rx.recv(), if sbom_enabled && sbom_on_demand => {
+                match result {
+                    Some(event) => {
+                        if let EventKind::ServerCommand { command, payload } = &event.kind {
+                            if is_sbom_request(command, payload) {
+                                info!(command = %command, "on-demand SBOM generation requested");
+                                run_sbom_tick(&bus).await;
+                            }
+                        }
+                    }
+                    None => {
+                        debug!("enhanced-inventory bus subscriber closed; on-demand SBOM disabled");
+                    }
+                }
+            }
         }
     }
 
@@ -328,7 +412,7 @@ async fn run(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use wda_core::config::{BrowserExtensionsConfig, RunningSoftwareConfig};
+    use wda_core::config::{BrowserExtensionsConfig, RunningSoftwareConfig, SbomConfig};
     use wda_event_bus::EventBus;
 
     fn test_agent_config() -> AgentConfig {
@@ -345,6 +429,14 @@ mod tests {
                 // for the single event slot on the bus.
                 enabled: false,
                 interval: 3600,
+            },
+            sbom: SbomConfig {
+                // Disabled by default for the same reason as
+                // browser_extensions — these unit tests focus on the
+                // running-software state machine.
+                enabled: false,
+                interval: 86_400,
+                on_demand: false,
             },
         };
         cfg
