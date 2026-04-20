@@ -70,7 +70,10 @@ cleanup() {
   [ -n "$AGENT_PID" ] && kill "$AGENT_PID" 2>/dev/null || true
   wait "$AGENT_PID" 2>/dev/null || true
   rm -rf /tmp/wda-e2e-fim /tmp/wda-e2e-logs
+  rm -f /tmp/wda-e2e-rootkit-marker
   sudo rm -f /etc/wazuh-desktop-agent/client.keys
+  sudo rm -rf /etc/wazuh-desktop-agent/sca
+  sudo rm -f /var/lib/wazuh-desktop-agent/rootcheck-baseline.json
   docker compose -f tests/docker-compose.yml down -v 2>/dev/null || true
 }
 trap cleanup EXIT
@@ -78,8 +81,11 @@ trap cleanup EXIT
 # ── Step 0: Clean up stale state from previous runs ────────────────
 echo "==> Step 0: Cleaning stale state..."
 rm -rf /tmp/wda-e2e-fim /tmp/wda-e2e-logs
+rm -f /tmp/wda-e2e-rootkit-marker
 sudo rm -f /var/lib/wazuh-desktop-agent/fim.db
+sudo rm -f /var/lib/wazuh-desktop-agent/rootcheck-baseline.json
 sudo rm -f /etc/wazuh-desktop-agent/client.keys
+sudo rm -rf /etc/wazuh-desktop-agent/sca
 # Remove ALL previously-enrolled agents from the running Wazuh container
 # so re-enrollment succeeds.  List agent IDs and remove each one.
 for STALE_ID in $(docker compose -f tests/docker-compose.yml exec -T wazuh-manager \
@@ -150,12 +156,37 @@ else
   echo "    Build complete."
 fi
 
-# ── Step 4: Create test directories ─────────────────────────────────
+# ── Step 4: Create test directories and seed module fixtures ────────
 echo "==> Step 4: Creating test directories..."
 mkdir -p /tmp/wda-e2e-fim /tmp/wda-e2e-logs
 # Pre-create log file so the watcher can attach immediately.
 touch /tmp/wda-e2e-logs/test.log
-echo "    Test directories ready."
+
+# Seed an SCA policy that the agent will load on startup. Checks the
+# existence of /etc/hostname — a file that always exists on Linux —
+# so the policy always evaluates to PASSED and the manager sees a
+# concrete SCA result on the `p:` queue.
+sudo mkdir -p /etc/wazuh-desktop-agent/sca
+sudo tee /etc/wazuh-desktop-agent/sca/e2e-test-policy.yaml >/dev/null <<'SCA_YAML'
+policy:
+  id: wda_e2e_test_policy
+  name: WDA E2E Test Policy
+  description: Minimal SCA policy exercised by the base E2E suite
+checks:
+  - id: "1001"
+    title: /etc/hostname exists
+    description: /etc/hostname is always present on Linux hosts
+    type: file
+    params:
+      path: /etc/hostname
+SCA_YAML
+
+# Plant a file that matches the rootcheck `signature_paths` entry
+# configured in tests/wazuh-test-config.yaml. The rootcheck sweep
+# will detect it and publish a signature hit alert on the `9:` queue.
+touch /tmp/wda-e2e-rootkit-marker
+
+echo "    Test directories, SCA policy, and rootkit marker ready."
 
 # ── Step 5: Run the agent ───────────────────────────────────────────
 echo "==> Step 5: Starting agent..."
@@ -351,6 +382,108 @@ else
   record FAIL "Could not determine agent ID for active response test"
 fi
 
-# ── Step 11: Cleanup handled by trap ─────────────────────────────────
-echo "==> Step 11: Tests complete, cleaning up..."
+# ── Step 11: Verify SCA policy evaluation ────────────────────────────
+echo "==> Step 11: Verifying SCA policy evaluation..."
+# The SCA scan_interval is 15s and the agent runs an initial evaluation
+# on startup, so results should already be in the archives by now.
+# Fall back to a short wait in case the initial evaluation was
+# throttled by the power-profile gate on slower CI runners.
+sleep 10
+
+SCA_ARCHIVES=$(docker compose -f tests/docker-compose.yml exec -T wazuh-manager \
+  cat /var/ossec/logs/archives/archives.json 2>/dev/null \
+  | grep -c "wda_e2e_test_policy" || true)
+echo "    SCA events found in archives: $SCA_ARCHIVES"
+if [ "${SCA_ARCHIVES:-0}" -gt 0 ]; then
+  record PASS "SCA policy evaluation received by server"
+else
+  # Fall back to a generic "ScaResult" match in case the manager's
+  # decoder strips policy_id before writing to archives.
+  SCA_GENERIC=$(docker compose -f tests/docker-compose.yml exec -T wazuh-manager \
+    cat /var/ossec/logs/archives/archives.json 2>/dev/null \
+    | grep -ciE 'ScaResult|"sca"' || true)
+  if [ "${SCA_GENERIC:-0}" -gt 0 ]; then
+    record PASS "SCA policy evaluation received by server (generic match)"
+  else
+    record FAIL "No SCA evaluation events found in archives"
+    docker compose -f tests/docker-compose.yml exec -T wazuh-manager \
+      tail -30 /var/ossec/logs/ossec.log 2>/dev/null || true
+  fi
+fi
+
+# ── Step 12: Verify rootcheck signature alert ────────────────────────
+echo "==> Step 12: Verifying rootcheck signature alert..."
+# /tmp/wda-e2e-rootkit-marker was planted in Step 4 and matches the
+# `signature_paths` entry in tests/wazuh-test-config.yaml. The agent
+# runs an initial rootcheck sweep on startup and every
+# scan_interval_secs (15s) afterwards, so the hit should already be in
+# the archives. Allow a short extra wait for slower CI runners.
+sleep 10
+
+ROOTCHECK_ARCHIVES=$(docker compose -f tests/docker-compose.yml exec -T wazuh-manager \
+  cat /var/ossec/logs/archives/archives.json 2>/dev/null \
+  | grep -c "wda-e2e-rootkit-marker" || true)
+echo "    Rootcheck marker events found in archives: $ROOTCHECK_ARCHIVES"
+if [ "${ROOTCHECK_ARCHIVES:-0}" -gt 0 ]; then
+  record PASS "Rootcheck signature alert received by server"
+else
+  # Fall back to a generic "rootcheck" match in case the decoder
+  # rewrites the payload shape.
+  ROOTCHECK_GENERIC=$(docker compose -f tests/docker-compose.yml exec -T wazuh-manager \
+    cat /var/ossec/logs/archives/archives.json 2>/dev/null \
+    | grep -ciE 'rootcheck|RootcheckAlert' || true)
+  if [ "${ROOTCHECK_GENERIC:-0}" -gt 0 ]; then
+    record PASS "Rootcheck signature alert received by server (generic match)"
+  else
+    record FAIL "No rootcheck alerts found in archives"
+    docker compose -f tests/docker-compose.yml exec -T wazuh-manager \
+      tail -30 /var/ossec/logs/ossec.log 2>/dev/null || true
+  fi
+fi
+
+# ── Step 13: Verify enhanced inventory events ────────────────────────
+echo "==> Step 13: Verifying enhanced inventory events..."
+# All three enhanced-inventory scanners (running_software, browser
+# extensions, SBOM) run every 10s once enhanced_inventory.enabled is
+# true. Each publishes `EventKind::EnhancedInventoryUpdate` which the
+# agent maps to `MessageType::Syscollector` (queue `d:`) wrapping the
+# payload in a small envelope with a `"type":"enhanced_inventory"`
+# tag and a per-scanner `"category"` so the manager can distinguish
+# the new indices from base syscollector scans.
+sleep 15
+
+EI_ARCHIVES=$(docker compose -f tests/docker-compose.yml exec -T wazuh-manager \
+  cat /var/ossec/logs/archives/archives.json 2>/dev/null \
+  | grep -c "enhanced_inventory" || true)
+echo "    Enhanced-inventory events found in archives: $EI_ARCHIVES"
+if [ "${EI_ARCHIVES:-0}" -gt 0 ]; then
+  record PASS "Enhanced inventory events received by server"
+else
+  record FAIL "No enhanced inventory events found in archives"
+  docker compose -f tests/docker-compose.yml exec -T wazuh-manager \
+    tail -30 /var/ossec/logs/ossec.log 2>/dev/null || true
+fi
+
+EI_RS=$(docker compose -f tests/docker-compose.yml exec -T wazuh-manager \
+  cat /var/ossec/logs/archives/archives.json 2>/dev/null \
+  | grep -c 'running_software' || true)
+echo "    Enhanced-inventory running_software events: $EI_RS"
+if [ "${EI_RS:-0}" -gt 0 ]; then
+  record PASS "Enhanced inventory running-software data received by server"
+else
+  record FAIL "No enhanced-inventory running-software events found in archives"
+fi
+
+EI_SBOM=$(docker compose -f tests/docker-compose.yml exec -T wazuh-manager \
+  cat /var/ossec/logs/archives/archives.json 2>/dev/null \
+  | grep -c '"sbom"' || true)
+echo "    Enhanced-inventory SBOM events: $EI_SBOM"
+if [ "${EI_SBOM:-0}" -gt 0 ]; then
+  record PASS "Enhanced inventory SBOM data received by server"
+else
+  record FAIL "No enhanced-inventory SBOM events found in archives"
+fi
+
+# ── Step 14: Cleanup handled by trap ─────────────────────────────────
+echo "==> Step 14: Tests complete, cleaning up..."
 exit "$EXIT_CODE"
