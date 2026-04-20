@@ -1674,6 +1674,7 @@ dependencies = [
  "anyhow",
  "async-trait",
  "bloomfilter",
+ "indexmap",
  "rmp-serde",
  "rusqlite",
  "serde",

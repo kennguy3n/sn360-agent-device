@@ -201,6 +201,67 @@ async fn publish_alert(bus: &EventBus, alert: &LocalAlert, offline: &OfflineQueu
     }
 }
 
+/// Replay up to `batch` detection payloads from the offline queue back
+/// to the server.  Stops as soon as a publish fails — the remaining
+/// items stay on disk and the next drain tick will try again.  A
+/// payload that fails to republish is re-enqueued so it's not lost if
+/// the server is merely slow.
+async fn drain_offline_queue(offline: &OfflineQueue, bus: &EventBus, batch: usize) {
+    let empty = match offline.is_empty() {
+        Ok(b) => b,
+        Err(e) => {
+            warn!(error = %e, "offline queue len check failed");
+            return;
+        }
+    };
+    if empty {
+        return;
+    }
+    let items = match offline.drain(batch) {
+        Ok(v) => v,
+        Err(e) => {
+            warn!(error = %e, "offline queue drain failed");
+            return;
+        }
+    };
+    if items.is_empty() {
+        return;
+    }
+    let drained = items.len();
+    let mut replayed = 0usize;
+    let mut requeued = 0usize;
+    for item in items {
+        let kind: EventKind = match serde_json::from_str(&item.payload) {
+            Ok(k) => k,
+            Err(e) => {
+                warn!(error = %e, "discarding corrupt offline payload");
+                continue;
+            }
+        };
+        let event = Event::new("local_detection", Priority::Normal, kind);
+        if let Err(e) = bus.publish_to_server(event).await {
+            warn!(
+                error = %e,
+                remaining_drained = drained - replayed,
+                "offline replay failed; re-queuing and deferring to next tick"
+            );
+            if let Err(qe) = offline.enqueue(&item.payload) {
+                warn!(error = %qe, "offline queue re-enqueue failed after replay error");
+            } else {
+                requeued += 1;
+            }
+            break;
+        }
+        replayed += 1;
+    }
+    if replayed > 0 || requeued > 0 {
+        debug!(
+            drained,
+            replayed, requeued, "offline queue drain tick completed"
+        );
+    }
+}
+
 /// A uniform alert shape shared by IOC, behavioural and YARA matches.
 #[derive(Debug, Clone)]
 struct LocalAlert {
@@ -406,6 +467,15 @@ async fn run(
     // Consume the immediate first tick — bundle was just loaded.
     rule_pull_timer.tick().await;
 
+    // Spool-drain timer — attempts to replay any detection payloads
+    // that were parked in the offline queue while the server was
+    // unreachable.  Cadence is deliberately shorter than the rule-pull
+    // interval so recovery is snappy once the server is back.
+    let mut drain_timer =
+        tokio::time::interval(Duration::from_secs(config.offline_drain_interval.max(5)));
+    drain_timer.tick().await;
+    let drain_batch_size = config.offline_drain_batch.max(1);
+
     loop {
         tokio::select! {
             biased;
@@ -424,6 +494,10 @@ async fn run(
                     }
                 };
                 handle_event(&pipeline, &bus, &event).await;
+            }
+
+            _ = drain_timer.tick() => {
+                drain_offline_queue(&pipeline.offline, &bus, drain_batch_size).await;
             }
 
             _ = rule_pull_timer.tick() => {
@@ -563,6 +637,8 @@ mod tests {
             rule_bundle_path: tmp.path().join("bundle.msgpack"),
             offline_queue_path: tmp.path().join("queue.db"),
             quarantine_dir: tmp.path().join("quarantine"),
+            offline_drain_interval: 30,
+            offline_drain_batch: 64,
         }
     }
 
@@ -901,5 +977,60 @@ mod tests {
         });
         let pipeline = DetectionPipeline::new(&cfg, bundle).unwrap();
         assert_eq!(pipeline.iocs.rule_count(), 2);
+    }
+
+    #[tokio::test]
+    async fn test_drain_offline_queue_replays_to_server() {
+        // Spool two detection payloads directly into the queue (simulating
+        // a prior outage) then confirm `drain_offline_queue` replays them
+        // to the server-bound channel in FIFO order and empties the queue.
+        let q = OfflineQueue::in_memory(100).unwrap();
+        let kind_a = EventKind::LocalDetectionAlert {
+            rule_id: "spooled-a".into(),
+            rule_type: "string".into(),
+            severity: "high".into(),
+            description: "".into(),
+            matched_value: "a".into(),
+        };
+        let kind_b = EventKind::LocalDetectionAlert {
+            rule_id: "spooled-b".into(),
+            rule_type: "string".into(),
+            severity: "high".into(),
+            description: "".into(),
+            matched_value: "b".into(),
+        };
+        q.enqueue(&serde_json::to_string(&kind_a).unwrap()).unwrap();
+        q.enqueue(&serde_json::to_string(&kind_b).unwrap()).unwrap();
+        assert_eq!(q.len().unwrap(), 2);
+
+        let (bus, mut server_rx) = EventBus::new(16, 16);
+        drain_offline_queue(&q, &bus, 10).await;
+
+        let first = tokio::time::timeout(Duration::from_millis(200), server_rx.recv())
+            .await
+            .expect("drained alert should arrive")
+            .expect("server_rx closed");
+        let second = tokio::time::timeout(Duration::from_millis(200), server_rx.recv())
+            .await
+            .expect("second drained alert should arrive")
+            .expect("server_rx closed");
+        let ids: Vec<_> = [first, second]
+            .into_iter()
+            .map(|e| match e.kind {
+                EventKind::LocalDetectionAlert { rule_id, .. } => rule_id,
+                other => panic!("unexpected kind: {:?}", other),
+            })
+            .collect();
+        assert_eq!(ids, vec!["spooled-a".to_string(), "spooled-b".to_string()]);
+        assert!(q.is_empty().unwrap(), "queue should be empty after drain");
+    }
+
+    #[tokio::test]
+    async fn test_drain_offline_queue_empty_is_noop() {
+        let q = OfflineQueue::in_memory(10).unwrap();
+        let (bus, mut server_rx) = EventBus::new(4, 4);
+        drain_offline_queue(&q, &bus, 10).await;
+        let nothing = tokio::time::timeout(Duration::from_millis(50), server_rx.recv()).await;
+        assert!(nothing.is_err(), "no events expected from empty queue");
     }
 }

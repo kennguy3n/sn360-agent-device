@@ -99,6 +99,7 @@ wda-enhanced-inventory = { path = "crates/wda-enhanced-inventory" }
 # Detection & inventory
 aho-corasick = "1"
 bloomfilter = "1"
+indexmap = "2"
 
 [profile.release]
 lto = "fat"
