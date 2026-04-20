@@ -85,10 +85,7 @@ impl wda_core::module::AgentModule for InventoryModule {
 /// every 30 s" still backs off appropriately on battery. Returns
 /// `None` for [`PowerProfile::CriticalBattery`], signalling that the
 /// module should pause scans entirely until conditions improve.
-fn effective_inventory_interval(
-    configured: Duration,
-    profile: PowerProfile,
-) -> Option<Duration> {
+fn effective_inventory_interval(configured: Duration, profile: PowerProfile) -> Option<Duration> {
     if matches!(profile, PowerProfile::CriticalBattery) {
         return None;
     }
@@ -360,11 +357,11 @@ mod tests {
 
     #[tokio::test]
     async fn rebuild_inventory_timer_returns_none_on_critical_battery() {
-        assert!(rebuild_inventory_timer(Duration::from_secs(60), PowerProfile::CriticalBattery)
-            .is_none());
         assert!(
-            rebuild_inventory_timer(Duration::from_secs(60), PowerProfile::Normal).is_some()
+            rebuild_inventory_timer(Duration::from_secs(60), PowerProfile::CriticalBattery)
+                .is_none()
         );
+        assert!(rebuild_inventory_timer(Duration::from_secs(60), PowerProfile::Normal).is_some());
     }
 
     #[tokio::test]

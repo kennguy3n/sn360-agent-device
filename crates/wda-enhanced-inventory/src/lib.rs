@@ -860,9 +860,7 @@ mod tests {
                 .is_none(),
             "critical battery must pause the timer"
         );
-        assert!(
-            rebuild_ei_timer(Duration::from_secs(60), PowerProfile::Normal, true).is_some()
-        );
+        assert!(rebuild_ei_timer(Duration::from_secs(60), PowerProfile::Normal, true).is_some());
     }
 
     #[tokio::test]

@@ -946,8 +946,10 @@ mod tests {
 
     #[test]
     fn effective_scan_interval_pauses_on_critical_battery() {
-        assert!(effective_scan_interval(Duration::from_secs(60), PowerProfile::CriticalBattery)
-            .is_none());
+        assert!(
+            effective_scan_interval(Duration::from_secs(60), PowerProfile::CriticalBattery)
+                .is_none()
+        );
     }
 
     #[test]
