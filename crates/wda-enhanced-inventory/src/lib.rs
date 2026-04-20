@@ -5,7 +5,9 @@
 //! * **Running software monitor** (task 4.7) — periodically snapshots
 //!   the process list on Linux, macOS and Windows and emits deltas on
 //!   the event bus (see [`running_software`]).
-//! * **Browser extensions** (task 4.8) — not yet implemented.
+//! * **Browser extensions** (task 4.8) — enumerates installed Chrome,
+//!   Firefox, Edge, and Safari extensions per user profile (see
+//!   [`browser_extensions`]).
 //! * **CycloneDX SBOM** (task 4.9) — not yet implemented.
 //!
 //! The module publishes
@@ -14,6 +16,7 @@
 //! queue on the Wazuh manager so the new categories land alongside
 //! the existing inventory indices.
 
+pub mod browser_extensions;
 pub mod running_software;
 
 use std::collections::HashMap;
@@ -29,6 +32,7 @@ use wda_core::module::{AgentModule, ModuleHandle, ModuleHealth, ModuleStatus};
 use wda_core::signal::ShutdownSignal;
 use wda_event_bus::{Event, EventBus, EventKind, Priority};
 
+use crate::browser_extensions::{enumerate_browser_extensions, BrowserExtension};
 use crate::running_software::{enumerate_processes, ProcessEntry};
 
 const STATUS_INITIALIZED: u8 = 0;
@@ -228,6 +232,33 @@ async fn run_running_software_tick(bus: &EventBus, state: &mut RunningSoftwareSt
     state.previous = current;
 }
 
+/// Take one browser-extensions snapshot and emit it as a full list
+/// on the bus. Unlike running-software, extensions churn slowly
+/// enough that a flat snapshot is both cheap and easier to reconcile
+/// than a delta stream.
+async fn run_browser_extensions_tick(bus: &EventBus) {
+    let extensions: Vec<BrowserExtension> =
+        match tokio::task::spawn_blocking(enumerate_browser_extensions).await {
+            Ok(v) => v,
+            Err(e) => {
+                warn!(error = %e, "browser-extensions enumeration task panicked");
+                return;
+            }
+        };
+
+    debug!(count = extensions.len(), "browser-extensions snapshot");
+    publish_update(
+        bus,
+        "browser_extensions",
+        json!({
+            "type": "snapshot",
+            "count": extensions.len(),
+            "extensions": extensions,
+        }),
+    )
+    .await;
+}
+
 /// Main enhanced-inventory run loop.
 async fn run(
     ei_config: EnhancedInventoryConfig,
@@ -238,6 +269,8 @@ async fn run(
     info!(
         running_software_enabled = ei_config.running_software.enabled,
         running_software_interval = ei_config.running_software.interval,
+        browser_extensions_enabled = ei_config.browser_extensions.enabled,
+        browser_extensions_interval = ei_config.browser_extensions.interval,
         "enhanced inventory module starting"
     );
 
@@ -247,15 +280,24 @@ async fn run(
     let rs_enabled = ei_config.running_software.enabled;
     let rs_interval = Duration::from_secs(ei_config.running_software.interval.max(1));
 
+    let be_enabled = ei_config.browser_extensions.enabled;
+    let be_interval = Duration::from_secs(ei_config.browser_extensions.interval.max(1));
+
     if rs_enabled {
         // Emit the baseline snapshot immediately on startup so the
         // manager has a fresh inventory without waiting a full cycle.
         run_running_software_tick(&bus, &mut rs_state).await;
     }
+    if be_enabled {
+        run_browser_extensions_tick(&bus).await;
+    }
 
     let mut rs_timer = tokio::time::interval(rs_interval);
-    // Consume the immediate first tick — handled above for the baseline.
+    let mut be_timer = tokio::time::interval(be_interval);
+    // Consume the immediate first tick on each timer — the baselines
+    // above already handled the initial snapshot.
     rs_timer.tick().await;
+    be_timer.tick().await;
 
     loop {
         tokio::select! {
@@ -270,6 +312,11 @@ async fn run(
                 debug!("running-software scan timer fired");
                 run_running_software_tick(&bus, &mut rs_state).await;
             }
+
+            _ = be_timer.tick(), if be_enabled => {
+                debug!("browser-extensions scan timer fired");
+                run_browser_extensions_tick(&bus).await;
+            }
         }
     }
 
@@ -281,7 +328,7 @@ async fn run(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use wda_core::config::RunningSoftwareConfig;
+    use wda_core::config::{BrowserExtensionsConfig, RunningSoftwareConfig};
     use wda_event_bus::EventBus;
 
     fn test_agent_config() -> AgentConfig {
@@ -290,6 +337,13 @@ mod tests {
             enabled: true,
             running_software: RunningSoftwareConfig {
                 enabled: true,
+                interval: 3600,
+            },
+            browser_extensions: BrowserExtensionsConfig {
+                // Disabled by default in tests so the RunningSoftware
+                // assertions don't race a browser-extensions snapshot
+                // for the single event slot on the bus.
+                enabled: false,
                 interval: 3600,
             },
         };

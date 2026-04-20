@@ -325,6 +325,9 @@ pub struct EnhancedInventoryConfig {
     /// Running-software monitor settings.
     #[serde(default)]
     pub running_software: RunningSoftwareConfig,
+    /// Browser-extension inventory settings.
+    #[serde(default)]
+    pub browser_extensions: BrowserExtensionsConfig,
 }
 
 /// Running-software monitor configuration.
@@ -336,6 +339,22 @@ pub struct RunningSoftwareConfig {
     pub enabled: bool,
     /// Interval in seconds between process-list snapshots.
     #[serde(default = "default_running_software_interval")]
+    pub interval: u64,
+}
+
+/// Browser-extension enumeration configuration.
+///
+/// Collects installed extensions for Chrome, Firefox, Edge, and
+/// Safari. See [`wda_enhanced_inventory::browser_extensions`] for
+/// platform-specific discovery paths.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct BrowserExtensionsConfig {
+    /// Whether the browser-extensions scanner is enabled when the
+    /// enhanced inventory module itself is active.
+    #[serde(default = "default_true")]
+    pub enabled: bool,
+    /// Interval in seconds between extension snapshots.
+    #[serde(default = "default_browser_extensions_interval")]
     pub interval: u64,
 }
 
@@ -542,6 +561,9 @@ fn default_ar_timeout() -> u64 {
 fn default_running_software_interval() -> u64 {
     60
 }
+fn default_browser_extensions_interval() -> u64 {
+    3600
+}
 fn default_lde_rule_pull_interval() -> u64 {
     300
 }
@@ -715,6 +737,15 @@ impl Default for RunningSoftwareConfig {
         Self {
             enabled: true,
             interval: default_running_software_interval(),
+        }
+    }
+}
+
+impl Default for BrowserExtensionsConfig {
+    fn default() -> Self {
+        Self {
+            enabled: true,
+            interval: default_browser_extensions_interval(),
         }
     }
 }

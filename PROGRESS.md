@@ -268,7 +268,7 @@ Software Inventory, and companion microservices.
 | 4.5 | LDE: YARA scanner integration (**required**, not feature-gated) | **Complete** |
 | 4.6 | LDE: Offline detection queue + server sync on reconnect | **Complete** |
 | 4.7 | Enhanced Inventory: running software monitor (all platforms) | **Complete** |
-| 4.8 | Enhanced Inventory: browser extension inventory (Chrome/Firefox/Edge/Safari) | Not Started |
+| 4.8 | Enhanced Inventory: browser extension inventory (Chrome/Firefox/Edge/Safari) | **Complete** |
 | 4.9 | Enhanced Inventory: SBOM generator (CycloneDX, on-demand) | Not Started |
 | 4.10 | TRDS microservice: rule CRUD API, compiler, delta distribution | Not Started |
 | 4.11 | IOCFS microservice: feed ingestion, normalization, bloom filter compilation | Not Started |
@@ -280,12 +280,14 @@ The `wda-local-detection` crate is fully implemented (Phase 4,
 tasks 4.1–4.6). YARA is a **required** runtime dependency (not
 feature-gated); `libyara-dev` (Linux) / `brew install yara` (macOS) /
 the corresponding Windows prebuilt must be present on the build host.
-The `wda-enhanced-inventory` crate now implements the running-software
-monitor (task 4.7) — baseline + delta snapshots on the event bus,
-routed to the manager as `MessageType::Syscollector`. Browser
-extensions (4.8) and the CycloneDX SBOM generator (4.9) are still
-outstanding. 4.10–4.14 are server-side microservices that live outside
-this repository.
+The `wda-enhanced-inventory` crate now implements both the
+running-software monitor (task 4.7) and the browser-extension
+enumerator (task 4.8). 4.7 emits baseline + delta snapshots on the
+event bus; 4.8 emits full per-interval snapshots of installed Chrome,
+Firefox, Edge, and Safari extensions (per user profile). Both categories
+are routed to the manager as `MessageType::Syscollector`. The CycloneDX
+SBOM generator (4.9) is the remaining agent-side task; 4.10–4.14 are
+server-side microservices that live outside this repository.
 
 ## Next Steps
 
@@ -310,7 +312,7 @@ bandwidth allows.
 | P1.8 | Linux user-idle detection | Implement `PowerMonitor::user_idle_duration()` on Linux via XScreenSaver (`XScreenSaverQueryInfo`) or D-Bus `org.freedesktop.ScreenSaver` / `logind`, so `PowerProfile::IdleAC` / `PowerProfile::BatteryIdle` are reachable on Linux. |
 | P1.9 | Re-run FIM burst benchmark on the merged pipeline | After the Phase 3 pipeline changes (lazy hashing, `RateLimiter`, `EventBatcher`) — reproduce with `bash tests/scripts/fim-burst-bench.sh` and update `benchmark-results.md` to confirm the strict < 3 % peak target. |
 | P1.10 | Tune FIM defaults for burst-heavy environments | Sweep `max_hashes_per_sec` / `batch_size` / `batch_timeout_ms` against representative workloads and pick config defaults that keep sampled peak comfortably under 3 % without degrading event latency. |
-| P1.11 | Regenerate `unit-test-results.txt` and add E2E coverage for enhanced inventory | Regenerate `unit-test-results.txt` to reflect the current test count (313 passing after PR #42, including 19 `wda-enhanced-inventory` tests). Extend `tests/scripts/run-e2e.sh` with an enhanced-inventory assertion path that toggles `modules.enhanced_inventory.enabled=true`, spawns a short-lived process on the agent host, and verifies the running-software baseline + delta reach the manager as `MessageType::Syscollector` events. |
+| P1.11 | Regenerate `unit-test-results.txt` and add E2E coverage for enhanced inventory | `unit-test-results.txt` is kept in sync in each Enhanced Inventory PR; after PR #44 it records **332 passing** (313 post-PR-#42 + 19 new `wda-enhanced-inventory` tests — 16 `browser_extensions` unit tests plus 3 integration tests). Still outstanding: extend `tests/scripts/run-e2e.sh` with an enhanced-inventory assertion path that toggles `modules.enhanced_inventory.enabled=true`, spawns a short-lived process on the agent host, and verifies the running-software baseline + delta (and a browser-extensions snapshot) reach the manager as `MessageType::Syscollector` events. |
 
 ### Priority 2 — Phase 4: Edge Detection & Enhanced Inventory
 
@@ -326,9 +328,9 @@ matching entry in the Phase 4 roadmap table above.
 | P2.5 | ~~YARA scanner integration~~ **Done (PR #38)** | 4.5 | YARA is now a **required** runtime dependency (not feature-gated); scanner has rate-limit and size-cap. |
 | P2.6 | ~~Offline detection queue + server sync on reconnect~~ **Done (PR #38)** | 4.6 | SQLite WAL-mode queue in `wda-local-detection` persists detections across disconnects and replays on reconnect. |
 | P2.7 | ~~Enhanced Inventory: running software monitor~~ **Done (PR #42)** | 4.7 | Cross-platform running-software enumeration in `wda-enhanced-inventory` (Linux `/proc`, macOS `ps`, Windows ToolHelp32) with baseline + delta reporting via `EventKind::EnhancedInventoryUpdate` → `MessageType::Syscollector`, PID-reuse detection, RFC 3339 `started_at` timestamps, and macOS path-with-spaces handling. Wired into `wda-agent` main loop behind the `modules.enhanced_inventory.enabled` toggle (off by default). |
-| P2.8 | Enhanced Inventory: browser extension enumeration | 4.8 | Enumerate installed browser extensions for Chrome, Firefox, Edge, and Safari; output CycloneDX SBOM format. **Immediate next agent-side task.** |
-| P2.9 | Enhanced Inventory: SBOM generator (on-demand) | 4.9 | Full CycloneDX SBOM for the device, triggered on-demand. **Immediate next agent-side task after 4.8.** |
-| P2.10 | Wire Enhanced Inventory into main agent — **Partially done (PR #42)** | (wiring for 4.7–4.9) | Running-software (4.7) is wired behind `modules.enhanced_inventory.enabled` in `crates/wda-agent/src/main.rs`. Browser extensions (4.8) and the SBOM generator (4.9) still need wiring into the same `EnhancedInventoryModule::start()` path when implemented. |
+| P2.8 | ~~Enhanced Inventory: browser extension enumeration~~ **Done (PR #44)** | 4.8 | Enumerate installed browser extensions for Chrome, Firefox, Edge, and Safari, keyed by user profile. Chromium-family extensions are discovered via each profile's `Extensions/<id>/<version>/manifest.json` (with locale message resolution for `__MSG_*__` name/description references); Firefox extensions via each profile's `extensions.json` (with addon-type filtering so themes/locales/dictionaries are dropped); Safari via `~/Library/Safari/Extensions/` plus `pluginkit -mAvvv -p com.apple.Safari.extension`. Published every `modules.enhanced_inventory.browser_extensions.interval` seconds (default 3600 s) via `EventKind::EnhancedInventoryUpdate` with category `browser_extensions`, routed to the manager as `MessageType::Syscollector`. |
+| P2.9 | Enhanced Inventory: SBOM generator (on-demand) | 4.9 | Full CycloneDX SBOM for the device, triggered on-demand. **Immediate next agent-side task.** |
+| P2.10 | Wire Enhanced Inventory into main agent — **Partially done (PR #42, PR #44)** | (wiring for 4.7–4.9) | Running-software (4.7) and browser extensions (4.8) are both wired behind `modules.enhanced_inventory.enabled` in `crates/wda-agent/src/main.rs`, with per-scanner toggles `modules.enhanced_inventory.running_software.enabled` / `modules.enhanced_inventory.browser_extensions.enabled` and independent scan intervals. The SBOM generator (4.9) still needs wiring into the same `EnhancedInventoryModule::start()` path when implemented. |
 | P2.11 | Companion microservices (TRDS / IOCFS / SIS / Gateway) | 4.10–4.13 | Server-side services for rule CRUD + delta distribution, IOC feed ingestion + bloom compilation, inventory ingestion + CVE matching, and mTLS / tenant routing. Live outside this repo; agent side already exposes `RuleBundle::load` hooks. |
 | P2.12 | Agent ↔ TRDS rule pull, hot-reload, version tracking | 4.14 | Wire the LDE rule loader to TRDS for versioned bundle pulls and hot-reload without restart. |
 
@@ -449,3 +451,76 @@ generator)**, both of which will land in the same
 Regenerating `unit-test-results.txt` to match this state, and
 adding an E2E assertion path for the running-software monitor,
 are tracked as P1.11 above.
+
+## Development Assessment — 2026-04-20 (Post-PR-#44)
+
+Phase 4 task **4.8 (browser extension enumeration)** landed in
+**PR #44**. `wda-enhanced-inventory` now ships a second scanner —
+`browser_extensions::enumerate_browser_extensions()` — that walks
+the installed Chrome, Firefox, Edge, and Safari profiles on every
+target platform and emits a `BrowserExtension { browser, profile,
+extension_id, name, version, description, enabled, path }` record
+for each installed extension.
+
+Discovery paths per browser follow the vendor-documented layouts:
+
+- **Chrome / Edge (Chromium-family)** — each profile's
+  `Extensions/<id>/<version>/manifest.json`, with the latest
+  version directory selected per extension. `manifest.json` `name`
+  and `description` fields that use `__MSG_key__` references are
+  resolved against `_locales/<default_locale>/messages.json` (and
+  `_locales/en/messages.json` as a fallback) so the Wazuh manager
+  receives human-readable strings rather than raw message keys.
+  Profile directories are filtered to `Default`, `Profile <n>`,
+  `Guest Profile`, and `System Profile` to avoid mistakenly
+  scanning browser-internal folders (`Crashpad`, `GrShaderCache`,
+  etc.).
+- **Firefox** — each profile's `extensions.json`, with
+  non-extension addon types (`theme`, `locale`, `dictionary`,
+  `sitepermissions`) filtered out. The `enabled` field is derived
+  from `active && !userDisabled && !appDisabled`.
+- **Safari** (macOS only) — `~/Library/Safari/Extensions/`
+  listings plus a parser for `pluginkit -mAvvv -p
+  com.apple.Safari.extension` output, merged by bundle identifier.
+
+The scanner runs on an independent timer from running-software so
+operators can tune each cadence separately. Defaults:
+`modules.enhanced_inventory.browser_extensions.enabled = true`,
+`interval = 3600` seconds. Results are published as full
+per-interval snapshots via `EventKind::EnhancedInventoryUpdate`
+with category `browser_extensions`, which
+`wda_agent::map_event_to_message` routes to
+`MessageType::Syscollector` (queue prefix `d:`) — the same index
+family used by running-software, keeping the extensions alongside
+the rest of the syscollector inventory on the manager side.
+
+Error handling is conservative: missing browsers, empty profile
+directories, and malformed `manifest.json` / `extensions.json`
+files all yield an empty extension list rather than an error, so
+the scanner cannot fail the enhanced-inventory run loop on a host
+that merely lacks a given browser.
+
+The unit-test count for `wda-enhanced-inventory` grew from 19 to
+**38** with this PR — 16 new `browser_extensions` unit tests
+(manifest parsing, locale-message resolution with manifest
+`default_locale` precedence, numeric version-directory ordering,
+version-dir selection, malformed-manifest handling, Firefox
+addon-type filtering, profile-directory filtering including
+`System Profile`, Safari `pluginkit` parse, JSON round-trip,
+empty-host smoke test) plus 3 integration tests in
+`tests/browser_extensions_integration.rs` that build a synthetic
+Chrome extension layout under a temp `HOME`, a synthetic Firefox
+profile with `extensions.json`, and an empty-home negative test.
+Post-review fixups in the same PR addressed three Devin-Review
+findings: `is_chromium_profile_dir` now accepts `System Profile`
+(matching the doc string), `resolve_chromium_message` tries the
+manifest-declared `default_locale` before the hardcoded English
+fallback chain, and `latest_version_dir` compares version
+directories numerically (splitting on non-digit characters) so
+`10.x` beats `9.x` instead of losing to a lexicographic
+tie-breaker.
+
+The remaining agent-side Phase 4 Enhanced Inventory task is
+**4.9 (CycloneDX SBOM generator)**. It is the sole outstanding
+slot in the `EnhancedInventoryModule::start()` scheduler and the
+`modules.enhanced_inventory.*` config tree.
