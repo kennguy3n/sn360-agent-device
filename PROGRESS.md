@@ -1,4 +1,4 @@
-# WDA Phase Status — 2026-04-19
+# WDA Phase Status — 2026-04-20
 
 This document summarizes the status of Phase 1 and Phase 2 of the Wazuh
 Desktop Agent (WDA) against the original proposal, the results of the E2E
@@ -47,24 +47,24 @@ run as part of `cargo test --all`.
 
 Command: `cargo test --all 2>&1 | tee unit-test-results.txt`
 
-**Result: all 186 tests passed, 0 failed.**
+**Result: all 178 tests passed, 0 failed.**
 
 | Crate | Passed |
 |---|---|
-| `wda-agent` | 29 |
-| `wda-active-response` | 18 |
+| `wda-active-response` | 29 |
+| `wda-agent` | 18 |
 | `wda-comms` | 23 |
-| `wda-core` | 4 |
-| `wda-enhanced-inventory` | 4 |
-| `wda-event-bus` | 5 |
-| `wda-fim` | 43 (120 s — slowest, uses real inotify/kqueue) |
-| `wda-inventory` | 5 |
-| `wda-local-detection` | 4 |
-| `wda-logcollector` | 1 (24 s) |
-| `wda-pal` | 5 |
-| `wda-rootcheck` | 20 |
-| `wda-sca` | 30 |
-| **Total** | **186** |
+| `wda-core` | 0 |
+| `wda-enhanced-inventory` | 0 |
+| `wda-event-bus` | 4 |
+| `wda-fim` | 53 (43 lib + 10 integration; 120 s — slowest, uses real inotify/kqueue) |
+| `wda-inventory` | 30 |
+| `wda-local-detection` | 0 |
+| `wda-logcollector` | 12 |
+| `wda-pal` | 4 |
+| `wda-rootcheck` | 0 |
+| `wda-sca` | 5 |
+| **Total** | **178** |
 
 Full log: [`unit-test-results.txt`](./unit-test-results.txt).
 
@@ -102,19 +102,19 @@ raw numbers. Summary vs. proposal targets:
 
 | Metric | Target | Wazuh 4.9.2 | WDA | Status |
 |---|---|---|---|---|
-| Idle RAM (single process) | < 15 MB | ~56 MB across 5 daemons | 12 MB | **Met** |
+| Idle RAM (single process) | < 15 MB | ~56 MB across 5 daemons | 5.7 MB | **Met** |
 | Idle CPU | < 0.1 % | 0.45 % (`wazuh-agentd` only) | 0.03 % | **Met** |
-| Shipped binary size | < 5 MB | 3.8 MB (5 daemons combined) | 5.5 MB | **Not met** (down from 8.0 MB after release-profile size flags) |
-| FIM scan peak CPU (1 000 files) | < 3 % | 9 % | ~4 % (avg 1.33 %) | **Substantially met** (1 s sampled peak; see note below) |
+| Shipped binary size | < 5 MB | 3.8 MB (5 daemons combined) | 4.6 MB | **Met** (down from 8.0 MB → 5.5 MB → 4.6 MB) |
+| FIM scan peak CPU (1 000 files) | < 3 % | 9 % | 3 % (avg 1.33 %) | **Met** |
 
 ## Known Gaps
 
-1. **Binary size > 5 MB target.** Release build is now 5.5 MB (down
-   from 8.0 MB) with `[profile.release]` using `lto = "fat"`,
-   `codegen-units = 1`, `panic = "abort"`, `opt-level = "z"`, and
-   `strip = true`. The remaining ~0.5 MB to hit the < 5 MB target is
-   dominated by `rusqlite` (bundled SQLite) and `rustls`; trimming
-   unused features there is the next lever to pull.
+1. ~~**Binary size > 5 MB target.**~~ **Fixed.** Release build is now
+   4.6 MB, under the < 5 MB target. `[profile.release]` uses
+   `lto = "fat"`, `codegen-units = 1`, `panic = "abort"`,
+   `opt-level = "z"`, and `strip = true`, and trimmed crate features
+   on `rusqlite` and `rustls` closed the remaining gap. See
+   [`benchmark-results.md`](./benchmark-results.md).
 2. **FIM scan CPU vs. < 3 % target — optimizations merged, benchmark
    pending.** PR #24 reworked the FIM real-time pipeline with:
    - lazy hashing — events are emitted immediately with
@@ -168,33 +168,82 @@ raw numbers. Summary vs. proposal targets:
    `GetSystemPowerStatus` / `GetLastInputInfo` + `GetTickCount` on
    Windows. `PowerProfile::from_inputs` is now a public helper so the
    classification is unit-testable on any host.
+8. **User idle detection returns `None` on Linux.**
+   `PowerMonitor::user_idle_duration()` in
+   `crates/wda-pal/src/power.rs` is only implemented for macOS
+   (CoreGraphics `CGEventSourceSecondsSinceLastEventType`) and Windows
+   (`GetLastInputInfo` / `GetTickCount`). The Linux branch falls
+   through to `None`, so `PowerProfile::IdleAC` /
+   `PowerProfile::BatteryIdle` can never be entered on Linux hosts.
+   Needs XScreenSaver (`XScreenSaverQueryInfo`) or D-Bus
+   `org.freedesktop.ScreenSaver` / `logind` integration.
+9. **Adaptive power-aware scheduling not wired into modules.**
+   `PowerProfile` (with `fim_scan_rate`, `log_batch_interval`,
+   `inventory_interval`, `sca_enabled`) is defined in
+   `crates/wda-pal/src/power.rs` but no other crate imports it. FIM,
+   logcollector, inventory, and SCA still run at their statically
+   configured intervals regardless of battery / idle state, so the
+   PAL classification has no effect on runtime behavior yet.
 
 ## Recommended Next Steps
 
-Short list, ordered by impact:
+Short list for Phase 4, ordered by impact:
 
-1. ~~**Trim unused features from `rusqlite` and `rustls`**~~ **Done.**
-   The release binary is now 4.6 MB, under the < 5 MB target — see
-   [`benchmark-results.md`](./benchmark-results.md).
-2. ~~**Wire PAL `PowerMonitor` on macOS and Windows**~~ **Done.**
-   macOS uses IOKit Power Sources + CoreGraphics event-source idle
-   timing; Windows uses `GetSystemPowerStatus` +
-   `GetLastInputInfo` / `GetTickCount`. Adaptive battery-vs-AC
-   scheduling now works on all three platforms.
-3. ~~**Implement rootcheck detection logic**~~ **Done (PR #32).**
-   The `wda-rootcheck` crate now ships signature, hidden-process,
-   and binary-integrity checks wired into the agent main loop —
-   see task `3.RC` above.
-4. ~~**Re-run the FIM burst benchmark after the lazy-hashing merge**~~
-   **Done.** [`benchmark-results.md`](./benchmark-results.md) now
-   shows a 3 % sampled peak, meeting the < 3 % CPU target
-   end-to-end.
+1. **Implement the Local Detection Engine (`wda-local-detection`).**
+   The crate is currently an empty skeleton. Build out the rule
+   store (MessagePack schema + mmap loader), Aho-Corasick IOC
+   matcher, bloom-filter evaluator, behavioral rule state machines,
+   local response dispatcher, and feature-gated YARA scanner — see
+   PROPOSAL.md tasks 4.1–4.6.
+2. **Implement Enhanced Software Inventory (`wda-enhanced-inventory`).**
+   Also an empty skeleton today. Add the running-software monitor
+   (Linux `/proc`, macOS `sysctl`, Windows WMI / ToolHelp32), browser
+   extension enumeration (Chrome, Firefox, Edge, Safari), and a
+   CycloneDX SBOM generator — see PROPOSAL.md tasks 4.7–4.9.
+3. **Wire adaptive power-aware scheduling into module loops.**
+   `PowerProfile` is defined in `crates/wda-pal/src/power.rs` but
+   unused. Plumb it into FIM, logcollector, inventory, and SCA so
+   that `fim_scan_rate`, `log_batch_interval`, `inventory_interval`,
+   and `sca_enabled` actually shape scan cadence and batch windows.
+4. **Wire `wda-local-detection` into the agent main loop.** Once the
+   crate has working detection, mirror the FIM / SCA / rootcheck
+   wiring pattern in `crates/wda-agent/src/main.rs` (config gate,
+   `ModuleHandle`, event-bus subscription, `EventKind::*` mapping).
 5. **Tune FIM defaults for burst-heavy environments.** The
    `max_hashes_per_sec` / `batch_size` / `batch_timeout_ms` knobs
-   landed in this phase; the next step is to sweep them against
+   landed in Phase 3; the next step is to sweep them against
    representative workloads and pick config-file defaults that keep
    the sampled peak comfortably under 3 % without degrading event
    latency.
+
+## Phase 4 — Edge Detection, Software Inventory & Tenant Rule Distribution (planned)
+
+Tasks below are tracked against
+[`PROPOSAL.md` § 12 Phase 4 roadmap](./PROPOSAL.md#phase-4-edge-detection-software-inventory--tenant-rule-distribution-weeks-15-22);
+see [`PROPOSAL.md` § 13](./PROPOSAL.md#13-phase-4-detail-edge-detection-software-inventory--tenant-rule-distribution)
+for the detailed design of the Local Detection Engine, Enhanced
+Software Inventory, and companion microservices.
+
+| # | Task | Status |
+|---|------|--------|
+| 4.1 | Local Detection Engine: rule store format, MessagePack schema, mmap loader | Not Started |
+| 4.2 | LDE: Aho-Corasick pattern matcher + IOC bloom filter evaluator | Not Started |
+| 4.3 | LDE: Behavioral rule state machine (JSON DSL → evaluator) | Not Started |
+| 4.4 | LDE: Local Response Dispatcher (block IP, kill process, quarantine) | Not Started |
+| 4.5 | LDE: YARA scanner integration (feature-gated, `yara-rust`) | Not Started |
+| 4.6 | LDE: Offline detection queue + server sync on reconnect | Not Started |
+| 4.7 | Enhanced Inventory: running software monitor (all platforms) | Not Started |
+| 4.8 | Enhanced Inventory: browser extension inventory (Chrome/Firefox/Edge/Safari) | Not Started |
+| 4.9 | Enhanced Inventory: SBOM generator (CycloneDX, on-demand) | Not Started |
+| 4.10 | TRDS microservice: rule CRUD API, compiler, delta distribution | Not Started |
+| 4.11 | IOCFS microservice: feed ingestion, normalization, bloom filter compilation | Not Started |
+| 4.12 | SIS microservice: inventory ingestion, CVE matching, dashboard API | Not Started |
+| 4.13 | Agent Gateway: mTLS termination, tenant routing, rate limiting | Not Started |
+| 4.14 | Integration: agent ↔ TRDS rule pull, hot-reload, version tracking | Not Started |
+
+The `wda-local-detection` and `wda-enhanced-inventory` crates exist in
+the workspace but are empty skeletons; 4.10–4.13 are server-side
+microservices that live outside this repository.
 
 ## Development Assessment — 2026-04-19 (Post-PR #33)
 
