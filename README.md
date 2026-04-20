@@ -41,7 +41,7 @@ make release
 ## Testing
 
 ```bash
-# Run all unit tests (186 tests)
+# Run all unit tests (237 tests)
 make test
 
 # Run linting (format check + clippy)
@@ -49,6 +49,10 @@ make lint
 
 # Run E2E tests against a local Wazuh 4.9.2 server (requires Docker)
 make e2e
+
+# Run security-focused E2E scenarios (malware drop, brute-force, ransomware,
+# IP block, etc.) against a local Wazuh 4.9.2 server
+make security-e2e
 
 # Platform-specific E2E
 make e2e-macos
