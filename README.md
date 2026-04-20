@@ -41,7 +41,7 @@ make release
 ## Testing
 
 ```bash
-# Run all unit tests (237 tests)
+# Run all unit tests (289 tests)
 make test
 
 # Run linting (format check + clippy)
