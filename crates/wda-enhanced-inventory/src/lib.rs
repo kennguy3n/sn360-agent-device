@@ -102,7 +102,12 @@ struct RunningSoftwareState {
 }
 
 /// Publish a single enhanced-inventory event on the shared bus.
-async fn publish_update(bus: &EventBus, category: &str, data: serde_json::Value) {
+///
+/// Returns `true` on success; logs a warning and returns `false` if the
+/// event bus rejected the event (e.g. the server queue is at capacity).
+/// Callers that track delivery (such as the running-software baseline)
+/// should only advance their state when this returns `true`.
+async fn publish_update(bus: &EventBus, category: &str, data: serde_json::Value) -> bool {
     let event = Event::new(
         "enhanced_inventory",
         Priority::Normal,
@@ -111,8 +116,12 @@ async fn publish_update(bus: &EventBus, category: &str, data: serde_json::Value)
             data,
         },
     );
-    if let Err(e) = bus.publish_to_server(event).await {
-        warn!(error = %e, category, "failed to publish enhanced inventory event");
+    match bus.publish_to_server(event).await {
+        Ok(()) => true,
+        Err(e) => {
+            warn!(error = %e, category, "failed to publish enhanced inventory event");
+            false
+        }
     }
 }
 
@@ -131,7 +140,7 @@ async fn run_running_software_tick(bus: &EventBus, state: &mut RunningSoftwareSt
 
     if !state.baseline_sent {
         let entries: Vec<&ProcessEntry> = current.values().collect();
-        publish_update(
+        let published = publish_update(
             bus,
             "running_software",
             json!({
@@ -141,8 +150,15 @@ async fn run_running_software_tick(bus: &EventBus, state: &mut RunningSoftwareSt
             }),
         )
         .await;
-        state.baseline_sent = true;
-        state.previous = current;
+        if published {
+            state.baseline_sent = true;
+            state.previous = current;
+        } else {
+            // Leave `baseline_sent` false so the next tick retries the
+            // full baseline instead of jumping straight to deltas that
+            // the manager cannot reconcile.
+            debug!("baseline publish failed; will retry on next tick");
+        }
         return;
     }
 
@@ -317,6 +333,47 @@ mod tests {
             }
             other => panic!("unexpected event: {:?}", other),
         }
+    }
+
+    #[tokio::test]
+    async fn test_baseline_retries_when_publish_fails() {
+        // Capacity-1 server queue + a pre-seeded entry means the next
+        // `publish_to_server` call will hit `ChannelFull` and the baseline
+        // must NOT mark itself sent.
+        let (bus, mut server_rx) = EventBus::new(16, 1);
+        bus.publish_to_server(Event::new("test", Priority::Normal, EventKind::Keepalive))
+            .await
+            .expect("seeding the server queue to saturate it");
+
+        let mut state = RunningSoftwareState::default();
+        run_running_software_tick(&bus, &mut state).await;
+
+        assert!(
+            !state.baseline_sent,
+            "baseline_sent must stay false when publish fails, so the next tick retries the full snapshot instead of sending orphan deltas"
+        );
+        assert!(
+            state.previous.is_empty(),
+            "previous snapshot must not be populated when the baseline was dropped"
+        );
+
+        // Drain the saturating keepalive and re-run the tick; the baseline
+        // should now go through and flip the flag.
+        let _seeded = server_rx.recv().await.expect("seeded event");
+        run_running_software_tick(&bus, &mut state).await;
+        let event = tokio::time::timeout(Duration::from_millis(500), server_rx.recv())
+            .await
+            .expect("expected a baseline event on retry")
+            .expect("server_rx closed");
+        match event.kind {
+            EventKind::EnhancedInventoryUpdate { category, data } => {
+                assert_eq!(category, "running_software");
+                assert_eq!(data["type"], "baseline");
+            }
+            other => panic!("unexpected event: {:?}", other),
+        }
+        assert!(state.baseline_sent);
+        assert!(!state.previous.is_empty());
     }
 
     #[tokio::test]
