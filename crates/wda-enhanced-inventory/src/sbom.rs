@@ -528,7 +528,8 @@ fn browser_extension_purl(browser: &str, id: &str, version: &str) -> Option<Stri
         return None;
     }
     let (ty, namespace) = match browser {
-        "chrome" | "edge" => ("chrome-extension", None),
+        "chrome" => ("chrome-extension", None),
+        "edge" => ("edge-extension", None),
         "firefox" => ("firefox-addon", None),
         "safari" => ("safari-extension", None),
         _ => return None,
@@ -819,7 +820,7 @@ mod tests {
         );
         assert_eq!(
             browser_extension_purl("edge", "abcd", "1.0"),
-            Some("pkg:chrome-extension/abcd@1.0".to_string())
+            Some("pkg:edge-extension/abcd@1.0".to_string())
         );
         assert_eq!(
             browser_extension_purl("firefox", "noscript@noscript.net", "13.0.8"),
