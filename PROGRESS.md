@@ -31,7 +31,7 @@ comparison against the official Wazuh agent 4.9.2.
 | 2.8 | SCA (policy evaluation) | Complete | YAML policies, regex / command / file checks |
 | 2.9 | Rootcheck | Complete | signature sweep (Wazuh rootkit_files.txt curated subset), Linux `/proc` vs `kill(pid, 0)` hidden-process detection (no-op on macOS/Windows), SHA-256 binary-integrity drift tracking against a JSON baseline, wired into agent main loop with `EventKind::RootcheckAlert` + `MessageType::Rootcheck` forwarding |
 
-## Phase 3 (this session) — gap-fill work
+## Phase 3 — gap-fill work
 
 | # | Task | Status |
 |---|---|---|
