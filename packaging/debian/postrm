@@ -1,0 +1,46 @@
+#!/bin/sh
+# postrm script for wda-agent.
+#
+# On `remove`, disables the systemd unit but preserves state and
+# configuration so a future reinstall picks up where we left off.
+# On `purge`, also deletes the state directory, log directory,
+# configuration directory, and the unprivileged `wda` user/group.
+
+set -e
+
+WDA_USER=wda
+WDA_GROUP=wda
+WDA_HOME=/var/lib/wazuh-desktop-agent
+WDA_LOG=/var/log/wazuh-desktop-agent
+WDA_CONF=/etc/wazuh-desktop-agent
+
+case "$1" in
+    remove)
+        if [ -d /run/systemd/system ]; then
+            systemctl daemon-reload >/dev/null 2>&1 || true
+        fi
+        ;;
+
+    purge)
+        rm -rf "$WDA_HOME" "$WDA_LOG" "$WDA_CONF"
+        if getent passwd "$WDA_USER" >/dev/null; then
+            deluser --system "$WDA_USER" >/dev/null 2>&1 || true
+        fi
+        if getent group "$WDA_GROUP" >/dev/null; then
+            delgroup --system "$WDA_GROUP" >/dev/null 2>&1 || true
+        fi
+        if [ -d /run/systemd/system ]; then
+            systemctl daemon-reload >/dev/null 2>&1 || true
+        fi
+        ;;
+
+    upgrade|failed-upgrade|abort-install|abort-upgrade|disappear)
+        ;;
+
+    *)
+        echo "postrm called with unknown argument \`$1'" >&2
+        exit 1
+        ;;
+esac
+
+exit 0

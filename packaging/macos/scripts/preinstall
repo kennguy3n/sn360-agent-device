@@ -1,0 +1,17 @@
+#!/bin/bash
+# macOS preinstall script for wda-agent.
+#
+# On upgrades we stop the running agent before the new binary is laid
+# down so we don't replace the executable while the old process is
+# still running.
+
+set -e
+
+LAUNCHD_LABEL="com.wazuh.desktop-agent"
+LAUNCHD_PLIST="/Library/LaunchDaemons/${LAUNCHD_LABEL}.plist"
+
+if launchctl list "$LAUNCHD_LABEL" >/dev/null 2>&1; then
+    launchctl unload "$LAUNCHD_PLIST" >/dev/null 2>&1 || true
+fi
+
+exit 0

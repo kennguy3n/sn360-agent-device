@@ -28,6 +28,74 @@ pub struct AgentConfig {
     /// Logging configuration.
     #[serde(default)]
     pub logging: LoggingConfig,
+
+    /// Security hardening: privilege separation (P3.2) and tamper
+    /// protection (P3.3).
+    #[serde(default)]
+    pub security: SecurityConfig,
+}
+
+/// Security hardening settings: privilege separation (P3.2) and
+/// tamper protection (P3.3).
+///
+/// The defaults are conservative — privilege dropping is off unless an
+/// operator explicitly configures `run_as_user`, and tamper protection
+/// is off unless explicitly enabled. This lets distro packagers
+/// (`packaging/debian/postinst`, `packaging/rpm/wda-agent.spec`) turn
+/// the hardening on via the default config they ship rather than
+/// forcing every operator to opt in.
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct SecurityConfig {
+    /// Unprivileged user to `setuid()` to after privileged
+    /// initialization (enrollment, binding low ports, reading
+    /// root-owned config). `None` disables privilege dropping — the
+    /// agent continues running as whatever user systemd/launchd/SCM
+    /// started it as.
+    #[serde(default)]
+    pub run_as_user: Option<String>,
+    /// Unprivileged group to `setgid()` to. Defaults to `run_as_user`'s
+    /// primary group when unset.
+    #[serde(default)]
+    pub run_as_group: Option<String>,
+    /// Absolute path to a small setuid helper binary used by the
+    /// active-response module to run privileged commands (e.g.
+    /// `iptables`) after the main agent has dropped privileges.
+    #[serde(default)]
+    pub privilege_helper_path: Option<PathBuf>,
+    /// Tamper-protection settings (see [`TamperConfig`]).
+    #[serde(default)]
+    pub tamper: TamperConfig,
+}
+
+/// Tamper-protection settings (P3.3).
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct TamperConfig {
+    /// Master enable switch.
+    #[serde(default)]
+    pub enabled: bool,
+    /// Expected lowercase-hex SHA-256 of the currently-running
+    /// `wda-agent` binary, or `None` to skip the self-integrity check.
+    ///
+    /// Production deployments ship this value embedded in a signed
+    /// manifest installed alongside the binary.
+    #[serde(default)]
+    pub expected_binary_sha256: Option<String>,
+    /// Additional files that should be marked immutable on Linux
+    /// (`chattr +i`) once the agent has settled. Non-existent paths
+    /// are skipped with a warning rather than aborting startup so an
+    /// incomplete install doesn't take the agent out.
+    #[serde(default)]
+    pub immutable_paths: Vec<PathBuf>,
+    /// Systemd-style watchdog heartbeat interval, in seconds. The
+    /// agent notifies the service manager at roughly half this
+    /// interval; systemd will `SIGKILL` and restart the unit if
+    /// heartbeats stop.
+    ///
+    /// A value of `0` disables the heartbeat. This must match the
+    /// `WatchdogSec=` directive in the systemd unit — see
+    /// `packaging/systemd/wda-agent.service`.
+    #[serde(default)]
+    pub watchdog_interval_secs: u64,
 }
 
 /// Server connection configuration.

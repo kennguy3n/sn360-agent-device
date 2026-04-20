@@ -1,0 +1,60 @@
+#!/bin/sh
+# postinst script for wda-agent
+#
+# Creates the `wda` user/group, ensures runtime directories exist with
+# correct ownership, and registers the systemd service. Idempotent so
+# upgrades and reinstalls are safe.
+
+set -e
+
+WDA_USER=wda
+WDA_GROUP=wda
+WDA_HOME=/var/lib/wazuh-desktop-agent
+WDA_LOG=/var/log/wazuh-desktop-agent
+WDA_CONF=/etc/wazuh-desktop-agent
+
+case "$1" in
+    configure)
+        if ! getent group "$WDA_GROUP" >/dev/null; then
+            addgroup --system "$WDA_GROUP"
+        fi
+        if ! getent passwd "$WDA_USER" >/dev/null; then
+            adduser --system --ingroup "$WDA_GROUP" \
+                    --home "$WDA_HOME" --shell /usr/sbin/nologin \
+                    --no-create-home --gecos "Wazuh Desktop Agent" \
+                    "$WDA_USER"
+        fi
+
+        mkdir -p "$WDA_HOME" "$WDA_LOG" "$WDA_CONF" "$WDA_CONF/sca"
+        chown -R "$WDA_USER:$WDA_GROUP" "$WDA_HOME" "$WDA_LOG"
+        chmod 0750 "$WDA_HOME" "$WDA_LOG"
+        chmod 0755 "$WDA_CONF" "$WDA_CONF/sca"
+        # Config is world-readable metadata; the secret lives in
+        # client.keys, which is owned by the agent user only.
+        if [ -f "$WDA_CONF/config.yaml" ]; then
+            chmod 0644 "$WDA_CONF/config.yaml"
+        fi
+        if [ -f "$WDA_CONF/client.keys" ]; then
+            chown "$WDA_USER:$WDA_GROUP" "$WDA_CONF/client.keys"
+            chmod 0600 "$WDA_CONF/client.keys"
+        fi
+
+        if [ -d /run/systemd/system ]; then
+            systemctl daemon-reload >/dev/null 2>&1 || true
+            systemctl enable wda-agent.service >/dev/null 2>&1 || true
+            if [ -z "${DPKG_ROOT:-}" ]; then
+                systemctl start wda-agent.service >/dev/null 2>&1 || true
+            fi
+        fi
+        ;;
+
+    abort-upgrade|abort-remove|abort-deconfigure)
+        ;;
+
+    *)
+        echo "postinst called with unknown argument \`$1'" >&2
+        exit 1
+        ;;
+esac
+
+exit 0
