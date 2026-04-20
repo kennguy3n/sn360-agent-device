@@ -25,6 +25,13 @@ use wda_event_bus::{Event, EventKind, Priority};
 
 #[tokio::main]
 async fn main() -> Result<()> {
+    // 0. Handle short-circuit CLI flags before any heavy init.
+    //    `--version` is consumed by the self-update smoke test to
+    //    confirm a freshly-installed binary runs.
+    if let Some(code) = handle_short_flags(std::env::args()) {
+        std::process::exit(code);
+    }
+
     // 1. Initialize tracing subscriber
     tracing_subscriber::fmt()
         .with_env_filter(
@@ -36,7 +43,7 @@ async fn main() -> Result<()> {
     info!("wazuh desktop agent starting");
 
     // 2. Load configuration (from CLI arg or default path)
-    let config = match std::env::args().nth(1) {
+    let config = match first_positional_arg(std::env::args()) {
         Some(path) => AgentConfig::from_yaml_file(std::path::Path::new(&path))
             .context("failed to load config from provided path")?,
         None => AgentConfig::load_default().context("failed to load default config")?,
@@ -377,7 +384,15 @@ async fn main() -> Result<()> {
         agent.register_module(ei_handle);
     }
 
-    // 12h. Tamper-protection watchdog (P3.3). Off unless
+    // 12h. Start Updater module (P3.1) if enabled.
+    //      Off by default; operators opt in and pin a verifying key.
+    if config.modules.updater.enabled {
+        info!("starting updater module");
+        let up_handle = wda_updater::UpdaterModule::start(&config, agent.shutdown_signal());
+        agent.register_module(up_handle);
+    }
+
+    // 12i. Tamper-protection watchdog (P3.3). Off unless
     // `security.tamper.watchdog_interval_secs` is non-zero AND
     // `$NOTIFY_SOCKET` is set by the service manager.
     let _watchdog_handle = tamper::spawn_watchdog(&config.security.tamper);
@@ -514,6 +529,44 @@ fn parse_server_command(payload: &str) -> (String, String) {
 /// Get the system hostname as a fallback agent name.
 fn gethostname() -> String {
     ::gethostname::gethostname().to_string_lossy().into_owned()
+}
+
+/// Handle short-circuit CLI flags (`--version`, `-V`, `--help`, `-h`).
+///
+/// Returns `Some(exit_code)` if the flag was handled and the process
+/// should exit immediately, or `None` to continue normal startup.
+///
+/// `--version` is used by the self-update smoke test in
+/// [`wda_updater::installer`] — a freshly-installed binary that
+/// cannot print its version within the smoke-test timeout is
+/// considered broken and the install is rolled back. Keep this
+/// handler minimal so it can succeed even if config or enrollment
+/// would later fail.
+fn handle_short_flags<I: IntoIterator<Item = String>>(args: I) -> Option<i32> {
+    for arg in args.into_iter().skip(1) {
+        match arg.as_str() {
+            "--version" | "-V" => {
+                println!("wda-agent {}", env!("CARGO_PKG_VERSION"));
+                return Some(0);
+            }
+            "--help" | "-h" => {
+                println!(
+                    "wda-agent {}\n\nUSAGE:\n    wda-agent [CONFIG_PATH]\n\nFLAGS:\n    -h, --help       Print this help\n    -V, --version    Print version and exit",
+                    env!("CARGO_PKG_VERSION")
+                );
+                return Some(0);
+            }
+            _ => {}
+        }
+    }
+    None
+}
+
+/// First positional (non-flag) argument, if any. Used to pull a
+/// config path off the command line while still allowing flag-style
+/// invocations.
+fn first_positional_arg<I: IntoIterator<Item = String>>(args: I) -> Option<String> {
+    args.into_iter().skip(1).find(|arg| !arg.starts_with('-'))
 }
 
 #[cfg(test)]

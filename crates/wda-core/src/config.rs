@@ -166,6 +166,8 @@ pub struct ModulesConfig {
     pub local_detection: LocalDetectionConfig,
     #[serde(default)]
     pub enhanced_inventory: EnhancedInventoryConfig,
+    #[serde(default)]
+    pub updater: UpdateConfig,
 }
 
 /// FIM-specific configuration.
@@ -467,6 +469,59 @@ pub struct ScaConfig {
     /// Interval in seconds between policy re-evaluations (default 12h).
     #[serde(default = "default_sca_scan_interval")]
     pub scan_interval: u64,
+}
+
+/// Self-update (P3.1) configuration.
+///
+/// The updater is disabled by default and must be explicitly enabled by
+/// the operator — running without a configured `public_key` silently
+/// skips installs so a bad deployment can never replace the agent with
+/// an unsigned binary.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct UpdateConfig {
+    /// Master enable switch.
+    #[serde(default)]
+    pub enabled: bool,
+    /// HTTPS URL that returns the signed update manifest.
+    #[serde(default = "default_update_server_url")]
+    pub server_url: String,
+    /// Poll interval, in seconds (floored at 60 s by the updater).
+    #[serde(default = "default_update_check_interval")]
+    pub check_interval: u64,
+    /// Hex-encoded Ed25519 verifying key pinned at deploy time.
+    ///
+    /// An empty string is treated as "no key configured" and aborts
+    /// any install attempt.
+    #[serde(default)]
+    pub public_key: String,
+    /// Maximum number of seconds a newly-installed binary has to
+    /// report a successful `--version` before it is rolled back.
+    #[serde(default = "default_update_smoke_test_timeout")]
+    pub smoke_test_timeout: u64,
+}
+
+impl Default for UpdateConfig {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            server_url: default_update_server_url(),
+            check_interval: default_update_check_interval(),
+            public_key: String::new(),
+            smoke_test_timeout: default_update_smoke_test_timeout(),
+        }
+    }
+}
+
+fn default_update_server_url() -> String {
+    "https://updates.example.com/wda/latest.json".to_string()
+}
+
+fn default_update_check_interval() -> u64 {
+    3600
+}
+
+fn default_update_smoke_test_timeout() -> u64 {
+    10
 }
 
 /// Active response module configuration.
