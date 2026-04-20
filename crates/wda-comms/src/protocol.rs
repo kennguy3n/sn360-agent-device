@@ -31,6 +31,8 @@ pub enum MessageType {
     Shutdown,
     /// Request from server.
     Request,
+    /// Local Detection Engine alert (edge-generated detection).
+    LocalDetection,
     /// Generic message.
     Generic,
 }
@@ -49,6 +51,7 @@ impl MessageType {
             MessageType::Startup => "agent_start",
             MessageType::Shutdown => "agent_stop",
             MessageType::Request => "request",
+            MessageType::LocalDetection => "local-detection",
             MessageType::Generic => "message",
         }
     }
@@ -66,6 +69,7 @@ impl MessageType {
             "agent_start" => MessageType::Startup,
             "agent_stop" => MessageType::Shutdown,
             "request" => MessageType::Request,
+            "local-detection" => MessageType::LocalDetection,
             _ => MessageType::Generic,
         }
     }
@@ -147,6 +151,11 @@ impl WazuhMessage {
             // source tag, mirroring Wazuh execd's
             // `SendMSG(..., "active-response", LOCALFILE_MQ)`.
             MessageType::ActiveResponse => format!("1:active-response:{}", self.payload),
+            // Local Detection Engine alerts have no Wazuh-native queue
+            // byte — the manager sees them as log events with a
+            // "local-detection" source tag routed through LOCALFILE_MQ.
+            // Analysisd then treats the payload as a JSON log record.
+            MessageType::LocalDetection => format!("1:local-detection:{}", self.payload),
             // Control messages already carry the correct prefix.
             MessageType::Keepalive | MessageType::Startup | MessageType::Shutdown => {
                 self.payload.clone()
@@ -417,6 +426,20 @@ mod tests {
     }
 
     #[test]
+    fn test_encode_body_local_detection_prefix() {
+        // LDE alerts are routed through the logcollector queue ('1')
+        // with a "local-detection" source tag.  Missing the queue byte
+        // would cause the manager to silently drop the payload.
+        let msg = WazuhMessage::new(
+            "001",
+            MessageType::LocalDetection,
+            "{\"rule_id\":\"ioc-1\"}",
+        );
+        let body = String::from_utf8(msg.encode_body()).unwrap();
+        assert_eq!(body, "1:local-detection:{\"rule_id\":\"ioc-1\"}");
+    }
+
+    #[test]
     fn test_message_type_roundtrip() {
         let types = vec![
             MessageType::Syscheck,
@@ -429,6 +452,7 @@ mod tests {
             MessageType::Startup,
             MessageType::Shutdown,
             MessageType::Request,
+            MessageType::LocalDetection,
             MessageType::Generic,
         ];
 

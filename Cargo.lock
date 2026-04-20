@@ -348,6 +348,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d9c4f5dac5e15c24eb999c26181a6ca40b39fe946cbe4c263c7209467bc83af2"
 
 [[package]]
+name = "fs_extra"
+version = "1.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "42703706b716c37f96a77aea830392ad231f44c9e9a67872fa5548707e11b11c"
+
+[[package]]
 name = "fsevent-sys"
 version = "4.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -884,6 +890,25 @@ dependencies = [
  "libc",
  "untrusted",
  "windows-sys 0.52.0",
+]
+
+[[package]]
+name = "rmp"
+version = "0.8.15"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4ba8be72d372b2c9b35542551678538b562e7cf86c3315773cae48dfbfe7790c"
+dependencies = [
+ "num-traits",
+]
+
+[[package]]
+name = "rmp-serde"
+version = "1.3.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "72f81bee8c8ef9b577d1681a70ebbc962c232461e397b22c208c43c04b67a155"
+dependencies = [
+ "rmp",
+ "serde",
 ]
 
 [[package]]
@@ -1522,6 +1547,7 @@ dependencies = [
  "wda-event-bus",
  "wda-fim",
  "wda-inventory",
+ "wda-local-detection",
  "wda-logcollector",
  "wda-pal",
  "wda-rootcheck",
@@ -1646,12 +1672,18 @@ version = "0.1.0"
 dependencies = [
  "aho-corasick",
  "anyhow",
+ "async-trait",
  "bloomfilter",
+ "rmp-serde",
+ "rusqlite",
  "serde",
  "serde_json",
+ "sha2",
+ "tempfile",
  "thiserror 2.0.18",
  "tokio",
  "tracing",
+ "wda-active-response",
  "wda-core",
  "wda-event-bus",
  "wda-pal",
@@ -2067,6 +2099,9 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "694e232eb98af91a4a9575698dc7a54aa60fc4f69dddade6d18251413bf38ee5"
 dependencies = [
  "bindgen",
+ "cc",
+ "fs_extra",
+ "glob",
 ]
 
 [[package]]

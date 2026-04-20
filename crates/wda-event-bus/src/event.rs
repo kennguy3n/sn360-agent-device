@@ -77,6 +77,22 @@ pub enum EventKind {
         description: String,
     },
 
+    // --- Local Detection Engine (LDE) events ---
+    /// A local detection rule (IOC, behavioral, or YARA) matched an event.
+    LocalDetectionAlert {
+        /// Identifier of the matched rule (e.g., "ioc-domain-1234", "behav-brute-ssh").
+        rule_id: String,
+        /// Type of rule that matched: "ioc", "behavioral", or "yara".
+        rule_type: String,
+        /// Severity: "info", "low", "medium", "high", "critical".
+        severity: String,
+        /// Human-readable description of the match.
+        description: String,
+        /// The value from the source event that triggered the match
+        /// (path, domain, hash, PID, etc.).
+        matched_value: String,
+    },
+
     // --- Active Response events ---
     /// Request to execute an active response action.
     ActiveResponseRequest {

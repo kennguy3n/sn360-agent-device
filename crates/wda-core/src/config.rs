@@ -94,6 +94,8 @@ pub struct ModulesConfig {
     pub active_response: ActiveResponseConfig,
     #[serde(default)]
     pub rootcheck: RootcheckConfig,
+    #[serde(default)]
+    pub local_detection: LocalDetectionConfig,
 }
 
 /// FIM-specific configuration.
@@ -237,6 +239,63 @@ pub struct RootcheckConfig {
     /// hidden-process sweep. Keep this conservative to cap CPU cost.
     #[serde(default = "default_rootcheck_max_pid")]
     pub max_pid: u32,
+}
+
+/// Local Detection Engine (LDE) module configuration.
+///
+/// The LDE evaluates detection rules locally at the edge — IOC matching
+/// via Aho-Corasick + bloom filters, behavioral rule state machines,
+/// and YARA file scanning — without a server round-trip. See
+/// [`PROPOSAL.md`](../../../PROPOSAL.md) § 5.x / Phase 4 tasks 4.1–4.6.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct LocalDetectionConfig {
+    /// Whether the LDE is enabled. Off by default — operators opt in.
+    #[serde(default)]
+    pub enabled: bool,
+    /// Interval in seconds between rule-bundle pulls from the Tenant
+    /// Rule Distribution Service (TRDS).
+    #[serde(default = "default_lde_rule_pull_interval")]
+    pub rule_pull_interval: u64,
+    /// Maximum number of detections buffered in the offline queue
+    /// when the server is unreachable. Bounded FIFO — oldest entries
+    /// are evicted when the queue is full.
+    #[serde(default = "default_lde_offline_queue_max")]
+    pub offline_queue_max: usize,
+    /// Upper bound on YARA scans per second. The scanner sleeps to
+    /// the next second boundary when the budget is exhausted.
+    #[serde(default = "default_lde_yara_scan_rate_limit")]
+    pub yara_scan_rate_limit: u32,
+    /// Files larger than this (MB) are skipped by the YARA scanner.
+    #[serde(default = "default_lde_yara_max_file_size_mb")]
+    pub yara_max_file_size_mb: u64,
+    /// Target false-positive rate for the hash/IP bloom filters.
+    #[serde(default = "default_lde_bloom_filter_fpr")]
+    pub bloom_filter_fpr: f64,
+    /// Maximum sliding-window size (seconds) for behavioral rules.
+    #[serde(default = "default_lde_behavioral_max_window_sec")]
+    pub behavioral_max_window_sec: u64,
+    /// Maximum number of distinct entities (subjects) tracked by the
+    /// behavioral engine. Bounds memory use.
+    #[serde(default = "default_lde_behavioral_max_tracked_entities")]
+    pub behavioral_max_tracked_entities: usize,
+    /// Whether `block_ip` local responses are allowed.
+    #[serde(default)]
+    pub block_ip: bool,
+    /// Whether `kill_process` local responses are allowed.
+    #[serde(default)]
+    pub kill_process: bool,
+    /// Whether `quarantine` local responses (move file aside) are allowed.
+    #[serde(default)]
+    pub quarantine: bool,
+    /// Path to the MessagePack rule bundle on disk.
+    #[serde(default = "default_lde_rule_bundle_path")]
+    pub rule_bundle_path: PathBuf,
+    /// Path to the SQLite offline-queue database.
+    #[serde(default = "default_lde_offline_queue_path")]
+    pub offline_queue_path: PathBuf,
+    /// Directory where quarantined files are moved.
+    #[serde(default = "default_lde_quarantine_dir")]
+    pub quarantine_dir: PathBuf,
 }
 
 /// SCA (Security Configuration Assessment) module configuration.
@@ -439,6 +498,69 @@ pub fn default_rootcheck_binary_paths() -> Vec<String> {
 fn default_ar_timeout() -> u64 {
     30
 }
+fn default_lde_rule_pull_interval() -> u64 {
+    300
+}
+fn default_lde_offline_queue_max() -> usize {
+    10_000
+}
+fn default_lde_yara_scan_rate_limit() -> u32 {
+    1
+}
+fn default_lde_yara_max_file_size_mb() -> u64 {
+    50
+}
+fn default_lde_bloom_filter_fpr() -> f64 {
+    0.01
+}
+fn default_lde_behavioral_max_window_sec() -> u64 {
+    300
+}
+fn default_lde_behavioral_max_tracked_entities() -> usize {
+    5_000
+}
+fn default_lde_rule_bundle_path() -> PathBuf {
+    #[cfg(unix)]
+    {
+        PathBuf::from("/var/lib/wazuh-desktop-agent/lde-rules.msgpack")
+    }
+    #[cfg(windows)]
+    {
+        PathBuf::from(r"C:\ProgramData\WazuhDesktopAgent\lde-rules.msgpack")
+    }
+    #[cfg(not(any(unix, windows)))]
+    {
+        PathBuf::new()
+    }
+}
+fn default_lde_offline_queue_path() -> PathBuf {
+    #[cfg(unix)]
+    {
+        PathBuf::from("/var/lib/wazuh-desktop-agent/lde-offline-queue.db")
+    }
+    #[cfg(windows)]
+    {
+        PathBuf::from(r"C:\ProgramData\WazuhDesktopAgent\lde-offline-queue.db")
+    }
+    #[cfg(not(any(unix, windows)))]
+    {
+        PathBuf::new()
+    }
+}
+fn default_lde_quarantine_dir() -> PathBuf {
+    #[cfg(unix)]
+    {
+        PathBuf::from("/var/lib/wazuh-desktop-agent/quarantine")
+    }
+    #[cfg(windows)]
+    {
+        PathBuf::from(r"C:\ProgramData\WazuhDesktopAgent\quarantine")
+    }
+    #[cfg(not(any(unix, windows)))]
+    {
+        PathBuf::new()
+    }
+}
 fn default_ar_actions() -> Vec<String> {
     vec![
         "block_ip".to_string(),
@@ -511,6 +633,27 @@ impl Default for RootcheckConfig {
             hidden_process_check: true,
             binary_integrity_check: true,
             max_pid: default_rootcheck_max_pid(),
+        }
+    }
+}
+
+impl Default for LocalDetectionConfig {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            rule_pull_interval: default_lde_rule_pull_interval(),
+            offline_queue_max: default_lde_offline_queue_max(),
+            yara_scan_rate_limit: default_lde_yara_scan_rate_limit(),
+            yara_max_file_size_mb: default_lde_yara_max_file_size_mb(),
+            bloom_filter_fpr: default_lde_bloom_filter_fpr(),
+            behavioral_max_window_sec: default_lde_behavioral_max_window_sec(),
+            behavioral_max_tracked_entities: default_lde_behavioral_max_tracked_entities(),
+            block_ip: false,
+            kill_process: false,
+            quarantine: false,
+            rule_bundle_path: default_lde_rule_bundle_path(),
+            offline_queue_path: default_lde_offline_queue_path(),
+            quarantine_dir: default_lde_quarantine_dir(),
         }
     }
 }

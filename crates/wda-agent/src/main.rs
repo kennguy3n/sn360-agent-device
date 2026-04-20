@@ -320,6 +320,17 @@ async fn main() -> Result<()> {
         agent.register_module(rc_handle);
     }
 
+    // 12f. Start Local Detection Engine (LDE) module if enabled
+    if config.modules.local_detection.enabled {
+        info!("starting local detection module");
+        let lde_handle = wda_local_detection::LocalDetectionModule::start(
+            &config,
+            agent.event_bus(),
+            agent.shutdown_signal(),
+        );
+        agent.register_module(lde_handle);
+    }
+
     // 13. Start agent and wait for shutdown signal
     agent.start().await;
     agent.wait_for_shutdown().await;
@@ -401,6 +412,11 @@ fn map_event_to_message(agent_id: &str, kind: &EventKind) -> Option<WazuhMessage
             let json =
                 serde_json::to_string(kind).unwrap_or_else(|e| format!("{{\"error\":\"{}\"}}", e));
             (MessageType::Rootcheck, json)
+        }
+        EventKind::LocalDetectionAlert { .. } => {
+            let json =
+                serde_json::to_string(kind).unwrap_or_else(|e| format!("{{\"error\":\"{}\"}}", e));
+            (MessageType::LocalDetection, json)
         }
         EventKind::ServerMessage { payload } => (MessageType::Generic, payload.clone()),
         // Lifecycle / internal events are not forwarded.
