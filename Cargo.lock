@@ -1544,6 +1544,7 @@ dependencies = [
  "wda-active-response",
  "wda-comms",
  "wda-core",
+ "wda-enhanced-inventory",
  "wda-event-bus",
  "wda-fim",
  "wda-inventory",
@@ -1604,6 +1605,8 @@ name = "wda-enhanced-inventory"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "chrono",
+ "nix",
  "serde",
  "serde_json",
  "thiserror 2.0.18",
@@ -1612,6 +1615,7 @@ dependencies = [
  "wda-core",
  "wda-event-bus",
  "wda-pal",
+ "windows",
 ]
 
 [[package]]

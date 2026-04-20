@@ -56,6 +56,18 @@ pub enum EventKind {
         data: serde_json::Value,
     },
 
+    // --- Enhanced inventory events ---
+    /// Enhanced inventory snapshot or delta.
+    ///
+    /// `category` is one of `"running_software"`, `"browser_extensions"`,
+    /// or `"sbom"` and `data` carries the module-specific payload
+    /// (typically a JSON object matching the Wazuh syscollector schema
+    /// so the manager can index it alongside the base inventory).
+    EnhancedInventoryUpdate {
+        category: String,
+        data: serde_json::Value,
+    },
+
     // --- SCA events ---
     /// SCA check result.
     ScaResult {
