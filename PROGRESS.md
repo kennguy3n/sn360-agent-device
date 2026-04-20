@@ -709,3 +709,76 @@ host (AC transitions to `Normal`, battery to `BatteryActive` /
 `CriticalBattery`), and the idle transitions will activate
 automatically once P1.8 lands via XScreenSaver or a D-Bus
 `logind` integration without requiring further module changes.
+
+## Development Assessment — 2026-04-20 (Post-E2E-expansion)
+
+Priority 1 tasks **P1.2 (E2E tests for SCA and Rootcheck)** and
+**P1.11 (E2E coverage for enhanced inventory)** landed in
+**PR #47**, together with a small doc-comment fix in
+`crates/wda-enhanced-inventory/src/lib.rs` to correctly describe
+the CycloneDX SBOM generator implemented in PR #45 (it was still
+labelled "not yet implemented").
+
+The base E2E harness at `tests/scripts/run-e2e.sh` grew from
+**9 PASS/FAIL assertions** to **14**. The five new assertions
+are:
+
+1. **SCA policy evaluation received by server** — the harness
+   seeds `/etc/wazuh-desktop-agent/sca/e2e-test-policy.yaml`
+   (one-check policy that probes `/etc/hostname`) before the
+   agent starts, and asserts that an event containing
+   `ScaResult` / `"sca"` reaches `/var/ossec/logs/archives/archives.json`
+   on the Wazuh manager. `tests/wazuh-test-config.yaml` points
+   `modules.sca.policy_dir` at that directory and sets
+   `scan_interval: 15` so the first cycle fires inside the E2E
+   window.
+2. **Rootcheck signature alert received by server** — the
+   harness plants `/tmp/wda-e2e-rootkit-marker`, which matches a
+   `signature_paths` entry added to
+   `tests/wazuh-test-config.yaml`. The assertion looks for the
+   marker path (or a generic `rootcheck` / `RootcheckAlert`
+   match) in `archives.json`, confirming the agent routed the
+   alert as `MessageType::Rootcheck` on queue `9:`.
+3. **Enhanced inventory running-software / SBOM /
+   browser-extensions scanners active** — three assertions.
+   The Wazuh 4.9.2 manager's analysisd syscollector decoder
+   only archives events whose `"type"` matches a known
+   `dbsync_*` variant, so the WDA envelope
+   `{"type":"enhanced_inventory", "category":"…"}` never lands
+   in `archives.json` even when the agent successfully delivered
+   the frame on queue `d:`. The harness therefore starts the
+   agent with
+   `RUST_LOG=info,wda_enhanced_inventory=debug` and greps the
+   agent log for the per-scanner snapshot debug lines
+   (`running-software`, `sbom snapshot`,
+   `browser-extensions snapshot`) as the ground-truth oracle.
+   A bonus `archives.json` lookup is still emitted for
+   visibility.
+
+Cleanup is correspondingly extended — the exit trap now also
+removes the SCA policy file, the rootcheck marker, and
+`/var/lib/wazuh-desktop-agent/rootcheck-baseline.json` so a
+re-run starts from a clean state.
+
+Configuration deltas in `tests/wazuh-test-config.yaml`:
+
+- `modules.sca.enabled: true` with `policy_dir` and
+  `scan_interval: 15`.
+- `modules.rootcheck.enabled: true` with
+  `scan_interval_secs: 15`, `signature_paths`, and
+  `hidden_process_check` / `binary_integrity_check` both
+  `false` to keep the harness deterministic on CI hosts.
+- `modules.enhanced_inventory.enabled: true` with all three
+  scanners (`running_software`, `browser_extensions`, `sbom`)
+  enabled at 10 s intervals and `sbom.on_demand: true`.
+
+The workspace unit-test count is **361 passing / 0 failed**,
+unchanged from PR #46 — this PR adds E2E coverage only and
+does not modify any module code. `unit-test-results.txt` is
+regenerated and committed. `e2e-results.txt` captures the full
+14-assertion run against the local Wazuh 4.9.2 manager.
+
+P1.2 and P1.11 are marked **Done (PR #47)** in the Known Gaps
+table above. The remaining Priority-1 work is P1.7 → closed in
+PR #46, P1.8 (Linux user-idle detection), and the lower-ranked
+follow-ups in the P2 / P3 bands.

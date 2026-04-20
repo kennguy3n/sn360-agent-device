@@ -5,391 +5,6 @@ Docker Compose version v2.32.1
 ==> Step 0: Cleaning stale state...
     Stale state removed.
 ==> Step 1: Starting Wazuh manager...
- wazuh-manager Pulling 
- 42ce99aa0f68 Pulling fs layer 
- 1f451b4d41ec Pulling fs layer 
- 41ee4dd90ed2 Pulling fs layer 
- cda7dde3c22c Pulling fs layer 
- d45a946063f2 Pulling fs layer 
- 8e49fe04f001 Pulling fs layer 
- 15f998b2272b Pulling fs layer 
- 0fc6860833c8 Pulling fs layer 
- e4ba29c8113f Pulling fs layer 
- 023e793057c3 Pulling fs layer 
- 97d423f5bec7 Pulling fs layer 
- c73d40f4d821 Pulling fs layer 
- fb8e1e50a931 Pulling fs layer 
- b1291270ad7e Pulling fs layer 
- 341f44dc474b Pulling fs layer 
- b3541e281744 Pulling fs layer 
- 9eb56f6b2b3c Pulling fs layer 
- d45a946063f2 Waiting 
- e4ba29c8113f Waiting 
- 023e793057c3 Waiting 
- 97d423f5bec7 Waiting 
- c73d40f4d821 Waiting 
- fb8e1e50a931 Waiting 
- b1291270ad7e Waiting 
- 341f44dc474b Waiting 
- b3541e281744 Waiting 
- 9eb56f6b2b3c Waiting 
- 0fc6860833c8 Waiting 
- cda7dde3c22c Waiting 
- 1f451b4d41ec Downloading     160B/160B
- 1f451b4d41ec Verifying Checksum 
- 1f451b4d41ec Download complete 
- 42ce99aa0f68 Downloading  528.1kB/52.34MB
- 41ee4dd90ed2 Downloading  63.44kB/6.111MB
- 42ce99aa0f68 Downloading  19.58MB/52.34MB
- 41ee4dd90ed2 Downloading  4.129MB/6.111MB
- 41ee4dd90ed2 Verifying Checksum 
- 41ee4dd90ed2 Download complete 
- 42ce99aa0f68 Downloading  28.62MB/52.34MB
- cda7dde3c22c Downloading     409B/531B
- cda7dde3c22c Downloading     531B/531B
- cda7dde3c22c Download complete 
- 42ce99aa0f68 Downloading  34.46MB/52.34MB
- 42ce99aa0f68 Downloading  39.25MB/52.34MB
- d45a946063f2 Downloading     409B/515B
- d45a946063f2 Downloading     515B/515B
- d45a946063f2 Verifying Checksum 
- d45a946063f2 Download complete 
- 42ce99aa0f68 Downloading  44.56MB/52.34MB
- 8e49fe04f001 Downloading     408B/1.376kB
- 8e49fe04f001 Downloading  1.376kB/1.376kB
- 8e49fe04f001 Verifying Checksum 
- 8e49fe04f001 Download complete 
- 42ce99aa0f68 Downloading  48.81MB/52.34MB
- 42ce99aa0f68 Verifying Checksum 
- 42ce99aa0f68 Download complete 
- 42ce99aa0f68 Extracting  524.3kB/52.34MB
- 15f998b2272b Downloading     389B/567B
- 15f998b2272b Downloading     567B/567B
- 15f998b2272b Verifying Checksum 
- 15f998b2272b Download complete 
- 0fc6860833c8 Downloading  11.31kB/1.032MB
- 0fc6860833c8 Downloading  1.032MB/1.032MB
- 0fc6860833c8 Download complete 
- 42ce99aa0f68 Extracting  1.573MB/52.34MB
- 023e793057c3 Downloading     408B/4.144kB
- 023e793057c3 Downloading  4.144kB/4.144kB
- 023e793057c3 Verifying Checksum 
- 023e793057c3 Download complete 
- 42ce99aa0f68 Extracting  4.719MB/52.34MB
- e4ba29c8113f Downloading  539.4kB/553.6MB
- 97d423f5bec7 Downloading     408B/1.211kB
- 97d423f5bec7 Downloading  1.211kB/1.211kB
- 97d423f5bec7 Download complete 
- 42ce99aa0f68 Extracting  5.243MB/52.34MB
- e4ba29c8113f Downloading  14.43MB/553.6MB
- 42ce99aa0f68 Extracting  10.49MB/52.34MB
- e4ba29c8113f Downloading  19.76MB/553.6MB
- c73d40f4d821 Downloading     389B/460B
- c73d40f4d821 Downloading     460B/460B
- c73d40f4d821 Verifying Checksum 
- c73d40f4d821 Download complete 
- 42ce99aa0f68 Extracting   17.3MB/52.34MB
- e4ba29c8113f Downloading   35.8MB/553.6MB
- fb8e1e50a931 Downloading     409B/459B
- fb8e1e50a931 Downloading     459B/459B
- fb8e1e50a931 Verifying Checksum 
- fb8e1e50a931 Download complete 
- 42ce99aa0f68 Extracting  24.12MB/52.34MB
- e4ba29c8113f Downloading  47.51MB/553.6MB
- e4ba29c8113f Downloading   57.6MB/553.6MB
- 42ce99aa0f68 Extracting  27.26MB/52.34MB
- b1291270ad7e Downloading     408B/6.677kB
- b1291270ad7e Downloading  6.677kB/6.677kB
- b1291270ad7e Verifying Checksum 
- b1291270ad7e Download complete 
- e4ba29c8113f Downloading  62.93MB/553.6MB
- 341f44dc474b Downloading     408B/6.681kB
- 341f44dc474b Downloading  6.681kB/6.681kB
- 341f44dc474b Download complete 
- 42ce99aa0f68 Extracting  28.84MB/52.34MB
- e4ba29c8113f Downloading  68.25MB/553.6MB
- 42ce99aa0f68 Extracting  29.88MB/52.34MB
- b3541e281744 Downloading  4.459kB/394kB
- e4ba29c8113f Downloading  72.55MB/553.6MB
- b3541e281744 Downloading    394kB/394kB
- b3541e281744 Download complete 
- 42ce99aa0f68 Extracting  30.41MB/52.34MB
- 9eb56f6b2b3c Downloading     158B/158B
- 9eb56f6b2b3c Verifying Checksum 
- 9eb56f6b2b3c Download complete 
- e4ba29c8113f Downloading  77.36MB/553.6MB
- 42ce99aa0f68 Extracting  33.03MB/52.34MB
- e4ba29c8113f Downloading  81.64MB/553.6MB
- 42ce99aa0f68 Extracting   34.6MB/52.34MB
- e4ba29c8113f Downloading  86.41MB/553.6MB
- 42ce99aa0f68 Extracting   36.7MB/52.34MB
- e4ba29c8113f Downloading  91.73MB/553.6MB
- 42ce99aa0f68 Extracting  38.27MB/52.34MB
- e4ba29c8113f Downloading  95.99MB/553.6MB
- 42ce99aa0f68 Extracting  40.37MB/52.34MB
- e4ba29c8113f Downloading  99.19MB/553.6MB
- 42ce99aa0f68 Extracting  43.52MB/52.34MB
- e4ba29c8113f Downloading  103.5MB/553.6MB
- 42ce99aa0f68 Extracting  46.14MB/52.34MB
- e4ba29c8113f Downloading  108.3MB/553.6MB
- 42ce99aa0f68 Extracting  48.23MB/52.34MB
- e4ba29c8113f Downloading    112MB/553.6MB
- e4ba29c8113f Downloading  114.7MB/553.6MB
- e4ba29c8113f Downloading  116.9MB/553.6MB
- e4ba29c8113f Downloading  121.1MB/553.6MB
- 42ce99aa0f68 Extracting  51.38MB/52.34MB
- e4ba29c8113f Downloading  126.4MB/553.6MB
- 42ce99aa0f68 Extracting   51.9MB/52.34MB
- 42ce99aa0f68 Extracting  52.34MB/52.34MB
- e4ba29c8113f Downloading  131.8MB/553.6MB
- 42ce99aa0f68 Pull complete 
- 1f451b4d41ec Extracting     160B/160B
- 1f451b4d41ec Extracting     160B/160B
- 1f451b4d41ec Pull complete 
- 41ee4dd90ed2 Extracting  65.54kB/6.111MB
- e4ba29c8113f Downloading  137.1MB/553.6MB
- 41ee4dd90ed2 Extracting  3.408MB/6.111MB
- e4ba29c8113f Downloading  141.4MB/553.6MB
- 41ee4dd90ed2 Extracting  5.112MB/6.111MB
- 41ee4dd90ed2 Extracting  6.111MB/6.111MB
- e4ba29c8113f Downloading  146.2MB/553.6MB
- 41ee4dd90ed2 Pull complete 
- cda7dde3c22c Extracting     531B/531B
- cda7dde3c22c Extracting     531B/531B
- cda7dde3c22c Pull complete 
- d45a946063f2 Extracting     515B/515B
- d45a946063f2 Extracting     515B/515B
- d45a946063f2 Pull complete 
- 8e49fe04f001 Extracting  1.376kB/1.376kB
- 8e49fe04f001 Extracting  1.376kB/1.376kB
- 8e49fe04f001 Pull complete 
- 15f998b2272b Extracting     567B/567B
- 15f998b2272b Extracting     567B/567B
- 15f998b2272b Pull complete 
- 0fc6860833c8 Extracting  32.77kB/1.032MB
- 0fc6860833c8 Extracting  1.032MB/1.032MB
- 0fc6860833c8 Extracting  1.032MB/1.032MB
- 0fc6860833c8 Pull complete 
- e4ba29c8113f Downloading  151.5MB/553.6MB
- e4ba29c8113f Downloading  156.8MB/553.6MB
- e4ba29c8113f Downloading  160.1MB/553.6MB
- e4ba29c8113f Downloading  162.2MB/553.6MB
- e4ba29c8113f Downloading    167MB/553.6MB
- e4ba29c8113f Downloading  172.3MB/553.6MB
- e4ba29c8113f Downloading  176.6MB/553.6MB
- e4ba29c8113f Downloading  181.4MB/553.6MB
- e4ba29c8113f Downloading  186.7MB/553.6MB
- e4ba29c8113f Downloading    192MB/553.6MB
- e4ba29c8113f Downloading  196.3MB/553.6MB
- e4ba29c8113f Downloading  201.1MB/553.6MB
- e4ba29c8113f Downloading  206.4MB/553.6MB
- e4ba29c8113f Downloading  211.7MB/553.6MB
- e4ba29c8113f Downloading    216MB/553.6MB
- e4ba29c8113f Downloading  220.8MB/553.6MB
- e4ba29c8113f Downloading  225.6MB/553.6MB
- e4ba29c8113f Downloading  230.9MB/553.6MB
- e4ba29c8113f Downloading  236.2MB/553.6MB
- e4ba29c8113f Downloading    241MB/553.6MB
- e4ba29c8113f Downloading  246.4MB/553.6MB
- e4ba29c8113f Downloading  250.7MB/553.6MB
- e4ba29c8113f Downloading  254.9MB/553.6MB
- e4ba29c8113f Downloading  257.1MB/553.6MB
- e4ba29c8113f Downloading  261.3MB/553.6MB
- e4ba29c8113f Downloading  265.1MB/553.6MB
- e4ba29c8113f Downloading  268.8MB/553.6MB
- e4ba29c8113f Downloading    272MB/553.6MB
- e4ba29c8113f Downloading  276.3MB/553.6MB
- e4ba29c8113f Downloading  280.5MB/553.6MB
- e4ba29c8113f Downloading  285.3MB/553.6MB
- e4ba29c8113f Downloading  289.6MB/553.6MB
- e4ba29c8113f Downloading  294.9MB/553.6MB
- e4ba29c8113f Downloading  300.3MB/553.6MB
- e4ba29c8113f Downloading  305.1MB/553.6MB
- e4ba29c8113f Downloading  308.8MB/553.6MB
- e4ba29c8113f Downloading    312MB/553.6MB
- e4ba29c8113f Downloading  316.8MB/553.6MB
- e4ba29c8113f Downloading  321.1MB/553.6MB
- e4ba29c8113f Downloading  324.3MB/553.6MB
- e4ba29c8113f Downloading  329.1MB/553.6MB
- e4ba29c8113f Downloading  334.4MB/553.6MB
- e4ba29c8113f Downloading  339.2MB/553.6MB
- e4ba29c8113f Downloading    344MB/553.6MB
- e4ba29c8113f Downloading  348.3MB/553.6MB
- e4ba29c8113f Downloading  353.1MB/553.6MB
- e4ba29c8113f Downloading  356.8MB/553.6MB
- e4ba29c8113f Downloading  360.1MB/553.6MB
- e4ba29c8113f Downloading  364.9MB/553.6MB
- e4ba29c8113f Downloading  369.2MB/553.6MB
- e4ba29c8113f Downloading    374MB/553.6MB
- e4ba29c8113f Downloading  379.3MB/553.6MB
- e4ba29c8113f Downloading  384.6MB/553.6MB
- e4ba29c8113f Downloading    390MB/553.6MB
- e4ba29c8113f Downloading  395.3MB/553.6MB
- e4ba29c8113f Downloading  400.1MB/553.6MB
- e4ba29c8113f Downloading  404.3MB/553.6MB
- e4ba29c8113f Downloading  410.2MB/553.6MB
- e4ba29c8113f Downloading  414.5MB/553.6MB
- e4ba29c8113f Downloading  418.7MB/553.6MB
- e4ba29c8113f Downloading  424.1MB/553.6MB
- e4ba29c8113f Downloading  429.4MB/553.6MB
- e4ba29c8113f Downloading  433.7MB/553.6MB
- e4ba29c8113f Downloading  438.4MB/553.6MB
- e4ba29c8113f Downloading  443.2MB/553.6MB
- e4ba29c8113f Downloading  449.1MB/553.6MB
- e4ba29c8113f Downloading  453.9MB/553.6MB
- e4ba29c8113f Downloading  458.7MB/553.6MB
- e4ba29c8113f Downloading  462.9MB/553.6MB
- e4ba29c8113f Downloading  467.8MB/553.6MB
- e4ba29c8113f Downloading  471.5MB/553.6MB
- e4ba29c8113f Downloading  475.8MB/553.6MB
- e4ba29c8113f Downloading  481.1MB/553.6MB
- e4ba29c8113f Downloading  485.9MB/553.6MB
- e4ba29c8113f Downloading  491.3MB/553.6MB
- e4ba29c8113f Downloading  496.6MB/553.6MB
- e4ba29c8113f Downloading  501.4MB/553.6MB
- e4ba29c8113f Downloading  506.2MB/553.6MB
- e4ba29c8113f Downloading    511MB/553.6MB
- e4ba29c8113f Downloading  516.4MB/553.6MB
- e4ba29c8113f Downloading  521.7MB/553.6MB
- e4ba29c8113f Downloading  527.1MB/553.6MB
- e4ba29c8113f Downloading  531.9MB/553.6MB
- e4ba29c8113f Downloading  537.2MB/553.6MB
- e4ba29c8113f Downloading    541MB/553.6MB
- e4ba29c8113f Downloading  546.3MB/553.6MB
- e4ba29c8113f Downloading  551.6MB/553.6MB
- e4ba29c8113f Verifying Checksum 
- e4ba29c8113f Download complete 
- e4ba29c8113f Extracting  557.1kB/553.6MB
- e4ba29c8113f Extracting  3.342MB/553.6MB
- e4ba29c8113f Extracting  11.14MB/553.6MB
- e4ba29c8113f Extracting  17.27MB/553.6MB
- e4ba29c8113f Extracting  23.95MB/553.6MB
- e4ba29c8113f Extracting  25.62MB/553.6MB
- e4ba29c8113f Extracting  30.08MB/553.6MB
- e4ba29c8113f Extracting  47.91MB/553.6MB
- e4ba29c8113f Extracting  61.83MB/553.6MB
- e4ba29c8113f Extracting  73.53MB/553.6MB
- e4ba29c8113f Extracting  83.56MB/553.6MB
- e4ba29c8113f Extracting  101.4MB/553.6MB
- e4ba29c8113f Extracting    117MB/553.6MB
- e4ba29c8113f Extracting  129.2MB/553.6MB
- e4ba29c8113f Extracting  139.3MB/553.6MB
- e4ba29c8113f Extracting  145.4MB/553.6MB
- e4ba29c8113f Extracting  147.6MB/553.6MB
- e4ba29c8113f Extracting  154.9MB/553.6MB
- e4ba29c8113f Extracting  157.1MB/553.6MB
- e4ba29c8113f Extracting  159.3MB/553.6MB
- e4ba29c8113f Extracting  163.8MB/553.6MB
- e4ba29c8113f Extracting  168.2MB/553.6MB
- e4ba29c8113f Extracting  171.6MB/553.6MB
- e4ba29c8113f Extracting  172.1MB/553.6MB
- e4ba29c8113f Extracting  172.7MB/553.6MB
- e4ba29c8113f Extracting  177.1MB/553.6MB
- e4ba29c8113f Extracting  177.7MB/553.6MB
- e4ba29c8113f Extracting  182.7MB/553.6MB
- e4ba29c8113f Extracting  184.4MB/553.6MB
- e4ba29c8113f Extracting  186.1MB/553.6MB
- e4ba29c8113f Extracting  187.2MB/553.6MB
- e4ba29c8113f Extracting  188.3MB/553.6MB
- e4ba29c8113f Extracting    190MB/553.6MB
- e4ba29c8113f Extracting  191.6MB/553.6MB
- e4ba29c8113f Extracting  194.4MB/553.6MB
- e4ba29c8113f Extracting  196.1MB/553.6MB
- e4ba29c8113f Extracting  197.8MB/553.6MB
- e4ba29c8113f Extracting    200MB/553.6MB
- e4ba29c8113f Extracting  201.7MB/553.6MB
- e4ba29c8113f Extracting  204.4MB/553.6MB
- e4ba29c8113f Extracting  207.2MB/553.6MB
- e4ba29c8113f Extracting  208.3MB/553.6MB
- e4ba29c8113f Extracting  209.5MB/553.6MB
- e4ba29c8113f Extracting  210.6MB/553.6MB
- e4ba29c8113f Extracting  213.9MB/553.6MB
- e4ba29c8113f Extracting  217.3MB/553.6MB
- e4ba29c8113f Extracting  218.4MB/553.6MB
- e4ba29c8113f Extracting  218.9MB/553.6MB
- e4ba29c8113f Extracting    220MB/553.6MB
- e4ba29c8113f Extracting  223.9MB/553.6MB
- e4ba29c8113f Extracting  225.1MB/553.6MB
- e4ba29c8113f Extracting  226.2MB/553.6MB
- e4ba29c8113f Extracting    229MB/553.6MB
- e4ba29c8113f Extracting  233.4MB/553.6MB
- e4ba29c8113f Extracting  240.1MB/553.6MB
- e4ba29c8113f Extracting  241.2MB/553.6MB
- e4ba29c8113f Extracting  242.9MB/553.6MB
- e4ba29c8113f Extracting    244MB/553.6MB
- e4ba29c8113f Extracting  245.7MB/553.6MB
- e4ba29c8113f Extracting  248.4MB/553.6MB
- e4ba29c8113f Extracting  249.6MB/553.6MB
- e4ba29c8113f Extracting  254.6MB/553.6MB
- e4ba29c8113f Extracting  261.8MB/553.6MB
- e4ba29c8113f Extracting  267.4MB/553.6MB
- e4ba29c8113f Extracting  272.4MB/553.6MB
- e4ba29c8113f Extracting  279.1MB/553.6MB
- e4ba29c8113f Extracting  283.5MB/553.6MB
- e4ba29c8113f Extracting  285.2MB/553.6MB
- e4ba29c8113f Extracting  285.8MB/553.6MB
- e4ba29c8113f Extracting    288MB/553.6MB
- e4ba29c8113f Extracting  290.8MB/553.6MB
- e4ba29c8113f Extracting    293MB/553.6MB
- e4ba29c8113f Extracting  294.7MB/553.6MB
- e4ba29c8113f Extracting  298.6MB/553.6MB
- e4ba29c8113f Extracting  300.3MB/553.6MB
- e4ba29c8113f Extracting  301.9MB/553.6MB
- e4ba29c8113f Extracting  304.2MB/553.6MB
- e4ba29c8113f Extracting  305.8MB/553.6MB
- e4ba29c8113f Extracting  307.5MB/553.6MB
- e4ba29c8113f Extracting  309.7MB/553.6MB
- e4ba29c8113f Extracting  311.4MB/553.6MB
- e4ba29c8113f Extracting  312.5MB/553.6MB
- e4ba29c8113f Extracting  314.2MB/553.6MB
- e4ba29c8113f Extracting  314.7MB/553.6MB
- e4ba29c8113f Extracting  315.9MB/553.6MB
- e4ba29c8113f Extracting    317MB/553.6MB
- e4ba29c8113f Extracting  318.1MB/553.6MB
- e4ba29c8113f Extracting  321.4MB/553.6MB
- e4ba29c8113f Extracting  328.1MB/553.6MB
- e4ba29c8113f Extracting  333.7MB/553.6MB
- e4ba29c8113f Extracting  338.7MB/553.6MB
- e4ba29c8113f Extracting  344.8MB/553.6MB
- e4ba29c8113f Extracting  345.9MB/553.6MB
- e4ba29c8113f Extracting    356MB/553.6MB
- e4ba29c8113f Extracting  374.3MB/553.6MB
- e4ba29c8113f Extracting  392.7MB/553.6MB
- e4ba29c8113f Extracting  411.1MB/553.6MB
- e4ba29c8113f Extracting  428.9MB/553.6MB
- e4ba29c8113f Extracting  447.3MB/553.6MB
- e4ba29c8113f Extracting  465.1MB/553.6MB
- e4ba29c8113f Extracting    483MB/553.6MB
- e4ba29c8113f Extracting  501.4MB/553.6MB
- e4ba29c8113f Extracting  519.7MB/553.6MB
- e4ba29c8113f Extracting  538.1MB/553.6MB
- e4ba29c8113f Extracting  551.5MB/553.6MB
- e4ba29c8113f Extracting  553.6MB/553.6MB
- e4ba29c8113f Pull complete 
- 023e793057c3 Extracting  4.144kB/4.144kB
- 023e793057c3 Extracting  4.144kB/4.144kB
- 023e793057c3 Pull complete 
- 97d423f5bec7 Extracting  1.211kB/1.211kB
- 97d423f5bec7 Pull complete 
- c73d40f4d821 Extracting     460B/460B
- c73d40f4d821 Extracting     460B/460B
- c73d40f4d821 Pull complete 
- fb8e1e50a931 Extracting     459B/459B
- fb8e1e50a931 Extracting     459B/459B
- fb8e1e50a931 Pull complete 
- b1291270ad7e Extracting  6.677kB/6.677kB
- b1291270ad7e Extracting  6.677kB/6.677kB
- b1291270ad7e Pull complete 
- 341f44dc474b Extracting  6.681kB/6.681kB
- 341f44dc474b Extracting  6.681kB/6.681kB
- 341f44dc474b Pull complete 
- b3541e281744 Extracting  32.77kB/394kB
- b3541e281744 Extracting    394kB/394kB
- b3541e281744 Pull complete 
- 9eb56f6b2b3c Extracting     158B/158B
- 9eb56f6b2b3c Extracting     158B/158B
- 9eb56f6b2b3c Pull complete 
- wazuh-manager Pulled 
  Network tests_default  Creating
  Network tests_default  Created
  Volume "tests_wazuh-data"  Creating
@@ -402,8 +17,8 @@ Docker Compose version v2.32.1
  Container tests-wazuh-manager-1  Started
     Wazuh manager is ready.
 ==> Step 2: Setting enrollment password...
-2026/04/20 01:57:10 wazuh-modulesd:router: INFO: Loaded router module.
-2026/04/20 01:57:10 wazuh-modulesd:content_manager: INFO: Loaded content_manager module.
+2026/04/20 15:37:10 wazuh-modulesd:router: INFO: Loaded router module.
+2026/04/20 15:37:10 wazuh-modulesd:content_manager: INFO: Loaded content_manager module.
 wazuh-clusterd not running...
 Killing wazuh-modulesd...
 Killing wazuh-monitord...
@@ -425,7 +40,7 @@ Starting Wazuh v4.9.2...
 Started wazuh-apid...
 Started wazuh-csyslogd...
 Started wazuh-dbd...
-2026/04/20 01:57:16 wazuh-integratord: INFO: Remote integrations not configured. Clean exit.
+2026/04/20 15:37:16 wazuh-integratord: INFO: Remote integrations not configured. Clean exit.
 Started wazuh-integratord...
 Started wazuh-agentlessd...
 Started wazuh-authd...
@@ -436,146 +51,55 @@ Started wazuh-syscheckd...
 Started wazuh-remoted...
 Started wazuh-logcollector...
 Started wazuh-monitord...
-2026/04/20 01:57:19 wazuh-modulesd:router: INFO: Loaded router module.
-2026/04/20 01:57:19 wazuh-modulesd:content_manager: INFO: Loaded content_manager module.
+2026/04/20 15:37:20 wazuh-modulesd:router: INFO: Loaded router module.
+2026/04/20 15:37:20 wazuh-modulesd:content_manager: INFO: Loaded content_manager module.
 Started wazuh-modulesd...
 Completed.
     Enrollment password configured.
 ==> Step 3: Building agent...
     Found existing ./target/release/wda-agent; skipping cargo build.
 ==> Step 4: Creating test directories...
-    Test directories ready.
+    Test directories, SCA policy, and rootkit marker ready.
 ==> Step 5: Starting agent...
-[2m2026-04-20T01:57:43.736901Z[0m [32m INFO[0m [2mwda_agent[0m[2m:[0m wazuh desktop agent starting
-[2m2026-04-20T01:57:43.737050Z[0m [32m INFO[0m [2mwda_core::config[0m[2m:[0m loaded configuration [3mpath[0m[2m=[0mtests/wazuh-test-config.yaml
-[2m2026-04-20T01:57:43.737156Z[0m [32m INFO[0m [2mwda_core::agent[0m[2m:[0m initializing agent
-[2m2026-04-20T01:57:43.737179Z[0m [32m INFO[0m [2mwda_agent[0m[2m:[0m no agent key found, enrolling with server
-[2m2026-04-20T01:57:43.737189Z[0m [32m INFO[0m [2mwda_comms::enrollment[0m[2m:[0m starting enrollment [3maddress[0m[2m=[0m127.0.0.1:1515 [3magent[0m[2m=[0mdevin-box
-[2m2026-04-20T01:57:43.741895Z[0m [32m INFO[0m [2mwda_comms::enrollment[0m[2m:[0m enrollment response received [3mresponse[0m[2m=[0mOSSEC K:'001 devin-box any af2586b3e2ce1ab459fcd91a1c994235bb77d6f7c2efb8ad192c49b48fc7c621'
-[2m2026-04-20T01:57:43.741920Z[0m [32m INFO[0m [2mwda_comms::enrollment[0m[2m:[0m enrollment successful [3magent_id[0m[2m=[0m001 [3magent_name[0m[2m=[0mdevin-box
-[2m2026-04-20T01:57:43.742055Z[0m [32m INFO[0m [2mwda_comms::enrollment[0m[2m:[0m agent key saved [3mpath[0m[2m=[0m/etc/wazuh-desktop-agent/client.keys
-[2m2026-04-20T01:57:43.742077Z[0m [32m INFO[0m [2mwda_agent[0m[2m:[0m enrollment complete, key saved [3magent_id[0m[2m=[0m001
-[2m2026-04-20T01:57:43.742083Z[0m [32m INFO[0m [2mwda_agent[0m[2m:[0m waiting 15 s for remoted to load new agent key
-[2m2026-04-20T01:57:58.743099Z[0m [32m INFO[0m [2mwda_agent[0m[2m:[0m connecting to server
-[2m2026-04-20T01:57:58.743136Z[0m [32m INFO[0m [2mwda_comms::connection[0m[2m:[0m connecting to server [3maddress[0m[2m=[0m127.0.0.1:1514
-[2m2026-04-20T01:57:58.743401Z[0m [32m INFO[0m [2mwda_comms::connection[0m[2m:[0m connected to server [3maddress[0m[2m=[0m127.0.0.1:1514
-[2m2026-04-20T01:57:58.743829Z[0m [32m INFO[0m [2mwda_agent[0m[2m:[0m startup message sent
-[2m2026-04-20T01:57:58.743887Z[0m [32m INFO[0m [2mwda_agent[0m[2m:[0m starting FIM module
-[2m2026-04-20T01:57:58.743898Z[0m [32m INFO[0m [2mwda_core::agent[0m[2m:[0m registered module [3mmodule[0m[2m=[0m"fim"
-[2m2026-04-20T01:57:58.743907Z[0m [32m INFO[0m [2mwda_agent[0m[2m:[0m starting logcollector module
-[2m2026-04-20T01:57:58.743922Z[0m [32m INFO[0m [2mwda_core::agent[0m[2m:[0m registered module [3mmodule[0m[2m=[0m"logcollector"
-[2m2026-04-20T01:57:58.743928Z[0m [32m INFO[0m [2mwda_agent[0m[2m:[0m starting inventory module
-[2m2026-04-20T01:57:58.743935Z[0m [32m INFO[0m [2mwda_core::agent[0m[2m:[0m registered module [3mmodule[0m[2m=[0m"inventory"
-[2m2026-04-20T01:57:58.743940Z[0m [32m INFO[0m [2mwda_agent[0m[2m:[0m starting active response module
-[2m2026-04-20T01:57:58.743949Z[0m [32m INFO[0m [2mwda_core::agent[0m[2m:[0m registered module [3mmodule[0m[2m=[0m"active_response"
-[2m2026-04-20T01:57:58.743973Z[0m [32m INFO[0m [2mwda_agent[0m[2m:[0m starting SCA module
-[2m2026-04-20T01:57:58.743971Z[0m [32m INFO[0m [2mwda_comms::keepalive[0m[2m:[0m starting keepalive loop [3minterval_secs[0m[2m=[0m10
-[2m2026-04-20T01:57:58.743981Z[0m [32m INFO[0m [2mwda_core::agent[0m[2m:[0m registered module [3mmodule[0m[2m=[0m"sca"
-[2m2026-04-20T01:57:58.743987Z[0m [32m INFO[0m [2mwda_core::agent[0m[2m:[0m starting agent
-[2m2026-04-20T01:57:58.743989Z[0m [32m INFO[0m [2mwda_agent[0m[2m:[0m event forwarding loop started
-[2m2026-04-20T01:57:58.744001Z[0m [32m INFO[0m [2mwda_agent[0m[2m:[0m server receive loop started
-[2m2026-04-20T01:57:58.744013Z[0m [32m INFO[0m [2mwda_fim[0m[2m:[0m FIM module starting
-[2m2026-04-20T01:57:58.744012Z[0m [32m INFO[0m [2mwda_core::agent[0m[2m:[0m agent started [3mmodules[0m[2m=[0m5
-[2m2026-04-20T01:57:58.744540Z[0m [32m INFO[0m [2mwda_logcollector[0m[2m:[0m logcollector module starting
-[2m2026-04-20T01:57:58.744587Z[0m [32m INFO[0m [2mwda_logcollector[0m[2m:[0m logcollector module running
-[2m2026-04-20T01:57:58.744585Z[0m [32m INFO[0m [2mwda_inventory[0m[2m:[0m inventory module starting
-[2m2026-04-20T01:57:58.744598Z[0m [32m INFO[0m [2mwda_inventory[0m[2m:[0m inventory module running [3minterval_secs[0m[2m=[0m15
-[2m2026-04-20T01:57:58.744616Z[0m [32m INFO[0m [2mwda_inventory[0m[2m:[0m starting inventory collection
-[2m2026-04-20T01:57:58.744638Z[0m [32m INFO[0m [2mwda_active_response[0m[2m:[0m active response module starting
-[2m2026-04-20T01:57:58.744669Z[0m [32m INFO[0m [2mwda_active_response[0m[2m:[0m active response module running
-[2m2026-04-20T01:57:58.744681Z[0m [32m INFO[0m [2mwda_logcollector::journal_reader[0m[2m:[0m journal reader starting
-[2m2026-04-20T01:57:58.744690Z[0m [32m INFO[0m [2mwda_sca[0m[2m:[0m SCA module starting
-[2m2026-04-20T01:57:58.744714Z[0m [33m WARN[0m [2mwda_sca[0m[2m:[0m SCA policy directory does not exist; no policies loaded [3mpath[0m[2m=[0m/etc/wazuh-desktop-agent/sca
-[2m2026-04-20T01:57:58.744721Z[0m [32m INFO[0m [2mwda_sca[0m[2m:[0m SCA policies loaded [3mpolicies[0m[2m=[0m0 [3mpath[0m[2m=[0m/etc/wazuh-desktop-agent/sca
-[2m2026-04-20T01:57:58.745326Z[0m [32m INFO[0m [2mwda_logcollector::file_reader[0m[2m:[0m file reader running [3mfiles[0m[2m=[0m1
-[2m2026-04-20T01:57:58.755277Z[0m [32m INFO[0m [2mwda_fim[0m[2m:[0m opened FIM state database [3mpath[0m[2m=[0m/var/lib/wazuh-desktop-agent/fim.db
-[2m2026-04-20T01:57:58.755389Z[0m [32m INFO[0m [2mwda_pal::fs_watcher[0m[2m:[0m filesystem watcher initialized
-[2m2026-04-20T01:57:58.755621Z[0m [32m INFO[0m [2mwda_fim[0m[2m:[0m watching directory [3mpath[0m[2m=[0m/tmp/wda-e2e-fim [3mrecursive[0m[2m=[0mtrue
-[2m2026-04-20T01:57:58.755647Z[0m [32m INFO[0m [2mwda_fim[0m[2m:[0m FIM module running
-[2m2026-04-20T01:57:58.757321Z[0m [32m INFO[0m [2mwda_fim[0m[2m:[0m baseline scan complete [3mscanned[0m[2m=[0m0 [3mnew[0m[2m=[0m0 [3mmodified[0m[2m=[0m0 [3mdeleted[0m[2m=[0m0
-[2m2026-04-20T01:57:58.758766Z[0m [32m INFO[0m [2mwda_logcollector::journal_reader[0m[2m:[0m journal reader running (event-driven via fd 41)
-[2m2026-04-20T01:57:59.853812Z[0m [32m INFO[0m [2mwda_inventory[0m[2m:[0m inventory collection complete
-    Agent started (PID 31378).
+    Agent started (PID 58013).
 ==> Step 6: Verifying enrollment...
     Enrolled agents: 
 Available agents: 
    ID: 001, Name: devin-box, IP: any
 ==> Step 7: Waiting for keepalive cycle (35s)...
-[2m2026-04-20T01:58:14.855173Z[0m [32m INFO[0m [2mwda_inventory[0m[2m:[0m starting inventory collection
-[2m2026-04-20T01:58:16.054707Z[0m [32m INFO[0m [2mwda_inventory[0m[2m:[0m inventory collection complete
-[2m2026-04-20T01:58:18.756287Z[0m [32m INFO[0m [2mwda_fim[0m[2m:[0m baseline scan timer fired
-[2m2026-04-20T01:58:18.756506Z[0m [32m INFO[0m [2mwda_fim::scanner[0m[2m:[0m system busy, deferring baseline scan [3mattempt[0m[2m=[0m1 [3mmax_retries[0m[2m=[0m3
-[2m2026-04-20T01:58:29.855081Z[0m [32m INFO[0m [2mwda_inventory[0m[2m:[0m starting inventory collection
-[2m2026-04-20T01:58:31.027360Z[0m [32m INFO[0m [2mwda_inventory[0m[2m:[0m inventory collection complete
-[2m2026-04-20T01:58:38.756202Z[0m [32m INFO[0m [2mwda_fim[0m[2m:[0m baseline scan timer fired
-[2m2026-04-20T01:58:38.756872Z[0m [32m INFO[0m [2mwda_fim[0m[2m:[0m baseline scan complete [3mscanned[0m[2m=[0m0 [3mnew[0m[2m=[0m0 [3mmodified[0m[2m=[0m0 [3mdeleted[0m[2m=[0m0
+    WARNING: 1 remoted/decrypt error(s) in ossec.log
+2026/04/20 15:38:00 wazuh-remoted: WARNING: Decrypt the message fail, socket 28
 ==> Step 8: Triggering FIM event...
     Waiting 40s for syscheck alert...
-[2m2026-04-20T01:58:44.854791Z[0m [32m INFO[0m [2mwda_inventory[0m[2m:[0m starting inventory collection
-[2m2026-04-20T01:58:46.008004Z[0m [32m INFO[0m [2mwda_inventory[0m[2m:[0m inventory collection complete
-[2m2026-04-20T01:58:58.755931Z[0m [32m INFO[0m [2mwda_fim[0m[2m:[0m baseline scan timer fired
-[2m2026-04-20T01:58:58.756879Z[0m [32m INFO[0m [2mwda_fim[0m[2m:[0m baseline scan complete [3mscanned[0m[2m=[0m1 [3mnew[0m[2m=[0m0 [3mmodified[0m[2m=[0m0 [3mdeleted[0m[2m=[0m0
-[2m2026-04-20T01:58:59.855066Z[0m [32m INFO[0m [2mwda_inventory[0m[2m:[0m starting inventory collection
-[2m2026-04-20T01:59:01.026501Z[0m [32m INFO[0m [2mwda_inventory[0m[2m:[0m inventory collection complete
-[2m2026-04-20T01:59:14.855495Z[0m [32m INFO[0m [2mwda_inventory[0m[2m:[0m starting inventory collection
-[2m2026-04-20T01:59:16.037617Z[0m [32m INFO[0m [2mwda_inventory[0m[2m:[0m inventory collection complete
-[2m2026-04-20T01:59:18.755899Z[0m [32m INFO[0m [2mwda_fim[0m[2m:[0m baseline scan timer fired
-[2m2026-04-20T01:59:18.756923Z[0m [32m INFO[0m [2mwda_fim[0m[2m:[0m baseline scan complete [3mscanned[0m[2m=[0m1 [3mnew[0m[2m=[0m0 [3mmodified[0m[2m=[0m0 [3mdeleted[0m[2m=[0m0
-[2m2026-04-20T01:59:18.757196Z[0m [32m INFO[0m [2mwda_fim[0m[2m:[0m baseline scan complete [3mscanned[0m[2m=[0m1 [3mnew[0m[2m=[0m0 [3mmodified[0m[2m=[0m0 [3mdeleted[0m[2m=[0m0
     Syscheck alerts found: 2
 ==> Step 8b: Verifying baseline scan...
     Waiting for baseline scan cycle...
-[2m2026-04-20T01:59:29.855341Z[0m [32m INFO[0m [2mwda_inventory[0m[2m:[0m starting inventory collection
-[2m2026-04-20T01:59:31.009597Z[0m [32m INFO[0m [2mwda_inventory[0m[2m:[0m inventory collection complete
-[2m2026-04-20T01:59:38.756205Z[0m [32m INFO[0m [2mwda_fim[0m[2m:[0m baseline scan timer fired
-[2m2026-04-20T01:59:38.757396Z[0m [32m INFO[0m [2mwda_fim[0m[2m:[0m baseline scan complete [3mscanned[0m[2m=[0m4 [3mnew[0m[2m=[0m0 [3mmodified[0m[2m=[0m0 [3mdeleted[0m[2m=[0m0
-[2m2026-04-20T01:59:44.855370Z[0m [32m INFO[0m [2mwda_inventory[0m[2m:[0m starting inventory collection
-[2m2026-04-20T01:59:46.018987Z[0m [32m INFO[0m [2mwda_inventory[0m[2m:[0m inventory collection complete
-[2m2026-04-20T01:59:58.756125Z[0m [32m INFO[0m [2mwda_fim[0m[2m:[0m baseline scan timer fired
-[2m2026-04-20T01:59:58.757122Z[0m [32m INFO[0m [2mwda_fim[0m[2m:[0m baseline scan complete [3mscanned[0m[2m=[0m4 [3mnew[0m[2m=[0m0 [3mmodified[0m[2m=[0m0 [3mdeleted[0m[2m=[0m0
     Baseline scan alerts found: 6
 ==> Step 8c: Verifying deletion detection...
     Waiting for next scan cycle to detect deletion...
-[2m2026-04-20T01:59:59.855393Z[0m [32m INFO[0m [2mwda_inventory[0m[2m:[0m starting inventory collection
-[2m2026-04-20T02:00:01.016870Z[0m [32m INFO[0m [2mwda_inventory[0m[2m:[0m inventory collection complete
-[2m2026-04-20T02:00:14.855316Z[0m [32m INFO[0m [2mwda_inventory[0m[2m:[0m starting inventory collection
-[2m2026-04-20T02:00:16.027930Z[0m [32m INFO[0m [2mwda_inventory[0m[2m:[0m inventory collection complete
-[2m2026-04-20T02:00:18.756573Z[0m [32m INFO[0m [2mwda_fim[0m[2m:[0m baseline scan timer fired
-[2m2026-04-20T02:00:18.757462Z[0m [32m INFO[0m [2mwda_fim[0m[2m:[0m baseline scan complete [3mscanned[0m[2m=[0m3 [3mnew[0m[2m=[0m0 [3mmodified[0m[2m=[0m0 [3mdeleted[0m[2m=[0m0
-[2m2026-04-20T02:00:29.855034Z[0m [32m INFO[0m [2mwda_inventory[0m[2m:[0m starting inventory collection
-[2m2026-04-20T02:00:31.021436Z[0m [32m INFO[0m [2mwda_inventory[0m[2m:[0m inventory collection complete
-[2m2026-04-20T02:00:38.755920Z[0m [32m INFO[0m [2mwda_fim[0m[2m:[0m baseline scan timer fired
-[2m2026-04-20T02:00:38.756951Z[0m [32m INFO[0m [2mwda_fim[0m[2m:[0m baseline scan complete [3mscanned[0m[2m=[0m3 [3mnew[0m[2m=[0m0 [3mmodified[0m[2m=[0m0 [3mdeleted[0m[2m=[0m0
     Deletion alerts found: 3
 ==> Step 9b: Verifying inventory data...
-[2m2026-04-20T02:00:44.855585Z[0m [32m INFO[0m [2mwda_inventory[0m[2m:[0m starting inventory collection
-[2m2026-04-20T02:00:46.021165Z[0m [32m INFO[0m [2mwda_inventory[0m[2m:[0m inventory collection complete
-[2m2026-04-20T02:00:58.756012Z[0m [32m INFO[0m [2mwda_fim[0m[2m:[0m baseline scan timer fired
-[2m2026-04-20T02:00:58.757190Z[0m [32m INFO[0m [2mwda_fim[0m[2m:[0m baseline scan complete [3mscanned[0m[2m=[0m3 [3mnew[0m[2m=[0m0 [3mmodified[0m[2m=[0m0 [3mdeleted[0m[2m=[0m0
-[2m2026-04-20T02:00:59.854953Z[0m [32m INFO[0m [2mwda_inventory[0m[2m:[0m starting inventory collection
-[2m2026-04-20T02:01:01.006385Z[0m [32m INFO[0m [2mwda_inventory[0m[2m:[0m inventory collection complete
-    Inventory events found: 14183
+    Inventory events found: 1091
 ==> Step 9: Triggering log collection event...
     Waiting 15s for log alert...
-[2m2026-04-20T02:01:14.855357Z[0m [32m INFO[0m [2mwda_inventory[0m[2m:[0m starting inventory collection
-[2m2026-04-20T02:01:16.018994Z[0m [32m INFO[0m [2mwda_inventory[0m[2m:[0m inventory collection complete
-[2m2026-04-20T02:01:18.756097Z[0m [32m INFO[0m [2mwda_fim[0m[2m:[0m baseline scan timer fired
-[2m2026-04-20T02:01:18.757498Z[0m [32m INFO[0m [2mwda_fim[0m[2m:[0m baseline scan complete [3mscanned[0m[2m=[0m3 [3mnew[0m[2m=[0m0 [3mmodified[0m[2m=[0m0 [3mdeleted[0m[2m=[0m0
     Log collection alerts found: 1
 ==> Step 9c: Triggering journal log event...
     Waiting 15s for journal log alert...
-[2m2026-04-20T02:01:29.855547Z[0m [32m INFO[0m [2mwda_inventory[0m[2m:[0m starting inventory collection
-[2m2026-04-20T02:01:31.022433Z[0m [32m INFO[0m [2mwda_inventory[0m[2m:[0m inventory collection complete
-[2m2026-04-20T02:01:38.756151Z[0m [32m INFO[0m [2mwda_fim[0m[2m:[0m baseline scan timer fired
-[2m2026-04-20T02:01:38.757153Z[0m [32m INFO[0m [2mwda_fim[0m[2m:[0m baseline scan complete [3mscanned[0m[2m=[0m3 [3mnew[0m[2m=[0m0 [3mmodified[0m[2m=[0m0 [3mdeleted[0m[2m=[0m0
     Journal log events found in archives: 1
 ==> Step 10: Testing active response...
 
 ** Selected active response does not exist.
     Waiting 15s for active response execution...
-[2m2026-04-20T02:01:44.856354Z[0m [32m INFO[0m [2mwda_inventory[0m[2m:[0m starting inventory collection
-[2m2026-04-20T02:01:51.406443Z[0m [32m INFO[0m [2mwda_inventory[0m[2m:[0m inventory collection complete
-==> Step 11: Tests complete, cleaning up...
+==> Step 11: Verifying SCA policy evaluation...
+    SCA events found in archives: 0
+==> Step 12: Verifying rootcheck signature alert...
+    Rootcheck marker events found in archives: 18
+==> Step 13: Verifying enhanced inventory events...
+    Enhanced-inventory events found in archives: 0 (manager-side, optional)
+    Enhanced-inventory running_software log lines: 1
+    Enhanced-inventory SBOM log lines: 2
+    Enhanced-inventory browser-extensions log lines: 2
+==> Step 14: Tests complete, cleaning up...
 
 ==============================
   E2E Test Summary
@@ -589,60 +113,65 @@ Available agents:
   PASS: Log collection alerts received by server
   PASS: Journal log collection events received by server
   PASS: Active response command processed
+  PASS: SCA policy evaluation received by server (generic match)
+  PASS: Rootcheck signature alert received by server
+  PASS: Enhanced inventory running-software scanner active (agent log oracle)
+  PASS: Enhanced inventory SBOM scanner active (agent log oracle)
+  PASS: Enhanced inventory browser-extensions scanner active (agent log oracle)
 ==============================
   RESULT: ALL CHECKS PASSED
 ==============================
 
 --- Agent log (last 50 lines) ---
-[2m2026-04-20T01:58:18.756506Z[0m [32m INFO[0m [2mwda_fim::scanner[0m[2m:[0m system busy, deferring baseline scan [3mattempt[0m[2m=[0m1 [3mmax_retries[0m[2m=[0m3
-[2m2026-04-20T01:58:29.855081Z[0m [32m INFO[0m [2mwda_inventory[0m[2m:[0m starting inventory collection
-[2m2026-04-20T01:58:31.027360Z[0m [32m INFO[0m [2mwda_inventory[0m[2m:[0m inventory collection complete
-[2m2026-04-20T01:58:38.756202Z[0m [32m INFO[0m [2mwda_fim[0m[2m:[0m baseline scan timer fired
-[2m2026-04-20T01:58:38.756872Z[0m [32m INFO[0m [2mwda_fim[0m[2m:[0m baseline scan complete [3mscanned[0m[2m=[0m0 [3mnew[0m[2m=[0m0 [3mmodified[0m[2m=[0m0 [3mdeleted[0m[2m=[0m0
-[2m2026-04-20T01:58:44.854791Z[0m [32m INFO[0m [2mwda_inventory[0m[2m:[0m starting inventory collection
-[2m2026-04-20T01:58:46.008004Z[0m [32m INFO[0m [2mwda_inventory[0m[2m:[0m inventory collection complete
-[2m2026-04-20T01:58:58.755931Z[0m [32m INFO[0m [2mwda_fim[0m[2m:[0m baseline scan timer fired
-[2m2026-04-20T01:58:58.756879Z[0m [32m INFO[0m [2mwda_fim[0m[2m:[0m baseline scan complete [3mscanned[0m[2m=[0m1 [3mnew[0m[2m=[0m0 [3mmodified[0m[2m=[0m0 [3mdeleted[0m[2m=[0m0
-[2m2026-04-20T01:58:59.855066Z[0m [32m INFO[0m [2mwda_inventory[0m[2m:[0m starting inventory collection
-[2m2026-04-20T01:59:01.026501Z[0m [32m INFO[0m [2mwda_inventory[0m[2m:[0m inventory collection complete
-[2m2026-04-20T01:59:14.855495Z[0m [32m INFO[0m [2mwda_inventory[0m[2m:[0m starting inventory collection
-[2m2026-04-20T01:59:16.037617Z[0m [32m INFO[0m [2mwda_inventory[0m[2m:[0m inventory collection complete
-[2m2026-04-20T01:59:18.755899Z[0m [32m INFO[0m [2mwda_fim[0m[2m:[0m baseline scan timer fired
-[2m2026-04-20T01:59:18.756923Z[0m [32m INFO[0m [2mwda_fim[0m[2m:[0m baseline scan complete [3mscanned[0m[2m=[0m1 [3mnew[0m[2m=[0m0 [3mmodified[0m[2m=[0m0 [3mdeleted[0m[2m=[0m0
-[2m2026-04-20T01:59:18.757196Z[0m [32m INFO[0m [2mwda_fim[0m[2m:[0m baseline scan complete [3mscanned[0m[2m=[0m1 [3mnew[0m[2m=[0m0 [3mmodified[0m[2m=[0m0 [3mdeleted[0m[2m=[0m0
-[2m2026-04-20T01:59:29.855341Z[0m [32m INFO[0m [2mwda_inventory[0m[2m:[0m starting inventory collection
-[2m2026-04-20T01:59:31.009597Z[0m [32m INFO[0m [2mwda_inventory[0m[2m:[0m inventory collection complete
-[2m2026-04-20T01:59:38.756205Z[0m [32m INFO[0m [2mwda_fim[0m[2m:[0m baseline scan timer fired
-[2m2026-04-20T01:59:38.757396Z[0m [32m INFO[0m [2mwda_fim[0m[2m:[0m baseline scan complete [3mscanned[0m[2m=[0m4 [3mnew[0m[2m=[0m0 [3mmodified[0m[2m=[0m0 [3mdeleted[0m[2m=[0m0
-[2m2026-04-20T01:59:44.855370Z[0m [32m INFO[0m [2mwda_inventory[0m[2m:[0m starting inventory collection
-[2m2026-04-20T01:59:46.018987Z[0m [32m INFO[0m [2mwda_inventory[0m[2m:[0m inventory collection complete
-[2m2026-04-20T01:59:58.756125Z[0m [32m INFO[0m [2mwda_fim[0m[2m:[0m baseline scan timer fired
-[2m2026-04-20T01:59:58.757122Z[0m [32m INFO[0m [2mwda_fim[0m[2m:[0m baseline scan complete [3mscanned[0m[2m=[0m4 [3mnew[0m[2m=[0m0 [3mmodified[0m[2m=[0m0 [3mdeleted[0m[2m=[0m0
-[2m2026-04-20T01:59:59.855393Z[0m [32m INFO[0m [2mwda_inventory[0m[2m:[0m starting inventory collection
-[2m2026-04-20T02:00:01.016870Z[0m [32m INFO[0m [2mwda_inventory[0m[2m:[0m inventory collection complete
-[2m2026-04-20T02:00:14.855316Z[0m [32m INFO[0m [2mwda_inventory[0m[2m:[0m starting inventory collection
-[2m2026-04-20T02:00:16.027930Z[0m [32m INFO[0m [2mwda_inventory[0m[2m:[0m inventory collection complete
-[2m2026-04-20T02:00:18.756573Z[0m [32m INFO[0m [2mwda_fim[0m[2m:[0m baseline scan timer fired
-[2m2026-04-20T02:00:18.757462Z[0m [32m INFO[0m [2mwda_fim[0m[2m:[0m baseline scan complete [3mscanned[0m[2m=[0m3 [3mnew[0m[2m=[0m0 [3mmodified[0m[2m=[0m0 [3mdeleted[0m[2m=[0m0
-[2m2026-04-20T02:00:29.855034Z[0m [32m INFO[0m [2mwda_inventory[0m[2m:[0m starting inventory collection
-[2m2026-04-20T02:00:31.021436Z[0m [32m INFO[0m [2mwda_inventory[0m[2m:[0m inventory collection complete
-[2m2026-04-20T02:00:38.755920Z[0m [32m INFO[0m [2mwda_fim[0m[2m:[0m baseline scan timer fired
-[2m2026-04-20T02:00:38.756951Z[0m [32m INFO[0m [2mwda_fim[0m[2m:[0m baseline scan complete [3mscanned[0m[2m=[0m3 [3mnew[0m[2m=[0m0 [3mmodified[0m[2m=[0m0 [3mdeleted[0m[2m=[0m0
-[2m2026-04-20T02:00:44.855585Z[0m [32m INFO[0m [2mwda_inventory[0m[2m:[0m starting inventory collection
-[2m2026-04-20T02:00:46.021165Z[0m [32m INFO[0m [2mwda_inventory[0m[2m:[0m inventory collection complete
-[2m2026-04-20T02:00:58.756012Z[0m [32m INFO[0m [2mwda_fim[0m[2m:[0m baseline scan timer fired
-[2m2026-04-20T02:00:58.757190Z[0m [32m INFO[0m [2mwda_fim[0m[2m:[0m baseline scan complete [3mscanned[0m[2m=[0m3 [3mnew[0m[2m=[0m0 [3mmodified[0m[2m=[0m0 [3mdeleted[0m[2m=[0m0
-[2m2026-04-20T02:00:59.854953Z[0m [32m INFO[0m [2mwda_inventory[0m[2m:[0m starting inventory collection
-[2m2026-04-20T02:01:01.006385Z[0m [32m INFO[0m [2mwda_inventory[0m[2m:[0m inventory collection complete
-[2m2026-04-20T02:01:14.855357Z[0m [32m INFO[0m [2mwda_inventory[0m[2m:[0m starting inventory collection
-[2m2026-04-20T02:01:16.018994Z[0m [32m INFO[0m [2mwda_inventory[0m[2m:[0m inventory collection complete
-[2m2026-04-20T02:01:18.756097Z[0m [32m INFO[0m [2mwda_fim[0m[2m:[0m baseline scan timer fired
-[2m2026-04-20T02:01:18.757498Z[0m [32m INFO[0m [2mwda_fim[0m[2m:[0m baseline scan complete [3mscanned[0m[2m=[0m3 [3mnew[0m[2m=[0m0 [3mmodified[0m[2m=[0m0 [3mdeleted[0m[2m=[0m0
-[2m2026-04-20T02:01:29.855547Z[0m [32m INFO[0m [2mwda_inventory[0m[2m:[0m starting inventory collection
-[2m2026-04-20T02:01:31.022433Z[0m [32m INFO[0m [2mwda_inventory[0m[2m:[0m inventory collection complete
-[2m2026-04-20T02:01:38.756151Z[0m [32m INFO[0m [2mwda_fim[0m[2m:[0m baseline scan timer fired
-[2m2026-04-20T02:01:38.757153Z[0m [32m INFO[0m [2mwda_fim[0m[2m:[0m baseline scan complete [3mscanned[0m[2m=[0m3 [3mnew[0m[2m=[0m0 [3mmodified[0m[2m=[0m0 [3mdeleted[0m[2m=[0m0
-[2m2026-04-20T02:01:44.856354Z[0m [32m INFO[0m [2mwda_inventory[0m[2m:[0m starting inventory collection
-[2m2026-04-20T02:01:51.406443Z[0m [32m INFO[0m [2mwda_inventory[0m[2m:[0m inventory collection complete
+[2m2026-04-20T15:38:59.737773Z[0m [32m INFO[0m [2mwda_fim[0m[2m:[0m baseline scan timer fired [3mprofile[0m[2m=[0mNormal
+[2m2026-04-20T15:38:59.738353Z[0m [32m INFO[0m [2mwda_fim[0m[2m:[0m baseline scan complete [3mscanned[0m[2m=[0m1 [3mnew[0m[2m=[0m0 [3mmodified[0m[2m=[0m0 [3mdeleted[0m[2m=[0m0
+[2m2026-04-20T15:39:14.723203Z[0m [32m INFO[0m [2mwda_rootcheck[0m[2m:[0m rootcheck sweep starting
+[2m2026-04-20T15:39:14.723290Z[0m [32m INFO[0m [2mwda_sca[0m[2m:[0m evaluating SCA policy [3mpolicy_id[0m[2m=[0mwda_e2e_test_policy
+[2m2026-04-20T15:39:19.737733Z[0m [32m INFO[0m [2mwda_fim[0m[2m:[0m baseline scan timer fired [3mprofile[0m[2m=[0mNormal
+[2m2026-04-20T15:39:19.738636Z[0m [32m INFO[0m [2mwda_fim[0m[2m:[0m baseline scan complete [3mscanned[0m[2m=[0m1 [3mnew[0m[2m=[0m0 [3mmodified[0m[2m=[0m0 [3mdeleted[0m[2m=[0m0
+[2m2026-04-20T15:39:29.724148Z[0m [32m INFO[0m [2mwda_rootcheck[0m[2m:[0m rootcheck sweep starting
+[2m2026-04-20T15:39:29.724189Z[0m [32m INFO[0m [2mwda_sca[0m[2m:[0m evaluating SCA policy [3mpolicy_id[0m[2m=[0mwda_e2e_test_policy
+[2m2026-04-20T15:39:39.737450Z[0m [32m INFO[0m [2mwda_fim[0m[2m:[0m baseline scan timer fired [3mprofile[0m[2m=[0mNormal
+[2m2026-04-20T15:39:39.738693Z[0m [32m INFO[0m [2mwda_fim[0m[2m:[0m baseline scan complete [3mscanned[0m[2m=[0m4 [3mnew[0m[2m=[0m0 [3mmodified[0m[2m=[0m0 [3mdeleted[0m[2m=[0m0
+[2m2026-04-20T15:39:44.723585Z[0m [32m INFO[0m [2mwda_rootcheck[0m[2m:[0m rootcheck sweep starting
+[2m2026-04-20T15:39:44.723624Z[0m [32m INFO[0m [2mwda_sca[0m[2m:[0m evaluating SCA policy [3mpolicy_id[0m[2m=[0mwda_e2e_test_policy
+[2m2026-04-20T15:39:59.723248Z[0m [32m INFO[0m [2mwda_rootcheck[0m[2m:[0m rootcheck sweep starting
+[2m2026-04-20T15:39:59.723274Z[0m [32m INFO[0m [2mwda_sca[0m[2m:[0m evaluating SCA policy [3mpolicy_id[0m[2m=[0mwda_e2e_test_policy
+[2m2026-04-20T15:39:59.737462Z[0m [32m INFO[0m [2mwda_fim[0m[2m:[0m baseline scan timer fired [3mprofile[0m[2m=[0mNormal
+[2m2026-04-20T15:39:59.738717Z[0m [32m INFO[0m [2mwda_fim[0m[2m:[0m baseline scan complete [3mscanned[0m[2m=[0m4 [3mnew[0m[2m=[0m0 [3mmodified[0m[2m=[0m0 [3mdeleted[0m[2m=[0m0
+[2m2026-04-20T15:40:14.723161Z[0m [32m INFO[0m [2mwda_rootcheck[0m[2m:[0m rootcheck sweep starting
+[2m2026-04-20T15:40:14.723248Z[0m [32m INFO[0m [2mwda_sca[0m[2m:[0m evaluating SCA policy [3mpolicy_id[0m[2m=[0mwda_e2e_test_policy
+[2m2026-04-20T15:40:19.738243Z[0m [32m INFO[0m [2mwda_fim[0m[2m:[0m baseline scan timer fired [3mprofile[0m[2m=[0mNormal
+[2m2026-04-20T15:40:19.739307Z[0m [32m INFO[0m [2mwda_fim[0m[2m:[0m baseline scan complete [3mscanned[0m[2m=[0m3 [3mnew[0m[2m=[0m0 [3mmodified[0m[2m=[0m0 [3mdeleted[0m[2m=[0m0
+[2m2026-04-20T15:40:29.723915Z[0m [32m INFO[0m [2mwda_rootcheck[0m[2m:[0m rootcheck sweep starting
+[2m2026-04-20T15:40:29.723968Z[0m [32m INFO[0m [2mwda_sca[0m[2m:[0m evaluating SCA policy [3mpolicy_id[0m[2m=[0mwda_e2e_test_policy
+[2m2026-04-20T15:40:39.737777Z[0m [32m INFO[0m [2mwda_fim[0m[2m:[0m baseline scan timer fired [3mprofile[0m[2m=[0mNormal
+[2m2026-04-20T15:40:39.739050Z[0m [32m INFO[0m [2mwda_fim[0m[2m:[0m baseline scan complete [3mscanned[0m[2m=[0m3 [3mnew[0m[2m=[0m0 [3mmodified[0m[2m=[0m0 [3mdeleted[0m[2m=[0m0
+[2m2026-04-20T15:40:44.723285Z[0m [32m INFO[0m [2mwda_rootcheck[0m[2m:[0m rootcheck sweep starting
+[2m2026-04-20T15:40:44.723354Z[0m [32m INFO[0m [2mwda_sca[0m[2m:[0m evaluating SCA policy [3mpolicy_id[0m[2m=[0mwda_e2e_test_policy
+[2m2026-04-20T15:40:59.723768Z[0m [32m INFO[0m [2mwda_rootcheck[0m[2m:[0m rootcheck sweep starting
+[2m2026-04-20T15:40:59.723795Z[0m [32m INFO[0m [2mwda_sca[0m[2m:[0m evaluating SCA policy [3mpolicy_id[0m[2m=[0mwda_e2e_test_policy
+[2m2026-04-20T15:40:59.738000Z[0m [32m INFO[0m [2mwda_fim[0m[2m:[0m baseline scan timer fired [3mprofile[0m[2m=[0mNormal
+[2m2026-04-20T15:40:59.739038Z[0m [32m INFO[0m [2mwda_fim[0m[2m:[0m baseline scan complete [3mscanned[0m[2m=[0m3 [3mnew[0m[2m=[0m0 [3mmodified[0m[2m=[0m0 [3mdeleted[0m[2m=[0m0
+[2m2026-04-20T15:41:14.724091Z[0m [32m INFO[0m [2mwda_rootcheck[0m[2m:[0m rootcheck sweep starting
+[2m2026-04-20T15:41:14.724110Z[0m [32m INFO[0m [2mwda_sca[0m[2m:[0m evaluating SCA policy [3mpolicy_id[0m[2m=[0mwda_e2e_test_policy
+[2m2026-04-20T15:41:19.737540Z[0m [32m INFO[0m [2mwda_fim[0m[2m:[0m baseline scan timer fired [3mprofile[0m[2m=[0mNormal
+[2m2026-04-20T15:41:19.738948Z[0m [32m INFO[0m [2mwda_fim[0m[2m:[0m baseline scan complete [3mscanned[0m[2m=[0m3 [3mnew[0m[2m=[0m0 [3mmodified[0m[2m=[0m0 [3mdeleted[0m[2m=[0m0
+[2m2026-04-20T15:41:29.723206Z[0m [32m INFO[0m [2mwda_rootcheck[0m[2m:[0m rootcheck sweep starting
+[2m2026-04-20T15:41:29.723217Z[0m [32m INFO[0m [2mwda_sca[0m[2m:[0m evaluating SCA policy [3mpolicy_id[0m[2m=[0mwda_e2e_test_policy
+[2m2026-04-20T15:41:39.737314Z[0m [32m INFO[0m [2mwda_fim[0m[2m:[0m baseline scan timer fired [3mprofile[0m[2m=[0mNormal
+[2m2026-04-20T15:41:39.738436Z[0m [32m INFO[0m [2mwda_fim[0m[2m:[0m baseline scan complete [3mscanned[0m[2m=[0m3 [3mnew[0m[2m=[0m0 [3mmodified[0m[2m=[0m0 [3mdeleted[0m[2m=[0m0
+[2m2026-04-20T15:41:44.723934Z[0m [32m INFO[0m [2mwda_rootcheck[0m[2m:[0m rootcheck sweep starting
+[2m2026-04-20T15:41:44.723968Z[0m [32m INFO[0m [2mwda_sca[0m[2m:[0m evaluating SCA policy [3mpolicy_id[0m[2m=[0mwda_e2e_test_policy
+[2m2026-04-20T15:41:59.723708Z[0m [32m INFO[0m [2mwda_rootcheck[0m[2m:[0m rootcheck sweep starting
+[2m2026-04-20T15:41:59.723757Z[0m [32m INFO[0m [2mwda_sca[0m[2m:[0m evaluating SCA policy [3mpolicy_id[0m[2m=[0mwda_e2e_test_policy
+[2m2026-04-20T15:41:59.737982Z[0m [32m INFO[0m [2mwda_fim[0m[2m:[0m baseline scan timer fired [3mprofile[0m[2m=[0mNormal
+[2m2026-04-20T15:41:59.739105Z[0m [32m INFO[0m [2mwda_fim[0m[2m:[0m baseline scan complete [3mscanned[0m[2m=[0m3 [3mnew[0m[2m=[0m0 [3mmodified[0m[2m=[0m0 [3mdeleted[0m[2m=[0m0
+[2m2026-04-20T15:42:14.724217Z[0m [32m INFO[0m [2mwda_rootcheck[0m[2m:[0m rootcheck sweep starting
+[2m2026-04-20T15:42:14.724279Z[0m [32m INFO[0m [2mwda_sca[0m[2m:[0m evaluating SCA policy [3mpolicy_id[0m[2m=[0mwda_e2e_test_policy
+[2m2026-04-20T15:42:19.737694Z[0m [32m INFO[0m [2mwda_fim[0m[2m:[0m baseline scan timer fired [3mprofile[0m[2m=[0mNormal
+[2m2026-04-20T15:42:19.738678Z[0m [32m INFO[0m [2mwda_fim[0m[2m:[0m baseline scan complete [3mscanned[0m[2m=[0m3 [3mnew[0m[2m=[0m0 [3mmodified[0m[2m=[0m0 [3mdeleted[0m[2m=[0m0
+[2m2026-04-20T15:42:29.724115Z[0m [32m INFO[0m [2mwda_rootcheck[0m[2m:[0m rootcheck sweep starting
+[2m2026-04-20T15:42:29.724129Z[0m [32m INFO[0m [2mwda_sca[0m[2m:[0m evaluating SCA policy [3mpolicy_id[0m[2m=[0mwda_e2e_test_policy
 --- End agent log ---
 Cleaning up...
