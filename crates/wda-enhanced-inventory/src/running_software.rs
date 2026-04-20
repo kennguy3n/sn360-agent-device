@@ -363,10 +363,14 @@ mod macos_impl {
         #[test]
         fn test_parse_line_handles_space_padded_day() {
             // `ps` space-pads the day of month, so single-digit days
-            // produce a double space after the month name.
-            let line = "7 /bin/launchd Mon Apr  7 06:30:00 2026";
+            // produce a double space after the month name. Use a real
+            // calendar date (Tue Apr 7 2026) because chrono validates
+            // the weekday during parsing.
+            let line = "7 /bin/launchd Tue Apr  7 06:30:00 2026";
             let p = parse_line(line).expect("parse_line should succeed");
-            let started = p.started_at.expect("started_at must be populated");
+            let started = p
+                .started_at
+                .expect("started_at must be populated after whitespace normalisation");
             assert!(chrono::DateTime::parse_from_rfc3339(&started).is_ok());
         }
 
