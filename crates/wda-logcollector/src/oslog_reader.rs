@@ -12,7 +12,9 @@ use tokio::process::Command;
 use tracing::{debug, error, info, warn};
 
 use wda_core::signal::ShutdownSignal;
-use wda_event_bus::{Event, EventBus, EventKind, Priority};
+use wda_event_bus::{Event, EventKind, Priority};
+
+use crate::batch::LogBatchSink;
 
 /// Configuration for the macOS Unified Log reader.
 #[derive(Debug, Clone)]
@@ -26,11 +28,11 @@ pub struct OsLogConfig {
 /// Reads events from the macOS Unified Log via `/usr/bin/log stream`.
 pub struct OsLogReader {
     config: OsLogConfig,
-    bus: EventBus,
+    bus: LogBatchSink,
 }
 
 impl OsLogReader {
-    pub fn new(config: OsLogConfig, bus: EventBus) -> Self {
+    pub fn new(config: OsLogConfig, bus: LogBatchSink) -> Self {
         Self { config, bus }
     }
 

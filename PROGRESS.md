@@ -47,24 +47,24 @@ run as part of `cargo test --all`.
 
 Command: `cargo test --all 2>&1 | tee unit-test-results.txt`
 
-**Result: all 348 tests passed, 0 failed.**
+**Result: all 361 tests passed, 0 failed.**
 
 | Crate | Passed |
 |---|---|
 | `wda-active-response` | 29 |
 | `wda-agent` | 18 |
 | `wda-comms` | 31 |
-| `wda-core` | 0 |
-| `wda-enhanced-inventory` | 54 (48 lib + 6 integration across 2 integration binaries) |
+| `wda-core` | 2 (new: `power` watch channel) |
+| `wda-enhanced-inventory` | 57 (50 lib + 7 integration across 2 integration binaries) |
 | `wda-event-bus` | 4 |
-| `wda-fim` | 65 (53 lib + 12 integration across 4 integration binaries; 60 s — slowest, uses real inotify/kqueue) |
-| `wda-inventory` | 30 |
+| `wda-fim` | 68 (57 lib + 11 integration across 4 integration binaries; 60 s — slowest, uses real inotify/kqueue) |
+| `wda-inventory` | 32 |
 | `wda-local-detection` | 56 |
-| `wda-logcollector` | 31 |
+| `wda-logcollector` | 34 |
 | `wda-pal` | 5 |
 | `wda-rootcheck` | 20 |
 | `wda-sca` | 5 |
-| **Total** | **348** |
+| **Total** | **361** |
 
 Full log: [`unit-test-results.txt`](./unit-test-results.txt).
 
@@ -227,13 +227,22 @@ verified by the unit, E2E, or benchmark suites above:
    be entered on Linux hosts. Needs XScreenSaver
    (`XScreenSaverQueryInfo`) or D-Bus `org.freedesktop.ScreenSaver`
    / `logind` integration.
-3. **Adaptive power-aware scheduling not wired into modules.**
-   `PowerProfile` (with `fim_scan_rate`, `log_batch_interval`,
-   `inventory_interval`, `sca_enabled`) is defined in
-   `crates/wda-pal/src/power.rs` but no other crate imports it.
-   FIM, logcollector, inventory, and SCA still run at their
-   statically configured intervals, so PAL classification has no
-   runtime effect yet.
+3. ~~**Adaptive power-aware scheduling not wired into modules.**~~
+   **Resolved (PR #46).** A shared
+   `tokio::sync::watch::Sender<PowerProfile>` now lives in
+   `crates/wda-core/src/power.rs`, fed every 30 s by
+   `spawn_power_profile_task` using `PowerMonitor::detect`. The
+   receiver is threaded through every module's `start()`
+   signature and consumed in each select loop: FIM multiplies
+   its scan interval by `1.0 / profile.fim_scan_rate()` and
+   proportionally adjusts `RateLimiter::max_per_sec`, the new
+   `wda-logcollector::LogBatchSink` coalesces per-line events
+   into windows driven by `profile.log_batch_interval()`,
+   inventory and enhanced-inventory stretch their timers to
+   `max(configured, profile.inventory_interval())`, and SCA
+   short-circuits when `!profile.sca_enabled()`.
+   `PowerProfile::CriticalBattery` pauses baseline-scan,
+   inventory, enhanced-inventory, and SCA timers entirely.
 4. **macOS FIM burst test** — skipped on CI due to kqueue event
    drops under load; see
    [`docs/known-issues/fim-burst-workload-macos-ci.md`](./docs/known-issues/fim-burst-workload-macos-ci.md).
@@ -315,7 +324,7 @@ bandwidth allows.
 | P1.4 | Implement rootcheck content-based checks | Add content inspection for files like `/etc/ld.so.preload` (suspicious shared library entries), not just existence. |
 | P1.5 | Cross-platform rootcheck hidden-process detection | Extend hidden-process detection to macOS (`proc_listallpids` vs `/proc`-equivalent) and Windows (`NtQuerySystemInformation` vs `EnumProcesses`). Currently Linux-only. |
 | P1.6 | ~~Update `PROGRESS.md` rootcheck status~~ **Done** | Phase 2.9 Rootcheck is recorded as Complete above, covering PR #32 (signatures, hidden-process, binary-integrity). |
-| P1.7 | Wire adaptive power-aware scheduling into module loops | Plumb `PowerProfile` into FIM, logcollector, inventory, and SCA so that `fim_scan_rate`, `log_batch_interval`, `inventory_interval`, and `sca_enabled` actually shape scan cadence and batch windows. |
+| P1.7 | ~~Wire adaptive power-aware scheduling into module loops~~ **Done (PR #46)** | `PowerProfile` is now broadcast via a `tokio::sync::watch` channel owned by the agent main loop and polled every 30 s by `wda_core::power::spawn_power_profile_task`. FIM applies `fim_scan_rate` to both the baseline-scan interval and the `RateLimiter` hash budget, `wda-logcollector::LogBatchSink` flushes on `log_batch_interval`, inventory / enhanced-inventory extend their timers to `max(configured, inventory_interval)`, and SCA gates evaluation cycles on `sca_enabled`. `CriticalBattery` pauses baseline FIM, inventory, enhanced-inventory, and SCA scans entirely. |
 | P1.8 | Linux user-idle detection | Implement `PowerMonitor::user_idle_duration()` on Linux via XScreenSaver (`XScreenSaverQueryInfo`) or D-Bus `org.freedesktop.ScreenSaver` / `logind`, so `PowerProfile::IdleAC` / `PowerProfile::BatteryIdle` are reachable on Linux. |
 | P1.9 | Re-run FIM burst benchmark on the merged pipeline | After the Phase 3 pipeline changes (lazy hashing, `RateLimiter`, `EventBatcher`) — reproduce with `bash tests/scripts/fim-burst-bench.sh` and update `benchmark-results.md` to confirm the strict < 3 % peak target. |
 | P1.10 | Tune FIM defaults for burst-heavy environments | Sweep `max_hashes_per_sec` / `batch_size` / `batch_timeout_ms` against representative workloads and pick config defaults that keep sampled peak comfortably under 3 % without degrading event latency. |
@@ -627,3 +636,76 @@ browser extensions, 4.9 SBOM) are implemented, wired behind
 manager as `MessageType::Syscollector`. The remaining Phase 4
 work (4.10–4.14) is the server-side TRDS / IOCFS / SIS / Gateway
 microservices which live outside this repository.
+
+## Development Assessment — 2026-04-20 (Post-PR-#46)
+
+Priority 1 task **P1.7 (adaptive power-aware scheduling)**
+landed in **PR #46**, closing the long-standing gap where
+`PowerProfile` classification had no runtime effect on module
+cadence. The change introduces a single
+`tokio::sync::watch::Sender<PowerProfile>` owned by the agent
+main loop and fed every 30 s by
+`wda_core::power::spawn_power_profile_task`, which re-classifies
+the host using `PowerMonitor::detect` (battery state, battery
+percentage, user idle vs. a 10-minute threshold). Each module
+receives a clone of the watch receiver at `start()` time and
+consults it at the top of every scheduling tick.
+
+Wiring per module:
+
+- **FIM** — baseline-scan interval is multiplied by
+  `1.0 / profile.fim_scan_rate()` via `effective_scan_interval`,
+  and `RateLimiter::max_per_sec` is rebuilt on every profile
+  transition via `effective_hash_budget`. `CriticalBattery`
+  pauses baseline scans entirely (timer becomes `None`); a
+  `fim_scan_rate` of `0.0` never collapses the hash budget to
+  the `RateLimiter` "unlimited" sentinel — the floor is `1`.
+- **logcollector** — a new `LogBatchSink` wraps the shared
+  `EventBus` and coalesces per-line events from the file /
+  journald / OSLog / Windows EventLog readers into windows
+  driven by `profile.log_batch_interval()`. `spawn_flush_task`
+  watches the profile receiver and rebuilds its timer on every
+  transition, so moving onto battery immediately stretches the
+  window without waiting for the current timer to expire. The
+  sink also force-flushes at a `MAX_BATCH_SIZE` ceiling so
+  memory stays bounded during log bursts.
+- **inventory / enhanced-inventory** — scan cadence is the
+  larger of the statically configured interval and
+  `profile.inventory_interval()`, so a "scan every 30 s" config
+  still backs off on battery. `CriticalBattery` pauses timers
+  entirely. Enhanced-inventory applies the same logic
+  uniformly to its running-software, browser-extensions, and
+  SBOM scanners.
+- **SCA** — evaluation cycles short-circuit at the top of the
+  tick when `!profile.sca_enabled()`, and log at debug level so
+  operators can see why a scheduled cycle was skipped.
+
+The shared channel is unit-tested in
+`crates/wda-core/src/power.rs`, and every profile-derived
+helper function has targeted unit tests against the full set
+of profile variants:
+`effective_scan_interval_stretches_on_battery` /
+`_pauses_on_critical_battery`,
+`effective_hash_budget_scales_with_profile` /
+`_preserves_unlimited_opt_out`,
+`effective_inventory_interval_honors_profile` /
+`rebuild_inventory_timer_returns_none_on_critical_battery`, and
+`effective_ei_interval_pauses_on_critical_battery` /
+`rebuild_ei_timer_respects_disabled_flag`.
+
+The workspace test count grew from **348 passing** to **361
+passing** with this PR — the 13-test delta is the 2 new
+`wda-core::power` watch-channel tests, 4 new `wda-fim`
+helper-function tests, 2 new `wda-inventory` helper-function
+tests, 2 new `wda-enhanced-inventory` helper-function tests,
+and 3 new `wda-logcollector::batch` tests.
+
+The one remaining power-related gap is **P1.8 (Linux user-idle
+detection)** — on Linux,
+`PowerMonitor::user_idle_duration()` still returns `None`, so a
+Linux host can never enter `PowerProfile::IdleAC` /
+`PowerProfile::BatteryIdle`. P1.7 works correctly on such a
+host (AC transitions to `Normal`, battery to `BatteryActive` /
+`CriticalBattery`), and the idle transitions will activate
+automatically once P1.8 lands via XScreenSaver or a D-Bus
+`logind` integration without requiring further module changes.

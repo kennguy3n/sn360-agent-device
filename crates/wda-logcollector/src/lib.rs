@@ -4,6 +4,7 @@
 //! (inotify/notify) with seek position tracking, and forwards them
 //! to the event bus for server delivery.
 
+pub mod batch;
 pub mod file_reader;
 #[cfg(all(target_os = "linux", feature = "linux-journal"))]
 pub mod journal_reader;
@@ -23,8 +24,10 @@ use tracing::{error, info, warn};
 use wda_core::config::AgentConfig;
 use wda_core::module::ModuleHandle;
 use wda_core::signal::ShutdownSignal;
+use wda_core::PowerProfileReceiver;
 use wda_event_bus::EventBus;
 
+use crate::batch::{spawn_flush_task, LogBatchSink};
 use crate::file_reader::FileReader;
 #[cfg(all(target_os = "linux", feature = "linux-journal"))]
 use crate::journal_reader::JournalReader;
@@ -44,13 +47,24 @@ pub struct LogCollectorModule;
 
 impl LogCollectorModule {
     /// Start the log collector module, returning a `ModuleHandle`.
-    pub fn start(config: &AgentConfig, bus: EventBus, shutdown: ShutdownSignal) -> ModuleHandle {
+    ///
+    /// `power_rx` drives the adaptive
+    /// [`LogBatchSink`](crate::batch::LogBatchSink) flush cadence: as the
+    /// active [`PowerProfile`](wda_core::PowerProfile) transitions between
+    /// AC, battery, and critical-battery states the flush interval is
+    /// updated to match [`PowerProfile::log_batch_interval`].
+    pub fn start(
+        config: &AgentConfig,
+        bus: EventBus,
+        shutdown: ShutdownSignal,
+        power_rx: PowerProfileReceiver,
+    ) -> ModuleHandle {
         let lc_config = config.modules.logcollector.clone();
         let status = Arc::new(AtomicU8::new(STATUS_INITIALIZED));
         let task_status = Arc::clone(&status);
 
         let task = tokio::spawn(async move {
-            if let Err(e) = run(lc_config, bus, shutdown, task_status.clone()).await {
+            if let Err(e) = run(lc_config, bus, shutdown, power_rx, task_status.clone()).await {
                 error!(error = %e, "logcollector module failed");
                 task_status.store(STATUS_FAILED, Ordering::Relaxed);
                 return Err(e);
@@ -81,9 +95,18 @@ async fn run(
     lc_config: wda_core::config::LogCollectorConfig,
     bus: EventBus,
     shutdown: ShutdownSignal,
+    power_rx: PowerProfileReceiver,
     status: Arc<AtomicU8>,
 ) -> anyhow::Result<()> {
     info!("logcollector module starting");
+
+    // Every reader publishes through this batching sink so the agent
+    // coalesces log bursts into periodic flushes. The flush cadence
+    // follows the active power profile (5 s on AC, up to 60 s on
+    // critical battery) via a dedicated flush task driven by the
+    // shared `power_rx` watch receiver.
+    let sink = LogBatchSink::batched(bus.clone());
+    let flush_handle = spawn_flush_task(sink.clone(), power_rx, shutdown.clone());
 
     // Collect file-based sources and journal sources.
     let mut paths = Vec::new();
@@ -171,7 +194,7 @@ async fn run(
     let state_path = SeekState::default_path();
     let state = SeekState::load(state_path);
 
-    let file_reader = FileReader::new(paths, formats, state, bus.clone());
+    let file_reader = FileReader::new(paths, formats, state, sink.clone());
 
     status.store(_STATUS_RUNNING, Ordering::Relaxed);
     info!("logcollector module running");
@@ -181,9 +204,9 @@ async fn run(
     let mut journal_handles = Vec::new();
     #[cfg(all(target_os = "linux", feature = "linux-journal"))]
     for source in journal_sources {
-        let journal_bus = bus.clone();
+        let journal_sink = sink.clone();
         let journal_shutdown = shutdown.clone();
-        let reader = JournalReader::new(source, journal_bus);
+        let reader = JournalReader::new(source, journal_sink);
         let handle = tokio::spawn(async move {
             if let Err(e) = reader.run(journal_shutdown).await {
                 error!(error = %e, "journal reader failed");
@@ -195,9 +218,9 @@ async fn run(
     // Spawn Windows Event Log reader.
     #[cfg(target_os = "windows")]
     let eventlog_handle = if !eventlog_channels.is_empty() {
-        let el_bus = bus.clone();
+        let el_sink = sink.clone();
         let el_shutdown = shutdown.clone();
-        let reader = WindowsEventLogReader::new(eventlog_channels, el_bus);
+        let reader = WindowsEventLogReader::new(eventlog_channels, el_sink);
         Some(tokio::spawn(async move {
             if let Err(e) = reader.run(el_shutdown).await {
                 error!(error = %e, "Windows Event Log reader failed");
@@ -212,9 +235,9 @@ async fn run(
     let mut oslog_handles = Vec::new();
     #[cfg(target_os = "macos")]
     for config in oslog_configs {
-        let ol_bus = bus.clone();
+        let ol_sink = sink.clone();
         let ol_shutdown = shutdown.clone();
-        let reader = OsLogReader::new(config, ol_bus);
+        let reader = OsLogReader::new(config, ol_sink);
         let handle = tokio::spawn(async move {
             if let Err(e) = reader.run(ol_shutdown).await {
                 error!(error = %e, "macOS Unified Log reader failed");
@@ -242,6 +265,12 @@ async fn run(
     for handle in oslog_handles {
         let _ = handle.await;
     }
+
+    // Drain any events still buffered in the batch sink and wait for
+    // the flush task to exit so we never lose the final window of
+    // log events on shutdown.
+    sink.flush_now().await;
+    let _ = flush_handle.await;
 
     status.store(STATUS_STOPPED, Ordering::Relaxed);
     info!("logcollector module stopped");

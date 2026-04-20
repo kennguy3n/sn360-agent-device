@@ -15,6 +15,7 @@ use std::time::Duration;
 use tokio::signal;
 
 use wda_core::config::{AgentConfig, FimConfig, FimDirectory, ModulesConfig};
+use wda_core::power::{channel as power_channel, PowerProfile};
 use wda_core::signal::ShutdownController;
 use wda_event_bus::EventBus;
 use wda_fim::FimModule;
@@ -51,8 +52,9 @@ async fn main() -> anyhow::Result<()> {
 
     let (bus, mut server_rx) = EventBus::new(4096, 4096);
     let (controller, shutdown) = ShutdownController::new();
+    let (_power_tx, power_rx) = power_channel(PowerProfile::Normal);
 
-    let _handle = FimModule::start(&config, bus, shutdown);
+    let _handle = FimModule::start(&config, bus, shutdown, power_rx);
     eprintln!("burst_watcher: watching {watch} (press Ctrl-C to stop)");
 
     // Drain the server queue on a separate task so events don't back

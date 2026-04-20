@@ -44,6 +44,7 @@ use tracing::{debug, error, info, warn};
 use wda_core::config::AgentConfig;
 use wda_core::module::{ModuleHandle, ModuleHealth, ModuleStatus};
 use wda_core::signal::ShutdownSignal;
+use wda_core::{PowerProfile, PowerProfileReceiver};
 use wda_event_bus::{Event, EventBus, EventKind, Priority};
 
 use crate::batcher::EventBatcher;
@@ -70,13 +71,22 @@ pub struct FimModule {
 
 impl FimModule {
     /// Start the FIM module, returning a `ModuleHandle` that owns the spawned task.
-    pub fn start(config: &AgentConfig, bus: EventBus, shutdown: ShutdownSignal) -> ModuleHandle {
+    ///
+    /// `power_rx` delivers the active [`PowerProfile`] so the module can
+    /// retune its scan interval and [`RateLimiter`] budget when the host
+    /// transitions between AC/battery/critical states.
+    pub fn start(
+        config: &AgentConfig,
+        bus: EventBus,
+        shutdown: ShutdownSignal,
+        power_rx: PowerProfileReceiver,
+    ) -> ModuleHandle {
         let fim_config = config.modules.fim.clone();
         let status = std::sync::Arc::new(AtomicU8::new(STATUS_INITIALIZED));
         let task_status = std::sync::Arc::clone(&status);
 
         let task = tokio::spawn(async move {
-            if let Err(e) = run(fim_config, bus, shutdown, task_status.clone()).await {
+            if let Err(e) = run(fim_config, bus, shutdown, power_rx, task_status.clone()).await {
                 error!(error = %e, "FIM module failed");
                 task_status.store(STATUS_FAILED, Ordering::Relaxed);
                 return Err(e);
@@ -86,6 +96,41 @@ impl FimModule {
 
         ModuleHandle::new("fim", task)
     }
+}
+
+/// Compute the effective baseline-scan interval for `profile`.
+///
+/// Multiplies the configured interval by `1.0 / profile.fim_scan_rate()`:
+/// when scans are accelerated (`IdleAC`, rate `2.0`) the interval shrinks;
+/// when they are reduced (`BatteryActive`, rate `0.5`) the interval
+/// stretches. [`PowerProfile::CriticalBattery`] returns `None` — the caller
+/// should pause baseline scans entirely.
+fn effective_scan_interval(base: Duration, profile: PowerProfile) -> Option<Duration> {
+    let rate = profile.fim_scan_rate();
+    if rate <= 0.0 {
+        return None;
+    }
+    let secs = (base.as_secs_f64() / rate).clamp(1.0, f64::from(u32::MAX));
+    Some(Duration::from_secs_f64(secs))
+}
+
+/// Compute the effective `max_hashes_per_sec` for `profile`.
+///
+/// `0` preserves "unlimited" (the caller opted out of rate limiting via
+/// `fim.max_hashes_per_sec = 0`). A `CriticalBattery` rate of `0.0`
+/// collapses the budget to `1` rather than `0` — the latter would be
+/// interpreted by [`RateLimiter`] as "disable rate limiting" and we
+/// want the opposite behavior (maximum throttle).
+fn effective_hash_budget(base: u32, profile: PowerProfile) -> u32 {
+    if base == 0 {
+        return 0;
+    }
+    let rate = profile.fim_scan_rate();
+    if rate <= 0.0 {
+        return 1;
+    }
+    let scaled = (f64::from(base) * rate).round();
+    scaled.clamp(1.0, f64::from(u32::MAX)) as u32
 }
 
 impl wda_core::module::AgentModule for FimModule {
@@ -242,6 +287,7 @@ async fn run(
     fim_config: wda_core::config::FimConfig,
     bus: EventBus,
     mut shutdown: ShutdownSignal,
+    mut power_rx: PowerProfileReceiver,
     status: std::sync::Arc<AtomicU8>,
 ) -> anyhow::Result<()> {
     info!("FIM module starting");
@@ -280,27 +326,42 @@ async fn run(
     info!("FIM module running");
 
     // Set up the baseline scan timer.
-    let scan_interval = Duration::from_secs(fim_config.scan_interval);
-    let mut scan_timer = tokio::time::interval(scan_interval);
-    // The first tick completes immediately — this triggers the initial baseline scan.
-    scan_timer.tick().await;
+    //
+    // The configured `scan_interval` is the baseline for a `Normal`
+    // power profile; `rebuild_scan_timer` stretches or compresses it
+    // based on the live profile, and returns `None` when the current
+    // profile is `CriticalBattery` so the loop can pause scans.
+    let base_scan_interval = Duration::from_secs(fim_config.scan_interval);
+    let mut current_profile = *power_rx.borrow();
+    let mut scan_timer = rebuild_scan_timer(base_scan_interval, current_profile);
 
     let scan_db_path: Option<PathBuf> = db.path();
     let scan_directories = fim_config.directories.clone();
     let scan_bus = bus.clone();
 
-    // Run initial baseline scan on startup.
-    {
+    // Run initial baseline scan on startup, unless the host is already
+    // on critical battery in which case we defer until the profile
+    // recovers.
+    if current_profile.fim_scan_rate() > 0.0 {
         let db_path = scan_db_path.clone();
         let dirs = scan_directories.clone();
         let scan_bus = scan_bus.clone();
         tokio::spawn(async move {
             run_baseline_scan_task(db_path, dirs, scan_bus).await;
         });
+    } else {
+        info!(
+            profile = ?current_profile,
+            "skipping initial baseline scan: FIM paused under critical-battery profile"
+        );
     }
 
     // Rate limiter + batcher for the real-time hashing pipeline.
-    let mut rate_limiter = RateLimiter::new(fim_config.max_hashes_per_sec);
+    let base_max_hashes_per_sec = fim_config.max_hashes_per_sec;
+    let mut rate_limiter = RateLimiter::new(effective_hash_budget(
+        base_max_hashes_per_sec,
+        current_profile,
+    ));
     let mut batcher = EventBatcher::new(fim_config.batch_size, fim_config.batch_timeout_ms);
 
     // Internal channel for completed hash jobs. Bounded so a
@@ -322,8 +383,37 @@ async fn run(
                 break;
             }
 
-            _ = scan_timer.tick() => {
-                info!("baseline scan timer fired");
+            change = power_rx.changed() => {
+                if change.is_err() {
+                    // Sender dropped; the agent is shutting down. Keep
+                    // running with the last-known profile until the
+                    // shutdown signal fires.
+                    debug!("power-profile sender dropped, FIM holding last profile");
+                    continue;
+                }
+                let new_profile = *power_rx.borrow();
+                if new_profile == current_profile {
+                    continue;
+                }
+                info!(
+                    previous = ?current_profile,
+                    current = ?new_profile,
+                    "FIM retuning for new power profile"
+                );
+                current_profile = new_profile;
+                scan_timer = rebuild_scan_timer(base_scan_interval, current_profile);
+                rate_limiter.set_max_per_sec(effective_hash_budget(
+                    base_max_hashes_per_sec,
+                    current_profile,
+                ));
+            }
+
+            _ = tick_scan_timer(scan_timer.as_mut()), if scan_timer.is_some() => {
+                if current_profile.fim_scan_rate() <= 0.0 {
+                    debug!(profile = ?current_profile, "FIM scan timer fired under paused profile; skipping scan");
+                    continue;
+                }
+                info!(profile = ?current_profile, "baseline scan timer fired");
                 let db_path = scan_db_path.clone();
                 let dirs = scan_directories.clone();
                 let scan_bus = scan_bus.clone();
@@ -368,6 +458,29 @@ async fn run(
     status.store(STATUS_STOPPED, Ordering::Relaxed);
     info!("FIM module stopped");
     Ok(())
+}
+
+/// Construct a baseline-scan [`tokio::time::Interval`] for the given
+/// profile, consuming the immediate first tick so the timer doesn't
+/// fire a redundant scan right after startup. Returns `None` for
+/// profiles that pause baseline scans entirely.
+fn rebuild_scan_timer(base: Duration, profile: PowerProfile) -> Option<tokio::time::Interval> {
+    let interval = effective_scan_interval(base, profile)?;
+    let mut timer = tokio::time::interval(interval);
+    timer.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
+    Some(timer)
+}
+
+/// Await the next tick on an optional interval. Only polled when the
+/// `if timer.is_some()` guard in the select arm holds, so it is never
+/// called with `None`.
+async fn tick_scan_timer(timer: Option<&mut tokio::time::Interval>) {
+    match timer {
+        Some(t) => {
+            t.tick().await;
+        }
+        None => std::future::pending::<()>().await,
+    }
 }
 
 /// Sleep until `deadline`, or wait forever if `deadline` is `None`.
@@ -719,6 +832,7 @@ mod tests {
     use std::time::Duration;
     use tempfile::TempDir;
     use wda_core::config::{FimConfig, FimDirectory, ModulesConfig};
+    use wda_core::power::PowerProfile;
     use wda_core::signal::ShutdownController;
 
     /// Build a minimal `AgentConfig` that watches `dir`.
@@ -755,8 +869,9 @@ mod tests {
 
         let (bus, mut server_rx) = EventBus::new(256, 256);
         let (controller, signal) = ShutdownController::new();
+        let (_power_tx, power_rx) = wda_core::power_profile_channel(PowerProfile::Normal);
 
-        let _handle = FimModule::start(&config, bus, signal);
+        let _handle = FimModule::start(&config, bus, signal, power_rx);
 
         // Wait for the watcher to register.
         tokio::time::sleep(Duration::from_millis(200)).await;
@@ -809,5 +924,54 @@ mod tests {
         }
 
         controller.shutdown();
+    }
+
+    #[test]
+    fn effective_scan_interval_stretches_on_battery() {
+        let base = Duration::from_secs(3600);
+        let ac = effective_scan_interval(base, PowerProfile::Normal).unwrap();
+        let battery = effective_scan_interval(base, PowerProfile::BatteryActive).unwrap();
+        let idle_ac = effective_scan_interval(base, PowerProfile::IdleAC).unwrap();
+
+        assert_eq!(ac, base, "Normal should preserve configured interval");
+        assert!(
+            battery > ac,
+            "BatteryActive should stretch the interval, got {battery:?} vs {ac:?}"
+        );
+        assert!(
+            idle_ac < ac,
+            "IdleAC should shrink the interval, got {idle_ac:?} vs {ac:?}"
+        );
+    }
+
+    #[test]
+    fn effective_scan_interval_pauses_on_critical_battery() {
+        assert!(
+            effective_scan_interval(Duration::from_secs(60), PowerProfile::CriticalBattery)
+                .is_none()
+        );
+    }
+
+    #[test]
+    fn effective_hash_budget_scales_with_profile() {
+        let base = 1000u32;
+        let ac = effective_hash_budget(base, PowerProfile::Normal);
+        let battery = effective_hash_budget(base, PowerProfile::BatteryActive);
+        let critical = effective_hash_budget(base, PowerProfile::CriticalBattery);
+
+        assert_eq!(ac, base);
+        assert!(battery < ac && battery > 0);
+        // CriticalBattery must never emit a literal 0 (that disables
+        // rate limiting in RateLimiter); the sentinel is 1.
+        assert_eq!(critical, 1);
+    }
+
+    #[test]
+    fn effective_hash_budget_preserves_unlimited_opt_out() {
+        // Callers that set max_hashes_per_sec = 0 explicitly want no
+        // rate limiting at all — the profile must not magically
+        // introduce one.
+        assert_eq!(effective_hash_budget(0, PowerProfile::Normal), 0);
+        assert_eq!(effective_hash_budget(0, PowerProfile::CriticalBattery), 0);
     }
 }

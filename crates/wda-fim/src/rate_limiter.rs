@@ -68,6 +68,26 @@ impl RateLimiter {
     pub fn dispatched_in_window(&self) -> u32 {
         self.dispatched
     }
+
+    /// Return the current per-second dispatch cap.
+    pub fn max_per_sec(&self) -> u32 {
+        self.max_per_sec
+    }
+
+    /// Update the per-second dispatch cap.
+    ///
+    /// Used by the FIM run loop to retune the limiter in response to
+    /// a [`PowerProfile`](wda_core::PowerProfile) change — e.g. when
+    /// the host transitions onto battery and
+    /// [`PowerProfile::fim_scan_rate`] drops from `1.0` to `0.5`, the
+    /// effective hash budget is halved to bound real-time CPU.
+    ///
+    /// The current window counter is preserved so an in-flight burst
+    /// that has already exceeded the new cap still back-pressures
+    /// correctly until the window rolls over.
+    pub fn set_max_per_sec(&mut self, max_per_sec: u32) {
+        self.max_per_sec = max_per_sec;
+    }
 }
 
 #[cfg(test)]

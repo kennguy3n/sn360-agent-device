@@ -8,8 +8,9 @@ use tokio::io::{AsyncBufReadExt, AsyncSeekExt, BufReader};
 use tokio::sync::mpsc;
 use tracing::{debug, error, info, warn};
 
-use wda_event_bus::{Event, EventBus, EventKind, Priority};
+use wda_event_bus::{Event, EventKind, Priority};
 
+use crate::batch::LogBatchSink;
 use crate::state::SeekState;
 
 /// Watches a set of log files for new content and publishes log events.
@@ -20,13 +21,18 @@ pub struct FileReader {
     formats: Vec<String>,
     /// Seek state tracker.
     state: SeekState,
-    /// Event bus for publishing log events.
-    bus: EventBus,
+    /// Batching sink for publishing log events.
+    bus: LogBatchSink,
 }
 
 impl FileReader {
     /// Create a new file reader.
-    pub fn new(paths: Vec<PathBuf>, formats: Vec<String>, state: SeekState, bus: EventBus) -> Self {
+    pub fn new(
+        paths: Vec<PathBuf>,
+        formats: Vec<String>,
+        state: SeekState,
+        bus: LogBatchSink,
+    ) -> Self {
         Self {
             paths,
             formats,
@@ -239,6 +245,7 @@ mod tests {
     use std::io::Write;
     use tempfile::TempDir;
     use wda_core::signal::ShutdownController;
+    use wda_event_bus::EventBus;
 
     #[tokio::test]
     async fn test_file_reader_detects_new_lines() {
@@ -262,7 +269,7 @@ mod tests {
             vec![log_path.clone()],
             vec!["syslog".to_string()],
             state,
-            bus,
+            LogBatchSink::immediate(bus),
         );
 
         let handle = tokio::spawn(async move {
@@ -335,7 +342,7 @@ mod tests {
             vec![log_path.clone()],
             vec!["plain".to_string()],
             state,
-            bus,
+            LogBatchSink::immediate(bus),
         );
 
         let handle = tokio::spawn(async move {

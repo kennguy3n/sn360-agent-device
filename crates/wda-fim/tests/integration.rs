@@ -9,6 +9,7 @@ use tempfile::TempDir;
 use tokio::time::timeout;
 
 use wda_core::config::{AgentConfig, FimConfig, FimDirectory};
+use wda_core::power::{channel as power_channel, PowerProfile};
 use wda_core::signal::ShutdownController;
 use wda_event_bus::{EventBus, EventKind};
 
@@ -40,8 +41,9 @@ async fn test_fim_detects_file_creation() {
     let (bus, mut server_rx) = EventBus::new(256, 256);
     let (shutdown_controller, _shutdown_signal) = ShutdownController::new();
     let shutdown = shutdown_controller.subscribe();
+    let (_power_tx, power_rx) = power_channel(PowerProfile::Normal);
 
-    let _handle = wda_fim::FimModule::start(&config, bus, shutdown);
+    let _handle = wda_fim::FimModule::start(&config, bus, shutdown, power_rx);
 
     // Give the watcher time to register.
     tokio::time::sleep(Duration::from_millis(200)).await;
@@ -80,8 +82,9 @@ async fn test_fim_detects_file_modification() {
     let (bus, mut server_rx) = EventBus::new(256, 256);
     let (shutdown_controller, _shutdown_signal) = ShutdownController::new();
     let shutdown = shutdown_controller.subscribe();
+    let (_power_tx, power_rx) = power_channel(PowerProfile::Normal);
 
-    let _handle = wda_fim::FimModule::start(&config, bus, shutdown);
+    let _handle = wda_fim::FimModule::start(&config, bus, shutdown, power_rx);
 
     tokio::time::sleep(Duration::from_millis(200)).await;
 
@@ -126,8 +129,9 @@ async fn test_fim_detects_file_deletion() {
     let (bus, mut server_rx) = EventBus::new(256, 256);
     let (shutdown_controller, _shutdown_signal) = ShutdownController::new();
     let shutdown = shutdown_controller.subscribe();
+    let (_power_tx, power_rx) = power_channel(PowerProfile::Normal);
 
-    let _handle = wda_fim::FimModule::start(&config, bus, shutdown);
+    let _handle = wda_fim::FimModule::start(&config, bus, shutdown, power_rx);
 
     tokio::time::sleep(Duration::from_millis(200)).await;
 
@@ -167,8 +171,9 @@ async fn test_fim_clean_shutdown() {
     let (bus, _server_rx) = EventBus::new(256, 256);
     let (shutdown_controller, _shutdown_signal) = ShutdownController::new();
     let shutdown = shutdown_controller.subscribe();
+    let (_power_tx, power_rx) = power_channel(PowerProfile::Normal);
 
-    let handle = wda_fim::FimModule::start(&config, bus, shutdown);
+    let handle = wda_fim::FimModule::start(&config, bus, shutdown, power_rx);
 
     tokio::time::sleep(Duration::from_millis(200)).await;
 

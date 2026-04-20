@@ -16,7 +16,9 @@ use tokio::sync::mpsc;
 use tracing::{debug, error, info, warn};
 
 use wda_core::signal::ShutdownSignal;
-use wda_event_bus::{Event, EventBus, EventKind, Priority};
+use wda_event_bus::{Event, EventKind, Priority};
+
+use crate::batch::LogBatchSink;
 
 use windows::core::{Error as WinError, HSTRING, PCWSTR};
 use windows::Win32::Foundation::ERROR_INSUFFICIENT_BUFFER;
@@ -40,11 +42,11 @@ pub struct EventLogChannelConfig {
 /// Reads events from Windows Event Log channels via `EvtSubscribe`.
 pub struct WindowsEventLogReader {
     channels: Vec<EventLogChannelConfig>,
-    bus: EventBus,
+    bus: LogBatchSink,
 }
 
 impl WindowsEventLogReader {
-    pub fn new(channels: Vec<EventLogChannelConfig>, bus: EventBus) -> Self {
+    pub fn new(channels: Vec<EventLogChannelConfig>, bus: LogBatchSink) -> Self {
         Self { channels, bus }
     }
 
@@ -200,7 +202,7 @@ fn render_event_xml(event: EVT_HANDLE) -> windows::core::Result<String> {
 async fn subscribe_channel(
     channel: &str,
     query: &str,
-    bus: EventBus,
+    bus: LogBatchSink,
     mut shutdown: ShutdownSignal,
 ) -> anyhow::Result<()> {
     info!(channel = %channel, query = %query, "subscribing to event log channel");

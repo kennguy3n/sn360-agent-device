@@ -9,6 +9,7 @@ use tempfile::TempDir;
 use tokio::time::timeout;
 
 use wda_core::config::{AgentConfig, FimConfig, FimDirectory, ModulesConfig};
+use wda_core::power::{channel as power_channel, PowerProfile};
 use wda_core::signal::ShutdownController;
 use wda_event_bus::{EventBus, EventKind};
 use wda_fim::FimModule;
@@ -72,8 +73,9 @@ async fn test_burst_does_not_block_event_loop() {
 
     let (bus, mut server_rx) = EventBus::new(4096, 4096);
     let (controller, signal) = ShutdownController::new();
+    let (_power_tx, power_rx) = power_channel(PowerProfile::Normal);
 
-    let _handle = FimModule::start(&config, bus, signal);
+    let _handle = FimModule::start(&config, bus, signal, power_rx);
 
     // Let the watcher register.
     tokio::time::sleep(Duration::from_millis(200)).await;
@@ -194,8 +196,9 @@ async fn test_two_phase_emission_metadata_then_hash() {
 
     let (bus, mut server_rx) = EventBus::new(256, 256);
     let (controller, signal) = ShutdownController::new();
+    let (_power_tx, power_rx) = power_channel(PowerProfile::Normal);
 
-    let _handle = FimModule::start(&config, bus, signal);
+    let _handle = FimModule::start(&config, bus, signal, power_rx);
 
     // Wait for watcher to register.
     tokio::time::sleep(Duration::from_millis(200)).await;

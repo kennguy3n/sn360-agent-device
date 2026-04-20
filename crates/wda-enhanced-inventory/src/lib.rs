@@ -34,6 +34,7 @@ use tracing::{debug, error, info, warn};
 use wda_core::config::{AgentConfig, EnhancedInventoryConfig};
 use wda_core::module::{AgentModule, ModuleHandle, ModuleHealth, ModuleStatus};
 use wda_core::signal::ShutdownSignal;
+use wda_core::{PowerProfile, PowerProfileReceiver};
 use wda_event_bus::{Event, EventBus, EventKind, EventReceiver, Priority};
 
 use crate::browser_extensions::{enumerate_browser_extensions, BrowserExtension};
@@ -51,13 +52,25 @@ pub struct EnhancedInventoryModule {
 
 impl EnhancedInventoryModule {
     /// Spawn the enhanced-inventory run loop and return a [`ModuleHandle`].
-    pub fn start(config: &AgentConfig, bus: EventBus, shutdown: ShutdownSignal) -> ModuleHandle {
+    ///
+    /// `power_rx` lets the module adapt to the active [`PowerProfile`]:
+    /// the running-software, browser-extensions, and SBOM timers are
+    /// all rebuilt against [`PowerProfile::inventory_interval`] when
+    /// the profile changes, and on
+    /// [`PowerProfile::CriticalBattery`] all enhanced-inventory scans
+    /// are skipped until the host recovers.
+    pub fn start(
+        config: &AgentConfig,
+        bus: EventBus,
+        shutdown: ShutdownSignal,
+        power_rx: PowerProfileReceiver,
+    ) -> ModuleHandle {
         let ei_config = config.modules.enhanced_inventory.clone();
         let status = Arc::new(AtomicU8::new(STATUS_INITIALIZED));
         let task_status = Arc::clone(&status);
 
         let task = tokio::spawn(async move {
-            if let Err(e) = run(ei_config, bus, shutdown, task_status.clone()).await {
+            if let Err(e) = run(ei_config, bus, shutdown, power_rx, task_status.clone()).await {
                 error!(error = %e, "enhanced inventory module failed");
                 task_status.store(STATUS_FAILED, Ordering::Relaxed);
                 return Err(e);
@@ -304,11 +317,47 @@ async fn run_browser_extensions_tick(bus: &EventBus) {
     .await;
 }
 
+/// Compute the effective scan interval for an enhanced-inventory
+/// timer under the active [`PowerProfile`].
+///
+/// Returns `None` for [`PowerProfile::CriticalBattery`] so the caller
+/// can pause the timer entirely until the host recovers.
+fn effective_ei_interval(configured: Duration, profile: PowerProfile) -> Option<Duration> {
+    if matches!(profile, PowerProfile::CriticalBattery) {
+        return None;
+    }
+    Some(configured.max(profile.inventory_interval()))
+}
+
+fn rebuild_ei_timer(
+    configured: Duration,
+    profile: PowerProfile,
+    enabled: bool,
+) -> Option<tokio::time::Interval> {
+    if !enabled {
+        return None;
+    }
+    let interval = effective_ei_interval(configured, profile)?;
+    let mut timer = tokio::time::interval(interval);
+    timer.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
+    Some(timer)
+}
+
+async fn tick_ei_timer(timer: Option<&mut tokio::time::Interval>) {
+    match timer {
+        Some(t) => {
+            t.tick().await;
+        }
+        None => std::future::pending::<()>().await,
+    }
+}
+
 /// Main enhanced-inventory run loop.
 async fn run(
     ei_config: EnhancedInventoryConfig,
     bus: EventBus,
     mut shutdown: ShutdownSignal,
+    mut power_rx: PowerProfileReceiver,
     status: Arc<AtomicU8>,
 ) -> anyhow::Result<()> {
     info!(
@@ -326,13 +375,13 @@ async fn run(
 
     let mut rs_state = RunningSoftwareState::default();
     let rs_enabled = ei_config.running_software.enabled;
-    let rs_interval = Duration::from_secs(ei_config.running_software.interval.max(1));
+    let rs_configured = Duration::from_secs(ei_config.running_software.interval.max(1));
 
     let be_enabled = ei_config.browser_extensions.enabled;
-    let be_interval = Duration::from_secs(ei_config.browser_extensions.interval.max(1));
+    let be_configured = Duration::from_secs(ei_config.browser_extensions.interval.max(1));
 
     let sbom_enabled = ei_config.sbom.enabled;
-    let sbom_interval = Duration::from_secs(ei_config.sbom.interval.max(1));
+    let sbom_configured = Duration::from_secs(ei_config.sbom.interval.max(1));
     let sbom_on_demand = ei_config.sbom.on_demand;
 
     // Subscribe to the event bus so we can pick up server-pushed
@@ -341,26 +390,35 @@ async fn run(
     // on when `sbom_on_demand` is true.
     let mut bus_rx: EventReceiver = bus.subscribe();
 
-    if rs_enabled {
+    let mut current_profile = *power_rx.borrow();
+    let on_critical = matches!(current_profile, PowerProfile::CriticalBattery);
+
+    if rs_enabled && !on_critical {
         // Emit the baseline snapshot immediately on startup so the
         // manager has a fresh inventory without waiting a full cycle.
         run_running_software_tick(&bus, &mut rs_state).await;
     }
-    if be_enabled {
+    if be_enabled && !on_critical {
         run_browser_extensions_tick(&bus).await;
     }
-    if sbom_enabled {
+    if sbom_enabled && !on_critical {
         run_sbom_tick(&bus).await;
     }
 
-    let mut rs_timer = tokio::time::interval(rs_interval);
-    let mut be_timer = tokio::time::interval(be_interval);
-    let mut sbom_timer = tokio::time::interval(sbom_interval);
+    let mut rs_timer = rebuild_ei_timer(rs_configured, current_profile, rs_enabled);
+    let mut be_timer = rebuild_ei_timer(be_configured, current_profile, be_enabled);
+    let mut sbom_timer = rebuild_ei_timer(sbom_configured, current_profile, sbom_enabled);
     // Consume the immediate first tick on each timer — the baselines
     // above already handled the initial snapshot.
-    rs_timer.tick().await;
-    be_timer.tick().await;
-    sbom_timer.tick().await;
+    if let Some(ref mut t) = rs_timer {
+        t.tick().await;
+    }
+    if let Some(ref mut t) = be_timer {
+        t.tick().await;
+    }
+    if let Some(ref mut t) = sbom_timer {
+        t.tick().await;
+    }
 
     loop {
         tokio::select! {
@@ -371,18 +429,49 @@ async fn run(
                 break;
             }
 
-            _ = rs_timer.tick(), if rs_enabled => {
-                debug!("running-software scan timer fired");
+            change = power_rx.changed() => {
+                if change.is_err() {
+                    debug!(
+                        "power-profile sender dropped; enhanced inventory holding last profile"
+                    );
+                    continue;
+                }
+                let new_profile = *power_rx.borrow();
+                if new_profile == current_profile {
+                    continue;
+                }
+                info!(
+                    previous = ?current_profile,
+                    current = ?new_profile,
+                    "enhanced inventory retuning for new power profile"
+                );
+                current_profile = new_profile;
+                rs_timer = rebuild_ei_timer(rs_configured, current_profile, rs_enabled);
+                be_timer = rebuild_ei_timer(be_configured, current_profile, be_enabled);
+                sbom_timer = rebuild_ei_timer(sbom_configured, current_profile, sbom_enabled);
+                if let Some(ref mut t) = rs_timer {
+                    t.tick().await;
+                }
+                if let Some(ref mut t) = be_timer {
+                    t.tick().await;
+                }
+                if let Some(ref mut t) = sbom_timer {
+                    t.tick().await;
+                }
+            }
+
+            _ = tick_ei_timer(rs_timer.as_mut()), if rs_timer.is_some() => {
+                debug!(profile = ?current_profile, "running-software scan timer fired");
                 run_running_software_tick(&bus, &mut rs_state).await;
             }
 
-            _ = be_timer.tick(), if be_enabled => {
-                debug!("browser-extensions scan timer fired");
+            _ = tick_ei_timer(be_timer.as_mut()), if be_timer.is_some() => {
+                debug!(profile = ?current_profile, "browser-extensions scan timer fired");
                 run_browser_extensions_tick(&bus).await;
             }
 
-            _ = sbom_timer.tick(), if sbom_enabled => {
-                debug!("sbom scan timer fired");
+            _ = tick_ei_timer(sbom_timer.as_mut()), if sbom_timer.is_some() => {
+                debug!(profile = ?current_profile, "sbom scan timer fired");
                 run_sbom_tick(&bus).await;
             }
 
@@ -391,8 +480,19 @@ async fn run(
                     Some(event) => {
                         if let EventKind::ServerCommand { command, payload } = &event.kind {
                             if is_sbom_request(command, payload) {
-                                info!(command = %command, "on-demand SBOM generation requested");
-                                run_sbom_tick(&bus).await;
+                                if matches!(current_profile, PowerProfile::CriticalBattery) {
+                                    debug!(
+                                        command = %command,
+                                        profile = ?current_profile,
+                                        "deferring on-demand SBOM: critical battery"
+                                    );
+                                } else {
+                                    info!(
+                                        command = %command,
+                                        "on-demand SBOM generation requested"
+                                    );
+                                    run_sbom_tick(&bus).await;
+                                }
                             }
                         }
                     }
@@ -737,13 +837,40 @@ mod tests {
         assert!(!state.previous.contains_key(&phantom_pid));
     }
 
+    #[test]
+    fn effective_ei_interval_pauses_on_critical_battery() {
+        let cfg = Duration::from_secs(1800);
+        assert!(effective_ei_interval(cfg, PowerProfile::CriticalBattery).is_none());
+        let normal = effective_ei_interval(cfg, PowerProfile::Normal).unwrap();
+        let battery = effective_ei_interval(cfg, PowerProfile::BatteryActive).unwrap();
+        assert!(
+            battery >= normal,
+            "battery interval {battery:?} must be >= normal interval {normal:?}"
+        );
+    }
+
+    #[tokio::test]
+    async fn rebuild_ei_timer_respects_disabled_flag() {
+        assert!(
+            rebuild_ei_timer(Duration::from_secs(60), PowerProfile::Normal, false).is_none(),
+            "disabled module must not build a timer"
+        );
+        assert!(
+            rebuild_ei_timer(Duration::from_secs(60), PowerProfile::CriticalBattery, true)
+                .is_none(),
+            "critical battery must pause the timer"
+        );
+        assert!(rebuild_ei_timer(Duration::from_secs(60), PowerProfile::Normal, true).is_some());
+    }
+
     #[tokio::test]
     async fn test_module_lifecycle_starts_and_stops() {
         let agent_config = test_agent_config();
         let (controller, signal) = wda_core::signal::ShutdownController::new();
         let (bus, _server_rx) = EventBus::new(16, 16);
+        let (_power_tx, power_rx) = wda_core::power::channel(PowerProfile::Normal);
 
-        let handle = EnhancedInventoryModule::start(&agent_config, bus, signal);
+        let handle = EnhancedInventoryModule::start(&agent_config, bus, signal, power_rx);
 
         tokio::time::sleep(Duration::from_millis(50)).await;
         controller.shutdown();
@@ -766,8 +893,9 @@ mod tests {
 
         let (controller, signal) = wda_core::signal::ShutdownController::new();
         let (bus, mut server_rx) = EventBus::new(16, 16);
+        let (_power_tx, power_rx) = wda_core::power::channel(PowerProfile::Normal);
 
-        let handle = EnhancedInventoryModule::start(&agent_config, bus, signal);
+        let handle = EnhancedInventoryModule::start(&agent_config, bus, signal, power_rx);
 
         tokio::time::sleep(Duration::from_millis(100)).await;
         assert!(

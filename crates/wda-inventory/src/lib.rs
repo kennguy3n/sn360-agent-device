@@ -19,6 +19,7 @@ use tracing::{debug, error, info, warn};
 use wda_core::config::AgentConfig;
 use wda_core::module::ModuleHandle;
 use wda_core::signal::ShutdownSignal;
+use wda_core::{PowerProfile, PowerProfileReceiver};
 use wda_event_bus::{Event, EventBus, EventKind, Priority};
 
 use crate::syscollector_format::wrap_syscollector;
@@ -33,13 +34,24 @@ pub struct InventoryModule;
 
 impl InventoryModule {
     /// Start the inventory module, returning a `ModuleHandle` that owns the spawned task.
-    pub fn start(config: &AgentConfig, bus: EventBus, shutdown: ShutdownSignal) -> ModuleHandle {
+    ///
+    /// `power_rx` drives adaptive scan scheduling: when the active
+    /// [`PowerProfile`] transitions to battery the scan interval is
+    /// extended to match [`PowerProfile::inventory_interval`]; on
+    /// [`PowerProfile::CriticalBattery`] scans are skipped entirely so
+    /// the CPU and radio can stay asleep.
+    pub fn start(
+        config: &AgentConfig,
+        bus: EventBus,
+        shutdown: ShutdownSignal,
+        power_rx: PowerProfileReceiver,
+    ) -> ModuleHandle {
         let inv_config = config.modules.inventory.clone();
         let status = Arc::new(AtomicU8::new(STATUS_INITIALIZED));
         let task_status = Arc::clone(&status);
 
         let task = tokio::spawn(async move {
-            if let Err(e) = run(inv_config, bus, shutdown, task_status.clone()).await {
+            if let Err(e) = run(inv_config, bus, shutdown, power_rx, task_status.clone()).await {
                 error!(error = %e, "inventory module failed");
                 task_status.store(STATUS_FAILED, Ordering::Relaxed);
                 return Err(e);
@@ -65,16 +77,53 @@ impl wda_core::module::AgentModule for InventoryModule {
     }
 }
 
+/// Compute the effective inventory scan interval for the active
+/// [`PowerProfile`].
+///
+/// Returns the larger of the statically configured interval and the
+/// profile's preferred interval so that a config value like "scan
+/// every 30 s" still backs off appropriately on battery. Returns
+/// `None` for [`PowerProfile::CriticalBattery`], signalling that the
+/// module should pause scans entirely until conditions improve.
+fn effective_inventory_interval(configured: Duration, profile: PowerProfile) -> Option<Duration> {
+    if matches!(profile, PowerProfile::CriticalBattery) {
+        return None;
+    }
+    Some(configured.max(profile.inventory_interval()))
+}
+
+fn rebuild_inventory_timer(
+    configured: Duration,
+    profile: PowerProfile,
+) -> Option<tokio::time::Interval> {
+    let interval = effective_inventory_interval(configured, profile)?;
+    let mut timer = tokio::time::interval(interval);
+    timer.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
+    // Consume the immediate first tick — the caller has already
+    // handled the initial collection.
+    Some(timer)
+}
+
+async fn tick_inventory_timer(timer: Option<&mut tokio::time::Interval>) {
+    match timer {
+        Some(t) => {
+            t.tick().await;
+        }
+        None => std::future::pending::<()>().await,
+    }
+}
+
 /// The main inventory run loop.
 async fn run(
     inv_config: wda_core::config::InventoryConfig,
     bus: EventBus,
     mut shutdown: ShutdownSignal,
+    mut power_rx: PowerProfileReceiver,
     status: Arc<AtomicU8>,
 ) -> anyhow::Result<()> {
     info!("inventory module starting");
 
-    let interval = Duration::from_secs(inv_config.interval);
+    let configured_interval = Duration::from_secs(inv_config.interval);
     let categories = inv_config.collect.clone();
 
     status.store(STATUS_RUNNING, Ordering::Relaxed);
@@ -83,13 +132,27 @@ async fn run(
         "inventory module running"
     );
 
-    // Collect immediately on startup.
-    collect_and_publish(&categories, &bus).await;
+    let mut current_profile = *power_rx.borrow();
 
-    // Then collect periodically.
-    let mut timer = tokio::time::interval(interval);
-    // First tick fires immediately; we already collected above, so consume it.
-    timer.tick().await;
+    // Collect immediately on startup unless we already know the host
+    // is on critical battery, in which case we honor the pause.
+    if !matches!(current_profile, PowerProfile::CriticalBattery) {
+        collect_and_publish(&categories, &bus).await;
+    } else {
+        info!(
+            profile = ?current_profile,
+            "skipping initial inventory scan: critical battery"
+        );
+    }
+
+    // Build the periodic timer scoped to the active profile. The
+    // interval will be rebuilt on every profile transition.
+    let mut timer = rebuild_inventory_timer(configured_interval, current_profile);
+    if let Some(ref mut t) = timer {
+        // First tick fires immediately; we already collected above,
+        // so consume it to align future ticks to `interval`.
+        t.tick().await;
+    }
 
     loop {
         tokio::select! {
@@ -100,8 +163,29 @@ async fn run(
                 break;
             }
 
-            _ = timer.tick() => {
-                debug!("inventory collection timer fired");
+            change = power_rx.changed() => {
+                if change.is_err() {
+                    debug!("power-profile sender dropped; inventory holding last profile");
+                    continue;
+                }
+                let new_profile = *power_rx.borrow();
+                if new_profile == current_profile {
+                    continue;
+                }
+                info!(
+                    previous = ?current_profile,
+                    current = ?new_profile,
+                    "inventory retuning for new power profile"
+                );
+                current_profile = new_profile;
+                timer = rebuild_inventory_timer(configured_interval, current_profile);
+                if let Some(ref mut t) = timer {
+                    t.tick().await;
+                }
+            }
+
+            _ = tick_inventory_timer(timer.as_mut()), if timer.is_some() => {
+                debug!(profile = ?current_profile, "inventory collection timer fired");
                 collect_and_publish(&categories, &bus).await;
             }
         }
@@ -223,7 +307,8 @@ mod tests {
         let (bus, mut server_rx) = EventBus::new(256, 256);
         let (controller, signal) = ShutdownController::new();
 
-        let _handle = InventoryModule::start(&config, bus, signal);
+        let (_power_tx, power_rx) = wda_core::power_profile_channel(PowerProfile::Normal);
+        let _handle = InventoryModule::start(&config, bus, signal, power_rx);
 
         // Wait for the initial collection to publish events.
         let event = tokio::time::timeout(Duration::from_secs(10), server_rx.recv())
@@ -248,6 +333,35 @@ mod tests {
         }
 
         controller.shutdown();
+    }
+
+    #[test]
+    fn effective_inventory_interval_honors_profile() {
+        let cfg = Duration::from_secs(60);
+
+        // Normal keeps the configured interval because the profile's
+        // preferred floor (30 min) is above 60 s.
+        let normal = effective_inventory_interval(cfg, PowerProfile::Normal).unwrap();
+        assert!(normal >= PowerProfile::Normal.inventory_interval());
+
+        // BatteryActive stretches further than Normal.
+        let battery = effective_inventory_interval(cfg, PowerProfile::BatteryActive).unwrap();
+        assert!(
+            battery >= normal,
+            "battery interval {battery:?} should be >= normal interval {normal:?}"
+        );
+
+        // CriticalBattery pauses entirely.
+        assert!(effective_inventory_interval(cfg, PowerProfile::CriticalBattery).is_none());
+    }
+
+    #[tokio::test]
+    async fn rebuild_inventory_timer_returns_none_on_critical_battery() {
+        assert!(
+            rebuild_inventory_timer(Duration::from_secs(60), PowerProfile::CriticalBattery)
+                .is_none()
+        );
+        assert!(rebuild_inventory_timer(Duration::from_secs(60), PowerProfile::Normal).is_some());
     }
 
     #[tokio::test]
