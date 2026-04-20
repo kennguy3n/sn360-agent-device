@@ -1,185 +1,114 @@
-   Compiling cfg-if v1.0.4
-   Compiling proc-macro2 v1.0.106
-   Compiling unicode-ident v1.0.24
-   Compiling quote v1.0.45
-   Compiling libc v0.2.185
-   Compiling once_cell v1.21.4
-   Compiling memchr v2.8.0
-   Compiling autocfg v1.5.0
-   Compiling serde_core v1.0.228
-   Compiling serde v1.0.228
-   Compiling log v0.4.29
-   Compiling num-traits v0.2.19
-   Compiling tracing-core v0.1.36
    Compiling bitflags v2.11.1
-   Compiling pin-project-lite v0.2.17
-   Compiling thiserror v2.0.18
-   Compiling bytes v1.11.1
-   Compiling iana-time-zone v0.1.65
-   Compiling lazy_static v1.5.0
-   Compiling zmij v1.0.21
-   Compiling memoffset v0.9.1
-   Compiling rustix v0.38.44
-   Compiling syn v2.0.117
-   Compiling getrandom v0.4.2
-   Compiling itoa v1.0.18
-   Compiling cfg_aliases v0.2.1
-   Compiling serde_json v1.0.149
-   Compiling nix v0.29.0
-   Compiling instant v0.1.13
-   Compiling anyhow v1.0.102
-   Compiling bitflags v1.3.2
-   Compiling same-file v1.0.6
-   Compiling linux-raw-sys v0.4.15
-   Compiling notify-types v1.0.1
-   Compiling walkdir v2.5.0
-   Compiling mio v1.2.0
-   Compiling errno v0.3.14
-   Compiling socket2 v0.6.3
-   Compiling signal-hook-registry v1.4.8
-   Compiling inotify-sys v0.1.5
-   Compiling inotify v0.10.2
-   Compiling filetime v0.2.27
+   Compiling num-traits v0.2.19
+   Compiling tokio v1.52.1
    Compiling aho-corasick v1.1.4
    Compiling regex-syntax v0.8.10
-   Compiling notify v7.0.0
-   Compiling gethostname v0.5.0
-   Compiling equivalent v1.0.2
-   Compiling smallvec v1.15.1
-   Compiling hashbrown v0.17.0
-   Compiling sharded-slab v0.1.7
-   Compiling tracing-log v0.2.0
-   Compiling thread_local v1.1.9
-   Compiling indexmap v2.14.0
-   Compiling ryu v1.0.23
-   Compiling version_check v0.9.5
-   Compiling regex-automata v0.4.14
-   Compiling unsafe-libyaml v0.2.11
-   Compiling nu-ansi-term v0.50.3
-   Compiling uuid v1.23.1
-   Compiling shlex v1.3.0
-   Compiling find-msvc-tools v0.1.9
    Compiling typenum v1.19.0
-   Compiling cc v1.2.60
-   Compiling generic-array v0.14.7
-   Compiling rustix v1.1.4
    Compiling linux-raw-sys v0.12.1
    Compiling fastrand v2.4.1
+   Compiling rustix v0.38.44
+   Compiling nix v0.29.0
+   Compiling rustix v1.1.4
+   Compiling gethostname v0.5.0
+   Compiling generic-array v0.14.7
    Compiling cpufeatures v0.2.17
+   Compiling chrono v0.4.44
    Compiling zerocopy v0.8.48
-   Compiling ahash v0.8.12
-   Compiling vcpkg v0.2.15
-   Compiling pkg-config v0.3.33
    Compiling crypto-common v0.1.7
    Compiling block-buffer v0.10.4
-   Compiling fallible-iterator v0.3.0
-   Compiling glob v0.3.3
    Compiling digest v0.10.7
-   Compiling libsqlite3-sys v0.30.1
    Compiling sha2 v0.10.9
-   Compiling fallible-streaming-iterator v0.1.9
-   Compiling clang-sys v1.8.1
-   Compiling getrandom v0.2.17
-   Compiling matchers v0.2.0
-   Compiling minimal-lexical v0.2.1
-   Compiling nom v7.1.3
-   Compiling serde_derive v1.0.228
-   Compiling tokio-macros v2.7.0
-   Compiling tracing-attributes v0.1.31
-   Compiling tokio v1.52.1
-   Compiling thiserror-impl v2.0.18
-   Compiling tracing v0.1.44
+   Compiling regex-automata v0.4.14
    Compiling tempfile v3.27.0
-   Compiling hashbrown v0.14.5
-   Compiling ring v0.17.14
+   Compiling libsqlite3-sys v0.30.1
+   Compiling fallible-iterator v0.3.0
+   Compiling fallible-streaming-iterator v0.1.9
+   Compiling getrandom v0.2.17
+   Compiling nom v7.1.3
    Compiling libloading v0.8.9
-   Compiling hashlink v0.9.1
-   Compiling bindgen v0.68.1
-   Compiling cexpr v0.6.0
-   Compiling lazycell v1.3.0
-   Compiling rustc-hash v1.1.0
-   Compiling peeking_take_while v0.1.2
-   Compiling chrono v0.4.44
-   Compiling tracing-serde v0.2.0
-   Compiling tracing-subscriber v0.3.23
-   Compiling serde_yaml v0.9.34+deprecated
-   Compiling regex v1.12.3
    Compiling block-padding v0.3.3
-   Compiling fs_extra v1.3.0
-   Compiling wda-pal v0.1.0 (/home/ubuntu/repos/sn360-agent-device/crates/wda-pal)
-   Compiling wda-event-bus v0.1.0 (/home/ubuntu/repos/sn360-agent-device/crates/wda-event-bus)
    Compiling untrusted v0.9.0
+   Compiling clang-sys v1.8.1
    Compiling zeroize v1.8.2
-   Compiling wda-core v0.1.0 (/home/ubuntu/repos/sn360-agent-device/crates/wda-core)
    Compiling rustls-pki-types v1.14.0
+   Compiling ring v0.17.14
    Compiling inout v0.1.4
-   Compiling async-trait v0.1.89
-   Compiling thiserror v1.0.69
-   Compiling rustls v0.23.38
-   Compiling crc32fast v1.5.0
    Compiling cipher v0.4.4
-   Compiling thiserror-impl v1.0.69
    Compiling subtle v2.6.1
-   Compiling rustls-webpki v0.103.12
-   Compiling simd-adler32 v0.3.9
    Compiling adler2 v2.0.1
+   Compiling simd-adler32 v0.3.9
+   Compiling thiserror v1.0.69
+   Compiling crc32fast v1.5.0
    Compiling miniz_oxide v0.8.9
-   Compiling rusqlite v0.32.1
-   Compiling wda-active-response v0.1.0 (/home/ubuntu/repos/sn360-agent-device/crates/wda-active-response)
    Compiling rmp v0.8.15
    Compiling bit-vec v0.7.0
+   Compiling cexpr v0.6.0
+   Compiling wda-event-bus v0.1.0 (/home/ubuntu/repos/sn360-agent-device/crates/wda-event-bus)
+   Compiling wda-pal v0.1.0 (/home/ubuntu/repos/sn360-agent-device/crates/wda-pal)
+   Compiling matchers v0.2.0
+   Compiling tracing-subscriber v0.3.23
+   Compiling ahash v0.8.12
+   Compiling hashbrown v0.14.5
+   Compiling bindgen v0.68.1
+   Compiling rustls-webpki v0.103.12
    Compiling siphasher v1.0.2
-   Compiling wda-logcollector v0.1.0 (/home/ubuntu/repos/sn360-agent-device/crates/wda-logcollector)
-   Compiling rmp-serde v1.3.1
+   Compiling hashlink v0.9.1
    Compiling bloomfilter v1.0.16
+   Compiling regex v1.12.3
+   Compiling rusqlite v0.32.1
+   Compiling wda-core v0.1.0 (/home/ubuntu/repos/sn360-agent-device/crates/wda-core)
+   Compiling rustls v0.23.38
    Compiling flate2 v1.1.9
+   Compiling rmp-serde v1.3.1
    Compiling cbc v0.1.2
    Compiling aes v0.8.4
    Compiling md-5 v0.10.6
+   Compiling wda-fim v0.1.0 (/home/ubuntu/repos/sn360-agent-device/crates/wda-fim)
+   Compiling wda-active-response v0.1.0 (/home/ubuntu/repos/sn360-agent-device/crates/wda-active-response)
    Compiling socket2 v0.5.10
+   Compiling wda-enhanced-inventory v0.1.0 (/home/ubuntu/repos/sn360-agent-device/crates/wda-enhanced-inventory)
    Compiling wda-sca v0.1.0 (/home/ubuntu/repos/sn360-agent-device/crates/wda-sca)
    Compiling wda-inventory v0.1.0 (/home/ubuntu/repos/sn360-agent-device/crates/wda-inventory)
-   Compiling wda-fim v0.1.0 (/home/ubuntu/repos/sn360-agent-device/crates/wda-fim)
-   Compiling yara-sys v0.28.0
+   Compiling wda-logcollector v0.1.0 (/home/ubuntu/repos/sn360-agent-device/crates/wda-logcollector)
    Compiling wda-rootcheck v0.1.0 (/home/ubuntu/repos/sn360-agent-device/crates/wda-rootcheck)
-   Compiling wda-enhanced-inventory v0.1.0 (/home/ubuntu/repos/sn360-agent-device/crates/wda-enhanced-inventory)
    Compiling tokio-rustls v0.26.4
+   Compiling yara-sys v0.28.0
    Compiling wda-comms v0.1.0 (/home/ubuntu/repos/sn360-agent-device/crates/wda-comms)
    Compiling yara v0.28.0
    Compiling wda-local-detection v0.1.0 (/home/ubuntu/repos/sn360-agent-device/crates/wda-local-detection)
    Compiling wda-agent v0.1.0 (/home/ubuntu/repos/sn360-agent-device/crates/wda-agent)
-    Finished `test` profile [unoptimized + debuginfo] target(s) in 39.96s
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 24.35s
      Running unittests src/lib.rs (target/debug/deps/wda_active_response-6771a3ee136659bc)
 
 running 29 tests
-test actions::disable_account::tests::test_missing_user ... ok
 test actions::disable_account::tests::test_valid_username ... ok
-test actions::firewall_drop::tests::test_invalid_ip ... ok
-test actions::disable_account::tests::test_invalid_username ... ok
-test actions::disable_account::tests::test_refuse_root ... ok
 test actions::firewall_drop::tests::test_is_ipv6 ... ok
 test actions::firewall_drop::tests::test_valid_ipv4 ... ok
+test actions::disable_account::tests::test_invalid_username ... ok
+test actions::disable_account::tests::test_missing_user ... ok
+test actions::disable_account::tests::test_refuse_root ... ok
 test actions::firewall_drop::tests::test_valid_ipv6 ... ok
-test actions::firewall_drop::tests::test_invalid_ip_undo ... ok
 test actions::kill_process::tests::test_missing_pid ... ok
-test actions::tests::test_registry_unknown_action ... ok
-test actions::kill_process::tests::test_refuse_pid_1 ... ok
+test actions::firewall_drop::tests::test_invalid_ip ... ok
+test actions::firewall_drop::tests::test_invalid_ip_undo ... ok
 test actions::firewall_drop::tests::test_missing_ip_parameter ... ok
-test executor::tests::test_execute_successful_command ... ok
+test actions::kill_process::tests::test_refuse_pid_1 ... ok
+test actions::tests::test_registry_unknown_action ... ok
 test tests::test_extract_action_name ... ok
+test executor::tests::test_execute_nonexistent_command ... ok
 test executor::tests::test_combined_output ... ok
 test actions::tests::test_registry_registers_allowed_actions ... ok
-test executor::tests::test_execute_nonexistent_command ... ok
 test tests::test_parse_ar_execd_prefix ... ok
 test tests::test_parse_ar_json_command ... ok
+test actions::kill_process::tests::test_kill_nonexistent_pid ... ok
+test executor::tests::test_execute_failing_command ... ok
 test tests::test_parse_ar_legacy_disable_account ... ok
 test tests::test_parse_ar_legacy_format ... ok
 test tests::test_parse_ar_undo_command ... ok
-test executor::tests::test_execute_failing_command ... ok
-test actions::kill_process::tests::test_kill_nonexistent_pid ... ok
+test executor::tests::test_execute_successful_command ... ok
 test tests::test_module_starts_and_stops ... ok
-test tests::test_module_processes_server_command ... ok
 test tests::test_module_processes_ar_request ... ok
+test tests::test_module_processes_server_command ... ok
 test executor::tests::test_execute_timeout ... ok
 
 test result: ok. 29 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.11s
@@ -190,60 +119,60 @@ running 18 tests
 test tests::test_active_response_maps_to_active_response ... ok
 test tests::test_config_reloaded_not_forwarded ... ok
 test tests::test_file_created_maps_to_syscheck_with_payload ... ok
-test tests::test_file_deleted_maps_to_syscheck_with_payload ... ok
-test tests::test_file_metadata_changed_maps_to_syscheck_with_payload ... ok
 test tests::test_file_created_without_syscheck_payload_falls_back ... ok
-test tests::test_inventory_maps_to_syscollector ... ok
+test tests::test_file_deleted_maps_to_syscheck_with_payload ... ok
 test tests::test_file_modified_maps_to_syscheck_with_payload ... ok
-test tests::test_log_collected_maps_to_log_wire_format ... ok
+test tests::test_file_metadata_changed_maps_to_syscheck_with_payload ... ok
 test tests::test_keepalive_not_forwarded ... ok
+test tests::test_inventory_maps_to_syscollector ... ok
+test tests::test_event_forwarding_via_bus ... ok
+test tests::test_log_collected_maps_to_log_wire_format ... ok
+test tests::test_parse_server_command_request ... ok
 test tests::test_parse_server_command_execd ... ok
 test tests::test_parse_server_command_strips_trailing_nulls ... ok
 test tests::test_sca_maps_to_sca ... ok
 test tests::test_server_message_maps_to_generic ... ok
-test tests::test_shutdown_not_forwarded ... ok
 test tests::test_parse_server_command_generic ... ok
-test tests::test_parse_server_command_request ... ok
-test tests::test_event_forwarding_via_bus ... ok
+test tests::test_shutdown_not_forwarded ... ok
 
-test result: ok. 18 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+test result: ok. 18 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
 
      Running unittests src/lib.rs (target/debug/deps/wda_comms-200d6f37d6f9c44c)
 
 running 31 tests
-test blowfish_wazuh::tests::test_64_byte_key ... ok
-test blowfish_wazuh::tests::test_cbc_empty ... ok
 test blowfish_wazuh::tests::test_cbc_block_aligned ... ok
+test blowfish_wazuh::tests::test_cbc_empty ... ok
+test blowfish_wazuh::tests::test_64_byte_key ... ok
 test blowfish_wazuh::tests::test_cbc_roundtrip ... ok
 test blowfish_wazuh::tests::test_known_vector ... ok
-test crypto::tests::test_key_derivation_matches_wazuh ... ok
 test crypto::tests::test_crypto_token ... ok
+test crypto::tests::test_key_derivation_matches_wazuh ... ok
 test crypto::tests::test_strip_trailing_nulls ... ok
 test crypto::tests::test_message_framing_format ... ok
 test enrollment::tests::test_agent_key_parse_invalid ... ok
-test enrollment::tests::test_agent_key_roundtrip ... ok
+test crypto::tests::test_blowfish_roundtrip ... ok
+test crypto::tests::test_aes_roundtrip ... ok
 test protocol::tests::test_encode_body_active_response_prefix ... ok
 test protocol::tests::test_encode_body_control_messages_pass_through ... ok
+test enrollment::tests::test_agent_key_roundtrip ... ok
 test protocol::tests::test_encode_body_local_detection_prefix ... ok
 test protocol::tests::test_encode_body_log_prefix ... ok
 test protocol::tests::test_encode_body_rootcheck_prefix ... ok
-test crypto::tests::test_different_keys_fail_aes ... ok
-test crypto::tests::test_blowfish_roundtrip ... ok
 test protocol::tests::test_encode_body_sca_prefix ... ok
-test crypto::tests::test_aes_roundtrip ... ok
-test protocol::tests::test_encode_body_syscollector_prefix ... ok
 test protocol::tests::test_encode_body_syscheck_prefix ... ok
+test crypto::tests::test_different_keys_fail_aes ... ok
+test protocol::tests::test_encode_body_syscollector_prefix ... ok
+test protocol::tests::test_message_encode ... ok
 test protocol::tests::test_keepalive_message ... ok
 test protocol::tests::test_message_type_roundtrip ... ok
 test protocol::tests::test_message_decode ... ok
-test protocol::tests::test_message_encode ... ok
-test crypto::tests::test_different_keys_fail_blowfish ... ok
 test protocol::tests::test_startup_message ... ok
+test crypto::tests::test_different_keys_fail_blowfish ... ok
 test protocol::tests::test_compress_decompress ... ok
 test crypto::tests::test_large_message_blowfish ... ok
 test crypto::tests::test_large_message_aes ... ok
 
-test result: ok. 31 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+test result: ok. 31 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
 
      Running unittests src/lib.rs (target/debug/deps/wda_core-97906621d975e30d)
 
@@ -253,15 +182,28 @@ test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; fini
 
      Running unittests src/lib.rs (target/debug/deps/wda_enhanced_inventory-d1d57ce9809758db)
 
-running 19 tests
+running 32 tests
+test browser_extensions::tests::test_enumerate_browser_extensions_does_not_error_on_clean_host ... ok
+test browser_extensions::tests::test_browser_extension_json_roundtrips ... ok
+test browser_extensions::tests::test_chromium_profile_dir_filter ... ok
+test browser_extensions::tests::test_resolve_chromium_message_returns_none_for_non_reference ... ok
+test browser_extensions::tests::test_resolve_chromium_message_resolves_locale_reference ... ok
+test browser_extensions::tests::test_scan_chromium_returns_empty_for_missing_user_data ... ok
+test browser_extensions::tests::test_scan_chromium_reads_manifest_fields ... ok
+test browser_extensions::tests::test_scan_chromium_picks_latest_version_dir ... ok
+test browser_extensions::tests::test_scan_chromium_skips_non_profile_directories ... ok
+test running_software::linux_impl::tests::test_first_cmdline_arg_empty_yields_none ... ok
+test browser_extensions::tests::test_scan_firefox_missing_extensions_json_yields_empty ... ok
+test browser_extensions::tests::test_scan_chromium_skips_malformed_manifest ... ok
+test browser_extensions::tests::test_scan_firefox_malformed_json_yields_empty ... ok
 test running_software::linux_impl::tests::test_clock_ticks_positive ... ok
 test running_software::linux_impl::tests::test_first_cmdline_arg_handles_absolute_path ... ok
-test running_software::linux_impl::tests::test_first_cmdline_arg_empty_yields_none ... ok
 test running_software::linux_impl::tests::test_parse_stat_handles_parens_and_whitespace ... ok
 test running_software::linux_impl::tests::test_parse_stat_rejects_short_input ... ok
+test browser_extensions::tests::test_scan_firefox_parses_extensions_json ... ok
 test running_software::tests::test_process_entry_serializes_to_json_object ... ok
-test running_software::tests::test_enumerate_running_processes_returns_results ... ok
 test running_software::tests::test_enumerate_includes_current_pid ... ok
+test running_software::tests::test_enumerate_running_processes_returns_results ... ok
 test running_software::tests::test_process_entry_has_required_fields ... ok
 test tests::test_same_process_rejects_differing_name ... ok
 test tests::test_same_process_rejects_differing_path ... ok
@@ -270,52 +212,61 @@ test tests::test_delta_detects_pid_reuse ... ok
 test tests::test_delta_emits_only_on_change ... ok
 test tests::test_baseline_retries_when_publish_fails ... ok
 test tests::test_publishes_inventory_event ... ok
-test tests::test_module_lifecycle_starts_and_stops ... ok
 test tests::test_delta_retries_when_publish_fails ... ok
+test tests::test_module_lifecycle_starts_and_stops ... ok
 test tests::test_module_lifecycle_with_running_software_disabled ... ok
 
-test result: ok. 19 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.12s
+test result: ok. 32 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.12s
+
+     Running tests/browser_extensions_integration.rs (target/debug/deps/browser_extensions_integration-67b5d99589f0b2c8)
+
+running 3 tests
+test enumerate_on_empty_home_returns_empty_or_only_real_user_extensions ... ok
+test scan_firefox_against_synthetic_profile ... ok
+test enumerate_finds_synthetic_chrome_extension ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
 
      Running unittests src/lib.rs (target/debug/deps/wda_event_bus-117a3a4a40a4ab87)
 
 running 4 tests
 test bus::tests::test_subscriber_count ... ok
 test bus::tests::test_multiple_subscribers ... ok
-test bus::tests::test_publish_and_receive ... ok
 test bus::tests::test_server_queue ... ok
+test bus::tests::test_publish_and_receive ... ok
 
 test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
 
      Running unittests src/lib.rs (target/debug/deps/wda_fim-79466ccec1706e93)
 
 running 53 tests
-test batcher::tests::test_deadline_advances_after_push ... ok
 test batcher::tests::test_deadline_returns_none_when_empty ... ok
-test batcher::tests::test_flush_on_empty_is_noop ... ok
-test batcher::tests::test_zero_batch_size_flushes_each_push ... ok
+test batcher::tests::test_deadline_advances_after_push ... ok
 test batcher::tests::test_is_full_triggers_at_threshold ... ok
-test db::tests::test_get_nonexistent ... ok
-test db::tests::test_entry_with_null_sha256 ... ok
-test db::tests::test_get_all_entries ... ok
-test db::tests::test_get_entries_with_old_scan ... ok
-test db::tests::test_insert_and_get ... ok
+test batcher::tests::test_zero_batch_size_flushes_each_push ... ok
+test batcher::tests::test_flush_on_empty_is_noop ... ok
 test db::tests::test_delete_nonexistent_is_ok ... ok
 test db::tests::test_delete ... ok
+test db::tests::test_get_nonexistent ... ok
+test db::tests::test_insert_and_get ... ok
+test db::tests::test_get_all_entries ... ok
+test db::tests::test_get_entries_with_old_scan ... ok
+test db::tests::test_entry_with_null_sha256 ... ok
 test db::tests::test_open_in_memory ... ok
 test db::tests::test_update_last_scan ... ok
 test db::tests::test_upsert_updates_existing ... ok
 test debounce::tests::test_is_empty ... ok
-test db::tests::test_open_creates_parent_dirs ... ok
-test db::tests::test_open_on_disk_and_reopen ... ok
 test debounce::tests::test_next_deadline_empty ... ok
+test db::tests::test_open_creates_parent_dirs ... ok
 test event_format::tests::test_format_added_event ... ok
 test event_format::tests::test_format_deleted_event ... ok
 test event_format::tests::test_format_modified_event ... ok
 test event_format::tests::test_format_with_special_chars_in_path ... ok
 test event_format::tests::test_permissions_format ... ok
-test hasher::tests::test_hash_known_content ... ok
 test hasher::tests::test_hash_empty_file ... ok
+test hasher::tests::test_hash_known_content ... ok
 test hasher::tests::test_hash_nonexistent_file ... ok
+test db::tests::test_open_on_disk_and_reopen ... ok
 test idle::tests::test_high_threshold_returns_idle ... ok
 test idle::tests::test_is_system_idle_returns_bool ... ok
 test idle::tests::test_read_load_average ... ok
@@ -338,13 +289,12 @@ test batcher::tests::test_flush_publishes_all_events_and_empties_buffer ... ok
 test debounce::tests::test_latest_kind_wins ... ok
 test watcher::tests::test_watcher_detects_creation ... ok
 test debounce::tests::test_events_within_window_collapse ... ok
+test tests::test_fim_module_detects_file_creation_and_publishes_event ... ok
 test rate_limiter::tests::test_acquire_over_limit_sleeps_until_next_window ... ok
 test rate_limiter::tests::test_window_resets_after_one_second ... ok
 test watcher::tests::test_debounce_collapses_events ... ok
-test tests::test_fim_module_detects_file_creation_and_publishes_event has been running for over 60 seconds
-test tests::test_fim_module_detects_file_creation_and_publishes_event ... ok
 
-test result: ok. 53 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 60.08s
+test result: ok. 53 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.12s
 
      Running tests/baseline_scan_integration.rs (target/debug/deps/baseline_scan_integration-e4b99396ee59a3cf)
 
@@ -359,7 +309,7 @@ running 2 tests
 test test_two_phase_emission_metadata_then_hash ... ok
 test test_burst_does_not_block_event_loop ... ok
 
-test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 4.61s
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 4.02s
 
      Running tests/fim_integration.rs (target/debug/deps/fim_integration-4501f8851a8a3c5b)
 
@@ -385,118 +335,118 @@ test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; fini
      Running unittests src/lib.rs (target/debug/deps/wda_inventory-4490cb02c217c3f6)
 
 running 30 tests
-test hardware::tests::test_parse_cpuinfo_content ... ok
 test hardware::tests::test_parse_cpuinfo_empty ... ok
+test hardware::tests::test_parse_cpuinfo_content ... ok
 test hardware::tests::test_parse_kb_value ... ok
 test hardware::tests::test_parse_meminfo_content ... ok
-test hardware::tests::test_parse_meminfo_empty ... ok
+test hardware::tests::test_collect_hardware_info_returns_valid_json ... ok
+test network::unix_impl::tests::test_read_interface_mtu_loopback ... ok
 test network::unix_impl::tests::test_read_interface_state_loopback ... ok
 test network::unix_impl::tests::test_read_mac_address_loopback ... ok
 test network::unix_impl::tests::test_read_mac_address_nonexistent ... ok
+test hardware::tests::test_parse_meminfo_empty ... ok
 test os_info::tests::test_collect_os_info_returns_valid_json ... ok
-test hardware::tests::test_collect_hardware_info_returns_valid_json ... ok
-test network::unix_impl::tests::test_read_interface_mtu_loopback ... ok
 test os_info::tests::test_parse_os_release_empty ... ok
-test os_info::tests::test_parse_os_release_fedora ... ok
 test os_info::tests::test_parse_os_release_comments_and_blanks ... ok
-test packages::tests::test_parse_dpkg_output_empty ... ok
+test os_info::tests::test_parse_os_release_fedora ... ok
 test os_info::tests::test_parse_os_release_ubuntu ... ok
-test packages::tests::test_parse_dpkg_output_partial_fields ... ok
-test network::unix_impl::tests::test_collect_network_info_returns_results ... ok
-test syscollector_format::tests::test_build_hwinfo ... ok
-test packages::tests::test_parse_rpm_output ... ok
+test packages::tests::test_parse_dpkg_output_empty ... ok
 test packages::tests::test_parse_dpkg_output ... ok
-test syscollector_format::tests::test_build_netiface ... ok
-test syscollector_format::tests::test_build_netaddr ... ok
+test network::unix_impl::tests::test_collect_network_info_returns_results ... ok
+test packages::tests::test_parse_dpkg_output_partial_fields ... ok
 test packages::tests::test_parse_rpm_output_empty ... ok
-test syscollector_format::tests::test_build_osinfo ... ok
+test packages::tests::test_parse_rpm_output ... ok
+test syscollector_format::tests::test_build_hwinfo ... ok
+test syscollector_format::tests::test_build_netaddr ... ok
 test syscollector_format::tests::test_build_packages ... ok
+test syscollector_format::tests::test_build_netiface ... ok
 test syscollector_format::tests::test_wrap_syscollector_format ... ok
+test syscollector_format::tests::test_build_osinfo ... ok
 test tests::test_collect_and_publish_os_only ... ok
 test tests::test_inventory_module_lifecycle ... ok
 test packages::tests::test_collect_packages_runs_without_panic ... ok
 
-test result: ok. 30 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s
+test result: ok. 30 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
 
      Running unittests src/lib.rs (target/debug/deps/wda_local_detection-6acc1b2eba87eb31)
 
 running 56 tests
-test behavioral::tests::test_source_filter_ignores_other_sources ... ok
-test behavioral::tests::test_eviction_drops_oldest_inserted_first ... ok
+test behavioral::tests::test_threshold_fires_after_min_count ... ok
 test behavioral::tests::test_sequence_resets_after_window_expiry ... ok
 test behavioral::tests::test_sequence_detection_in_order ... ok
-test behavioral::tests::test_threshold_fires_after_min_count ... ok
+test behavioral::tests::test_eviction_drops_oldest_inserted_first ... ok
+test behavioral::tests::test_source_filter_ignores_other_sources ... ok
 test behavioral::tests::test_threshold_window_expiry_resets_count ... ok
 test behavioral::tests::test_tracked_entities_cap_evicts ... ok
 test ioc_matcher::tests::test_empty_bundle_matches_nothing ... ok
+test ioc_matcher::tests::test_rule_count_sums_backends ... ok
+test ioc_matcher::tests::test_hash_bloom_rejects_unknown ... ok
+test offline_queue::tests::test_enqueue_and_drain_fifo_order ... ok
+test offline_queue::tests::test_enqueue_stores_timestamp ... ok
+test offline_queue::tests::test_on_disk_roundtrip ... ok
 test ioc_matcher::tests::test_hash_bloom_reports_true_positive ... ok
 test ioc_matcher::tests::test_aho_corasick_matches_string_fields ... ok
 test ioc_matcher::tests::test_aho_corasick_matches_multiple_iocs ... ok
 test ioc_matcher::tests::test_ip_bloom_true_and_false_paths ... ok
 test ioc_matcher::tests::test_string_match_misses_cleanly ... ok
-test ioc_matcher::tests::test_hash_bloom_rejects_unknown ... ok
-test ioc_matcher::tests::test_rule_count_sums_backends ... ok
-test response::tests::test_quarantine_disabled_is_skipped ... ok
-test response::tests::test_quarantine_missing_source_fails ... ok
-test response::tests::test_quarantine_moves_file ... ok
-test rule_store::tests::test_default_is_empty ... ok
-test rule_store::tests::test_is_newer_than ... ok
 test response::tests::test_block_ip_disabled_is_skipped ... ok
-test response::tests::test_kill_process_disabled_is_skipped ... ok
-test rule_store::tests::test_load_and_save_roundtrip ... ok
-test rule_store::tests::test_load_missing_file_errors ... ok
-test rule_store::tests::test_msgpack_roundtrip ... ok
-test offline_queue::tests::test_capacity_enforced_fifo_eviction ... ok
-test offline_queue::tests::test_enqueue_stores_timestamp ... ok
-test offline_queue::tests::test_enqueue_and_drain_fifo_order ... ok
-test tests::test_extract_ipv4s_finds_all_dotted_quads ... ok
 test offline_queue::tests::test_drain_partial_keeps_remaining ... ok
+test response::tests::test_quarantine_disabled_is_skipped ... ok
+test offline_queue::tests::test_capacity_enforced_fifo_eviction ... ok
+test rule_store::tests::test_default_is_empty ... ok
+test rule_store::tests::test_load_missing_file_errors ... ok
+test rule_store::tests::test_is_newer_than ... ok
+test response::tests::test_kill_process_disabled_is_skipped ... ok
+test response::tests::test_quarantine_moves_file ... ok
+test rule_store::tests::test_msgpack_roundtrip ... ok
+test rule_store::tests::test_load_and_save_roundtrip ... ok
+test tests::test_extract_ipv4s_finds_all_dotted_quads ... ok
+test response::tests::test_quarantine_missing_source_fails ... ok
 test tests::test_extract_ipv4s_rejects_invalid_octets_and_malformed ... ok
 test tests::test_extract_sha256_from_syscheck_top_level ... ok
 test tests::test_extract_sha256_from_syscheck_nested ... ok
-test tests::test_drain_offline_queue_preserves_batch_on_publish_failure ... ok
 test tests::test_extract_sha256_rejects_wrong_length_or_garbage ... ok
-test tests::test_drain_offline_queue_replays_to_server ... ok
-test tests::test_drain_offline_queue_preserves_fifo_across_batches ... ok
+test tests::test_drain_offline_queue_preserves_batch_on_publish_failure ... ok
 test tests::test_load_initial_bundle_missing_is_empty ... ok
 test tests::test_local_alert_from_yara_uses_file_path ... ok
-test tests::test_behavioral_threshold_produces_alert ... ok
-test offline_queue::tests::test_on_disk_roundtrip ... ok
+test tests::test_drain_offline_queue_replays_to_server ... ok
+test tests::test_drain_offline_queue_preserves_fifo_across_batches ... ok
 test tests::test_hash_and_ip_ioc_build_ok ... ok
-test tests::test_hash_ioc_match_via_syscheck_payload ... ok
+test tests::test_behavioral_threshold_produces_alert ... ok
 test tests::test_ip_ioc_match_via_log_message ... ok
+test tests::test_hash_ioc_match_via_syscheck_payload ... ok
 test yara_scanner::tests::test_empty_rule_list_has_no_rules ... ok
 test yara_scanner::tests::test_rate_limiter_blocks_after_budget_exhausted ... ok
-test yara_scanner::tests::test_rate_limiter_refills_after_window ... ok
 test tests::test_pipeline_with_empty_bundle_builds ... ok
+test yara_scanner::tests::test_rate_limiter_refills_after_window ... ok
 test tests::test_string_ioc_match_publishes_alert ... ok
-test yara_scanner::tests::test_compiles_valid_rules_and_skips_missing_paths ... ok
-test yara_scanner::tests::test_scan_file_no_match ... ok
 test yara_scanner::tests::test_scan_file_matches ... ok
+test yara_scanner::tests::test_scan_file_no_match ... ok
+test yara_scanner::tests::test_compiles_valid_rules_and_skips_missing_paths ... ok
 test yara_scanner::tests::test_scan_skips_oversized_file ... ok
 test tests::test_drain_offline_queue_empty_is_noop ... ok
 test tests::test_module_lifecycle_starts_and_stops ... ok
 test tests::test_log_event_does_not_trigger_yara_scan ... ok
 
-test result: ok. 56 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.13s
+test result: ok. 56 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.11s
 
      Running unittests src/lib.rs (target/debug/deps/wda_logcollector-0b9156ab8875532c)
 
 running 31 tests
-test journal_reader::tests::test_journal_entry_display_without_identifier ... ok
-test state::tests::test_corrupt_state_file ... ok
-test state::tests::test_load_empty_state ... ok
 test journal_reader::tests::test_journal_entry_display_with_identifier ... ok
+test journal_reader::tests::test_journal_entry_display_without_identifier ... ok
+test state::tests::test_load_empty_state ... ok
 test journal_reader::tests::test_journal_reader_construction ... ok
+test state::tests::test_corrupt_state_file ... ok
 test state::tests::test_save_and_reload ... ok
-test state::tests::test_set_and_get_offset ... ok
-test windows_eventlog_parser::tests::decodes_numeric_character_references ... ok
-test windows_eventlog_parser::tests::cdata_content_is_not_entity_decoded_in_system_field ... ok
 test windows_eventlog_parser::tests::decode_entities_preserves_multibyte_utf8 ... ok
+test state::tests::test_set_and_get_offset ... ok
+test windows_eventlog_parser::tests::cdata_content_is_not_entity_decoded_in_system_field ... ok
+test windows_eventlog_parser::tests::decodes_numeric_character_references ... ok
 test windows_eventlog_parser::tests::decodes_predefined_xml_entities_in_data_values ... ok
-test windows_eventlog_parser::tests::handles_self_closing_data_elements ... ok
 test windows_eventlog_parser::tests::handles_missing_optional_fields ... ok
 test windows_eventlog_parser::tests::handles_unnamed_data_elements ... ok
+test windows_eventlog_parser::tests::handles_self_closing_data_elements ... ok
 test windows_eventlog_parser::tests::ignores_prefix_matches_for_event_id ... ok
 test windows_eventlog_parser::tests::parses_channel_and_computer ... ok
 test windows_eventlog_parser::tests::parses_event_id_text ... ok
@@ -515,7 +465,7 @@ test file_reader::tests::test_file_reader_handles_file_rotation ... ok
 test file_reader::tests::test_file_reader_detects_new_lines ... ok
 test journal_reader::tests::test_journal_reader_receives_events ... ok
 
-test result: ok. 31 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.99s
+test result: ok. 31 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.85s
 
      Running unittests src/lib.rs (target/debug/deps/wda_pal-f9112d9135ff1285)
 
@@ -532,27 +482,27 @@ test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; fini
 
 running 20 tests
 test binary_integrity::tests::test_baseline_load_missing_returns_empty ... ok
-test binary_integrity::tests::test_baseline_save_and_load_roundtrip ... ok
+test binary_integrity::tests::test_hash_known_content ... ok
 test binary_integrity::tests::test_compare_detects_missing_binary ... ok
+test binary_integrity::tests::test_baseline_save_and_load_roundtrip ... ok
 test binary_integrity::tests::test_compare_first_run_has_no_drift_but_records_baseline ... ok
 test binary_integrity::tests::test_compare_detects_hash_change ... ok
-test signatures::tests::test_builtin_signatures_are_absolute_paths ... ok
-test binary_integrity::tests::test_hash_known_content ... ok
 test binary_integrity::tests::test_compare_stable_when_no_changes ... ok
+test signatures::tests::test_builtin_signatures_are_absolute_paths ... ok
 test hidden_process::tests::test_scan_handles_max_pid_zero ... ok
 test tests::test_effective_binary_paths_falls_back_to_defaults_when_empty ... ok
+test tests::test_effective_binary_paths_honors_override ... ok
 test signatures::tests::test_clean_system_returns_no_hits ... ok
 test signatures::tests::test_missing_extra_path_not_reported ... ok
-test tests::test_effective_binary_paths_honors_override ... ok
 test signatures::tests::test_extra_path_hit_reported ... ok
 test tests::test_sweep_publishes_signature_hit_for_extra_path ... ok
 test hidden_process::tests::test_scan_runs_to_completion_on_clean_system ... ok
 test hidden_process::tests::test_own_pid_is_visible_and_not_reported_hidden ... ok
 test tests::test_module_lifecycle_starts_and_stops ... ok
-test tests::test_sweep_emits_nothing_on_clean_system ... ok
 test tests::test_binary_integrity_baseline_created_then_detects_tamper ... ok
+test tests::test_sweep_emits_nothing_on_clean_system ... ok
 
-test result: ok. 20 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.11s
+test result: ok. 20 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.10s
 
      Running unittests src/lib.rs (target/debug/deps/wda_sca-439150242c57a95a)
 
