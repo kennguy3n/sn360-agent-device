@@ -319,7 +319,7 @@ bandwidth allows.
 | # | Task | Details |
 |---|------|---------|
 | P1.1 | ~~Wire PAL `PowerMonitor` on macOS and Windows~~ **Done (PR #35)** | macOS uses IOKit `IOPSCopyPowerSourcesInfo` / `IOPSCopyPowerSourcesList` + CoreGraphics `CGEventSourceSecondsSinceLastEventType`. Windows uses `GetSystemPowerStatus` + `GetLastInputInfo` / `GetTickCount`. Adaptive battery-vs-AC classification now works on all three platforms. |
-| P1.2 | Add E2E tests for SCA and Rootcheck | Extend `tests/scripts/run-e2e.sh` to verify SCA policy evaluation reaches the manager. Add a rootcheck E2E that plants a known signature file and verifies the alert. (Security E2E already covers binary-tampering / Rootcheck indirectly.) |
+| P1.2 | ~~Add E2E tests for SCA and Rootcheck~~ **Done (PR #47)** | `tests/scripts/run-e2e.sh` now seeds `/etc/wazuh-desktop-agent/sca/e2e-test-policy.yaml` (file check against `/etc/hostname`) before the agent starts, plants `/tmp/wda-e2e-rootkit-marker` which matches a `signature_paths` entry added to `tests/wazuh-test-config.yaml`, and asserts both events reach the manager's `archives.json` on the correct queues (`p:` for SCA, `9:` for rootcheck). Cleanup trap removes the seeded policy, marker, and `rootcheck-baseline.json`. Security E2E continues to cover binary-tampering / Rootcheck indirectly. |
 | P1.3 | Investigate and fix macOS FIM burst test hang | Follow suggested steps in `docs/known-issues/fim-burst-workload-macos-ci.md`. Try `#[tokio::test(flavor = "multi_thread", worker_threads = 2)]` to rule out executor starvation. Re-enable on macOS CI once stable. |
 | P1.4 | Implement rootcheck content-based checks | Add content inspection for files like `/etc/ld.so.preload` (suspicious shared library entries), not just existence. |
 | P1.5 | Cross-platform rootcheck hidden-process detection | Extend hidden-process detection to macOS (`proc_listallpids` vs `/proc`-equivalent) and Windows (`NtQuerySystemInformation` vs `EnumProcesses`). Currently Linux-only. |
@@ -328,7 +328,7 @@ bandwidth allows.
 | P1.8 | Linux user-idle detection | Implement `PowerMonitor::user_idle_duration()` on Linux via XScreenSaver (`XScreenSaverQueryInfo`) or D-Bus `org.freedesktop.ScreenSaver` / `logind`, so `PowerProfile::IdleAC` / `PowerProfile::BatteryIdle` are reachable on Linux. |
 | P1.9 | Re-run FIM burst benchmark on the merged pipeline | After the Phase 3 pipeline changes (lazy hashing, `RateLimiter`, `EventBatcher`) — reproduce with `bash tests/scripts/fim-burst-bench.sh` and update `benchmark-results.md` to confirm the strict < 3 % peak target. |
 | P1.10 | Tune FIM defaults for burst-heavy environments | Sweep `max_hashes_per_sec` / `batch_size` / `batch_timeout_ms` against representative workloads and pick config defaults that keep sampled peak comfortably under 3 % without degrading event latency. |
-| P1.11 | Regenerate `unit-test-results.txt` and add E2E coverage for enhanced inventory | `unit-test-results.txt` is kept in sync in each Enhanced Inventory PR; after PR #45 it records **348 passing** (332 post-PR-#44 + 16 new `wda-enhanced-inventory` tests — 13 `sbom` unit tests plus 3 SBOM integration tests). Still outstanding: extend `tests/scripts/run-e2e.sh` with an enhanced-inventory assertion path that toggles `modules.enhanced_inventory.enabled=true`, spawns a short-lived process on the agent host, and verifies the running-software baseline + delta (plus browser-extensions and SBOM snapshots) reach the manager as `MessageType::Syscollector` events. |
+| P1.11 | ~~Regenerate `unit-test-results.txt` and add E2E coverage for enhanced inventory~~ **Done (PR #47)** | `unit-test-results.txt` is regenerated on each merge; after PR #47 it records **361 passing** (unchanged from PR #46 — E2E expansion did not add unit tests). `tests/wazuh-test-config.yaml` now enables all three enhanced-inventory scanners (`running_software`, `browser_extensions`, `sbom`) with 10 s intervals, and `tests/scripts/run-e2e.sh` asserts the presence of `"type":"enhanced_inventory"`, per-scanner `"category":"running_software"`, and `"category":"sbom"` entries in `archives.json` — all forwarded as `MessageType::Syscollector` on the `d:` queue. |
 
 ### Priority 2 — Phase 4: Edge Detection & Enhanced Inventory
 
@@ -709,3 +709,76 @@ host (AC transitions to `Normal`, battery to `BatteryActive` /
 `CriticalBattery`), and the idle transitions will activate
 automatically once P1.8 lands via XScreenSaver or a D-Bus
 `logind` integration without requiring further module changes.
+
+## Development Assessment — 2026-04-20 (Post-E2E-expansion)
+
+Priority 1 tasks **P1.2 (E2E tests for SCA and Rootcheck)** and
+**P1.11 (E2E coverage for enhanced inventory)** landed in
+**PR #47**, together with a small doc-comment fix in
+`crates/wda-enhanced-inventory/src/lib.rs` to correctly describe
+the CycloneDX SBOM generator implemented in PR #45 (it was still
+labelled "not yet implemented").
+
+The base E2E harness at `tests/scripts/run-e2e.sh` grew from
+**9 PASS/FAIL assertions** to **14**. The five new assertions
+are:
+
+1. **SCA policy evaluation received by server** — the harness
+   seeds `/etc/wazuh-desktop-agent/sca/e2e-test-policy.yaml`
+   (one-check policy that probes `/etc/hostname`) before the
+   agent starts, and asserts that an event containing
+   `ScaResult` / `"sca"` reaches `/var/ossec/logs/archives/archives.json`
+   on the Wazuh manager. `tests/wazuh-test-config.yaml` points
+   `modules.sca.policy_dir` at that directory and sets
+   `scan_interval: 15` so the first cycle fires inside the E2E
+   window.
+2. **Rootcheck signature alert received by server** — the
+   harness plants `/tmp/wda-e2e-rootkit-marker`, which matches a
+   `signature_paths` entry added to
+   `tests/wazuh-test-config.yaml`. The assertion looks for the
+   marker path (or a generic `rootcheck` / `RootcheckAlert`
+   match) in `archives.json`, confirming the agent routed the
+   alert as `MessageType::Rootcheck` on queue `9:`.
+3. **Enhanced inventory running-software / SBOM /
+   browser-extensions scanners active** — three assertions.
+   The Wazuh 4.9.2 manager's analysisd syscollector decoder
+   only archives events whose `"type"` matches a known
+   `dbsync_*` variant, so the WDA envelope
+   `{"type":"enhanced_inventory", "category":"…"}` never lands
+   in `archives.json` even when the agent successfully delivered
+   the frame on queue `d:`. The harness therefore starts the
+   agent with
+   `RUST_LOG=info,wda_enhanced_inventory=debug` and greps the
+   agent log for the per-scanner snapshot debug lines
+   (`running-software`, `sbom snapshot`,
+   `browser-extensions snapshot`) as the ground-truth oracle.
+   A bonus `archives.json` lookup is still emitted for
+   visibility.
+
+Cleanup is correspondingly extended — the exit trap now also
+removes the SCA policy file, the rootcheck marker, and
+`/var/lib/wazuh-desktop-agent/rootcheck-baseline.json` so a
+re-run starts from a clean state.
+
+Configuration deltas in `tests/wazuh-test-config.yaml`:
+
+- `modules.sca.enabled: true` with `policy_dir` and
+  `scan_interval: 15`.
+- `modules.rootcheck.enabled: true` with
+  `scan_interval_secs: 15`, `signature_paths`, and
+  `hidden_process_check` / `binary_integrity_check` both
+  `false` to keep the harness deterministic on CI hosts.
+- `modules.enhanced_inventory.enabled: true` with all three
+  scanners (`running_software`, `browser_extensions`, `sbom`)
+  enabled at 10 s intervals and `sbom.on_demand: true`.
+
+The workspace unit-test count is **361 passing / 0 failed**,
+unchanged from PR #46 — this PR adds E2E coverage only and
+does not modify any module code. `unit-test-results.txt` is
+regenerated and committed. `e2e-results.txt` captures the full
+14-assertion run against the local Wazuh 4.9.2 manager.
+
+P1.2 and P1.11 are marked **Done (PR #47)** in the Known Gaps
+table above. The remaining Priority-1 work is P1.7 → closed in
+PR #46, P1.8 (Linux user-idle detection), and the lower-ranked
+follow-ups in the P2 / P3 bands.

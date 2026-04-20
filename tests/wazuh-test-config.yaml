@@ -38,10 +38,28 @@ modules:
       - block_ip
       - kill_process
       - disable_account
+  sca:
+    enabled: true
+    policy_dir: "/etc/wazuh-desktop-agent/sca"
+    scan_interval: 15
+  rootcheck:
+    enabled: true
+    scan_interval_secs: 15
+    signature_paths:
+      - "/tmp/wda-e2e-rootkit-marker"
+    hidden_process_check: false
+    binary_integrity_check: false
   enhanced_inventory:
-    enabled: false
+    enabled: true
     running_software:
       enabled: true
-      interval: 60
+      interval: 10
+    browser_extensions:
+      enabled: true
+      interval: 10
+    sbom:
+      enabled: true
+      interval: 10
+      on_demand: true
 logging:
   level: "debug"
