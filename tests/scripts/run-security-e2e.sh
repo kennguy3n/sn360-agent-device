@@ -83,11 +83,24 @@ if [ "$WAZUH_READY" = false ]; then
   exit 1
 fi
 
-echo "==> Setup: Setting enrollment password..."
+echo "==> Setup: Setting enrollment password and AR config..."
+# The stock wazuh-manager:4.9.2 image defines the `<command>` entries for
+# `disable-account` and `firewall-drop` but ships no matching `<active-response>`
+# blocks, so `agent_control -f disable-account0` / `-f firewall-drop0` return
+# "Selected active response does not exist." Inject minimal local-location AR
+# blocks for both commands before the first `</ossec_config>` so Tests 7 and 10
+# can exercise the agent-side handlers.
+#
+# Wazuh exposes each AR under the key `<command_name><timeout>` in
+# `/var/ossec/etc/shared/ar.conf`, so `<timeout>0</timeout>` is required for
+# `agent_control -f disable-account0` / `-f firewall-drop0` to resolve. A high
+# `rules_id` keeps these ARs from auto-firing on any real alert.
 docker compose -f tests/docker-compose.yml exec -T wazuh-manager bash -c \
   "echo '${E2E_ENROLL_PASS}' > /var/ossec/etc/authd.pass && \
    sed -i 's|<use_password>no</use_password>|<use_password>yes</use_password>|' /var/ossec/etc/ossec.conf && \
    sed -i 's|<logall>no</logall>|<logall>yes</logall>|;s|<logall_json>no</logall_json>|<logall_json>yes</logall_json>|' /var/ossec/etc/ossec.conf && \
+   grep -q '<command>disable-account</command>' /var/ossec/etc/ossec.conf || \
+     sed -i '0,/<\/ossec_config>/{s|</ossec_config>|  <active-response>\n    <disabled>no</disabled>\n    <command>disable-account</command>\n    <location>local</location>\n    <rules_id>100000</rules_id>\n    <timeout>0</timeout>\n  </active-response>\n  <active-response>\n    <disabled>no</disabled>\n    <command>firewall-drop</command>\n    <location>local</location>\n    <rules_id>100001</rules_id>\n    <timeout>0</timeout>\n  </active-response>\n</ossec_config>|}' /var/ossec/etc/ossec.conf && \
    /var/ossec/bin/wazuh-control restart"
 sleep 15
 
@@ -311,26 +324,39 @@ fi
 echo "==> Test 10: Account disable active response..."
 
 if [ -n "$AGENT_ID" ]; then
-  # Create a test user for the disable test
+  # Create a test user with a real password so we can distinguish the
+  # locked-by-AR state (`!` prefix on the shadow hash) from the
+  # unlocked-but-no-password default.
   sudo useradd -m wda-e2e-testuser 2>/dev/null || true
+  echo 'wda-e2e-testuser:wda-e2e-testpass' | sudo chpasswd 2>/dev/null || true
 
-  docker compose -f tests/docker-compose.yml exec -T wazuh-manager \
-    /var/ossec/bin/agent_control -b "wda-e2e-testuser" -f disable-account0 -u "$AGENT_ID" 2>/dev/null || true
+  AR_DISPATCH_OUT=$(docker compose -f tests/docker-compose.yml exec -T wazuh-manager \
+    /var/ossec/bin/agent_control -b "wda-e2e-testuser" -f disable-account0 -u "$AGENT_ID" 2>&1 || true)
   sleep 10
 
-  # Check if the user's shell was changed (on Linux, disable sets /usr/bin/false)
+  # macOS platform_disable_account rewrites the shell to /usr/bin/false.
   USER_SHELL=$(getent passwd wda-e2e-testuser 2>/dev/null | cut -d: -f7 || true)
+  # Linux platform_disable_account runs `passwd -l` which locks the
+  # account; `passwd -S` reports 'L' and the shadow hash is prefixed
+  # with '!' in that case.
+  LOCK_STATUS=$(sudo passwd -S wda-e2e-testuser 2>/dev/null | awk '{print $2}' || true)
+  # Server-side confirmation that the AR is configured and was
+  # dispatched.  `agent_control -f` only prints this line when the AR
+  # name resolves in `/var/ossec/etc/shared/ar.conf`.
+  if echo "$AR_DISPATCH_OUT" | grep -q "Running active response 'disable-account0'"; then
+    AR_DISPATCHED=1
+  else
+    AR_DISPATCHED=0
+  fi
+
   if [ "$USER_SHELL" = "/usr/bin/false" ] || [ "$USER_SHELL" = "/bin/false" ]; then
     record PASS "Account disable active response executed (shell set to false)"
+  elif [ "$LOCK_STATUS" = "L" ]; then
+    record PASS "Account disable active response executed (account locked)"
+  elif [ "$AR_DISPATCHED" -eq 1 ]; then
+    record PASS "Account disable AR configured and dispatched by server"
   else
-    # Even if the shell wasn't changed, check if AR command was received
-    AR_DISABLE=$(docker compose -f tests/docker-compose.yml exec -T wazuh-manager \
-      grep -c "disable-account" /var/ossec/logs/ossec.log 2>/dev/null || true)
-    if [ "${AR_DISABLE:-0}" -gt 0 ]; then
-      record PASS "Account disable AR command processed (shell: ${USER_SHELL:-unknown})"
-    else
-      record FAIL "Account disable active response not executed"
-    fi
+    record FAIL "Account disable active response not executed"
   fi
 
   # Cleanup test user
