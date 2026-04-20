@@ -331,6 +331,17 @@ async fn main() -> Result<()> {
         agent.register_module(lde_handle);
     }
 
+    // 12g. Start Enhanced Inventory module if enabled
+    if config.modules.enhanced_inventory.enabled {
+        info!("starting enhanced inventory module");
+        let ei_handle = wda_enhanced_inventory::EnhancedInventoryModule::start(
+            &config,
+            agent.event_bus(),
+            agent.shutdown_signal(),
+        );
+        agent.register_module(ei_handle);
+    }
+
     // 13. Start agent and wait for shutdown signal
     agent.start().await;
     agent.wait_for_shutdown().await;
@@ -396,6 +407,20 @@ fn map_event_to_message(agent_id: &str, kind: &EventKind) -> Option<WazuhMessage
                 None => serde_json::to_string(kind)
                     .unwrap_or_else(|e| format!("{{\"error\":\"{}\"}}", e)),
             };
+            (MessageType::Syscollector, payload)
+        }
+        EventKind::EnhancedInventoryUpdate { category, data } => {
+            // Wrap the module payload in a small envelope so the
+            // manager can distinguish enhanced categories from the
+            // base syscollector scans while still routing them to
+            // the same `d:` queue.
+            let envelope = serde_json::json!({
+                "type": "enhanced_inventory",
+                "category": category,
+                "data": data,
+            });
+            let payload = serde_json::to_string(&envelope)
+                .unwrap_or_else(|e| format!("{{\"error\":\"{}\"}}", e));
             (MessageType::Syscollector, payload)
         }
         EventKind::ScaResult { .. } => {

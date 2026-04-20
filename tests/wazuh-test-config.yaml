@@ -38,5 +38,10 @@ modules:
       - block_ip
       - kill_process
       - disable_account
+  enhanced_inventory:
+    enabled: false
+    running_software:
+      enabled: true
+      interval: 60
 logging:
   level: "debug"

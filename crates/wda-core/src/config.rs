@@ -96,6 +96,8 @@ pub struct ModulesConfig {
     pub rootcheck: RootcheckConfig,
     #[serde(default)]
     pub local_detection: LocalDetectionConfig,
+    #[serde(default)]
+    pub enhanced_inventory: EnhancedInventoryConfig,
 }
 
 /// FIM-specific configuration.
@@ -305,6 +307,38 @@ pub struct LocalDetectionConfig {
     pub offline_drain_batch: usize,
 }
 
+/// Enhanced Inventory module configuration.
+///
+/// The enhanced inventory extends the base inventory with running
+/// software monitoring (task 4.7), browser extension enumeration
+/// (task 4.8), and CycloneDX SBOM generation (task 4.9). See
+/// [`PROPOSAL.md`](../../../PROPOSAL.md) § 13.2 for design details.
+///
+/// The module is **off by default** — operators opt in explicitly
+/// because running-software snapshots touch `/proc` on Linux and the
+/// equivalent syscalls on macOS / Windows.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct EnhancedInventoryConfig {
+    /// Whether the enhanced inventory module is enabled.
+    #[serde(default)]
+    pub enabled: bool,
+    /// Running-software monitor settings.
+    #[serde(default)]
+    pub running_software: RunningSoftwareConfig,
+}
+
+/// Running-software monitor configuration.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RunningSoftwareConfig {
+    /// Whether the running-software monitor is enabled when the
+    /// enhanced inventory module itself is active.
+    #[serde(default = "default_true")]
+    pub enabled: bool,
+    /// Interval in seconds between process-list snapshots.
+    #[serde(default = "default_running_software_interval")]
+    pub interval: u64,
+}
+
 /// SCA (Security Configuration Assessment) module configuration.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ScaConfig {
@@ -505,6 +539,9 @@ pub fn default_rootcheck_binary_paths() -> Vec<String> {
 fn default_ar_timeout() -> u64 {
     30
 }
+fn default_running_software_interval() -> u64 {
+    60
+}
 fn default_lde_rule_pull_interval() -> u64 {
     300
 }
@@ -669,6 +706,15 @@ impl Default for LocalDetectionConfig {
             quarantine_dir: default_lde_quarantine_dir(),
             offline_drain_interval: default_lde_offline_drain_interval(),
             offline_drain_batch: default_lde_offline_drain_batch(),
+        }
+    }
+}
+
+impl Default for RunningSoftwareConfig {
+    fn default() -> Self {
+        Self {
+            enabled: true,
+            interval: default_running_software_interval(),
         }
     }
 }

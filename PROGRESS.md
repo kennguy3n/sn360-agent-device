@@ -47,7 +47,7 @@ run as part of `cargo test --all`.
 
 Command: `cargo test --all 2>&1 | tee unit-test-results.txt`
 
-**Result: all 289 tests passed, 0 failed.**
+**Result: all 302 tests passed, 0 failed.**
 
 | Crate | Passed |
 |---|---|
@@ -55,7 +55,7 @@ Command: `cargo test --all 2>&1 | tee unit-test-results.txt`
 | `wda-agent` | 18 |
 | `wda-comms` | 31 |
 | `wda-core` | 0 |
-| `wda-enhanced-inventory` | 0 |
+| `wda-enhanced-inventory` | 13 |
 | `wda-event-bus` | 4 |
 | `wda-fim` | 65 (53 lib + 12 integration across 4 integration binaries; 60 s — slowest, uses real inotify/kqueue) |
 | `wda-inventory` | 30 |
@@ -64,7 +64,7 @@ Command: `cargo test --all 2>&1 | tee unit-test-results.txt`
 | `wda-pal` | 5 |
 | `wda-rootcheck` | 20 |
 | `wda-sca` | 5 |
-| **Total** | **289** |
+| **Total** | **302** |
 
 Full log: [`unit-test-results.txt`](./unit-test-results.txt).
 
@@ -237,9 +237,13 @@ verified by the unit, E2E, or benchmark suites above:
 4. **macOS FIM burst test** — skipped on CI due to kqueue event
    drops under load; see
    [`docs/known-issues/fim-burst-workload-macos-ci.md`](./docs/known-issues/fim-burst-workload-macos-ci.md).
-5. **`wda-enhanced-inventory` is an empty skeleton** — Phase 4
-   tasks 4.7–4.9 are still outstanding. (`wda-local-detection` is
-   now fully implemented — Phase 4 tasks 4.1–4.6, see PR #38.)
+5. **`wda-enhanced-inventory` partially implemented** — the
+   running-software monitor (task 4.7) is now complete across
+   Linux, macOS and Windows (baseline + delta snapshots on the
+   event bus, routed to the manager as `MessageType::Syscollector`).
+   Browser-extension enumeration (task 4.8) and the CycloneDX SBOM
+   generator (task 4.9) are still outstanding. (`wda-local-detection`
+   is fully implemented — Phase 4 tasks 4.1–4.6, see PR #38.)
 6. **No E2E coverage for SCA** — rootcheck is covered implicitly by
    the security E2E's system-binary-tampering test, but SCA policy
    evaluation still lacks an E2E assertion path.
@@ -263,7 +267,7 @@ Software Inventory, and companion microservices.
 | 4.4 | LDE: Local Response Dispatcher (block IP, kill process, quarantine) | **Complete** |
 | 4.5 | LDE: YARA scanner integration (**required**, not feature-gated) | **Complete** |
 | 4.6 | LDE: Offline detection queue + server sync on reconnect | **Complete** |
-| 4.7 | Enhanced Inventory: running software monitor (all platforms) | Not Started |
+| 4.7 | Enhanced Inventory: running software monitor (all platforms) | **Complete** |
 | 4.8 | Enhanced Inventory: browser extension inventory (Chrome/Firefox/Edge/Safari) | Not Started |
 | 4.9 | Enhanced Inventory: SBOM generator (CycloneDX, on-demand) | Not Started |
 | 4.10 | TRDS microservice: rule CRUD API, compiler, delta distribution | Not Started |
@@ -272,13 +276,16 @@ Software Inventory, and companion microservices.
 | 4.13 | Agent Gateway: mTLS termination, tenant routing, rate limiting | Not Started |
 | 4.14 | Integration: agent ↔ TRDS rule pull, hot-reload, version tracking | Not Started |
 
-The `wda-local-detection` crate is now fully implemented (Phase 4,
+The `wda-local-detection` crate is fully implemented (Phase 4,
 tasks 4.1–4.6). YARA is a **required** runtime dependency (not
 feature-gated); `libyara-dev` (Linux) / `brew install yara` (macOS) /
 the corresponding Windows prebuilt must be present on the build host.
-The `wda-enhanced-inventory` crate is still an empty skeleton, and
-4.10–4.14 are server-side microservices that live outside this
-repository.
+The `wda-enhanced-inventory` crate now implements the running-software
+monitor (task 4.7) — baseline + delta snapshots on the event bus,
+routed to the manager as `MessageType::Syscollector`. Browser
+extensions (4.8) and the CycloneDX SBOM generator (4.9) are still
+outstanding. 4.10–4.14 are server-side microservices that live outside
+this repository.
 
 ## Next Steps
 
@@ -317,7 +324,7 @@ matching entry in the Phase 4 roadmap table above.
 | P2.4 | ~~Local Response Dispatcher~~ **Done (PR #38)** | 4.4 | LDE decisions feed `wda-active-response` (`block_ip`, `kill_process`, `quarantine`) without a manager round-trip. |
 | P2.5 | ~~YARA scanner integration~~ **Done (PR #38)** | 4.5 | YARA is now a **required** runtime dependency (not feature-gated); scanner has rate-limit and size-cap. |
 | P2.6 | ~~Offline detection queue + server sync on reconnect~~ **Done (PR #38)** | 4.6 | SQLite WAL-mode queue in `wda-local-detection` persists detections across disconnects and replays on reconnect. |
-| P2.7 | Enhanced Inventory: running software monitor | 4.7 | Implement running-software monitoring in `wda-enhanced-inventory` on all platforms (Linux: `/proc`, macOS: `sysctl`, Windows: WMI / ToolHelp32). |
+| P2.7 | ~~Enhanced Inventory: running software monitor~~ **Done** | 4.7 | Cross-platform running-software enumeration in `wda-enhanced-inventory` (Linux `/proc`, macOS `ps`, Windows ToolHelp32) with baseline + delta reporting via `EventKind::EnhancedInventoryUpdate` → `MessageType::Syscollector`, wired into `wda-agent` main loop behind the `modules.enhanced_inventory.enabled` toggle (off by default). |
 | P2.8 | Enhanced Inventory: browser extension enumeration | 4.8 | Enumerate installed browser extensions for Chrome, Firefox, Edge, and Safari; output CycloneDX SBOM format. |
 | P2.9 | Enhanced Inventory: SBOM generator (on-demand) | 4.9 | Full CycloneDX SBOM for the device, triggered on-demand. |
 | P2.10 | Wire Enhanced Inventory into main agent | (wiring for 4.7–4.9) | Add config toggles and module start calls in `crates/wda-agent/src/main.rs` for `wda-enhanced-inventory`, following the pattern established by FIM / SCA / rootcheck / LDE. |
