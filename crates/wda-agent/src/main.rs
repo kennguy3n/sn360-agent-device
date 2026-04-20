@@ -3,6 +3,9 @@
 //! Orchestrates startup, enrollment, server connection, keepalive,
 //! and graceful shutdown of the agent.
 
+mod privilege;
+mod tamper;
+
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -38,6 +41,12 @@ async fn main() -> Result<()> {
             .context("failed to load config from provided path")?,
         None => AgentConfig::load_default().context("failed to load default config")?,
     };
+
+    // 2b. Startup tamper protection (P3.3): self-integrity check + best-effort
+    // file immutability. Runs before any network I/O so a tampered binary
+    // never gets a chance to enroll or connect.
+    tamper::apply_startup_protections(&config.security.tamper)
+        .context("tamper-protection startup check failed")?;
 
     // 3. Create the agent
     let mut agent = Agent::new(config.clone());
@@ -92,6 +101,13 @@ async fn main() -> Result<()> {
         info!("waiting 15 s for remoted to load new agent key");
         tokio::time::sleep(Duration::from_secs(15)).await;
     }
+
+    // 5c. Privilege separation (P3.2): drop root now that enrollment and
+    // key persistence (both of which want to write to root-owned paths
+    // under `/etc/wazuh-desktop-agent/`) are done. Port 1514 is
+    // unprivileged so the connection manager below still works fine
+    // under the drop-to user.
+    privilege::drop_privileges(&config.security).context("failed to drop privileges")?;
 
     // 6. Create ConnectionManager and WazuhCipher from the agent key
     let protocol = match config.server.protocol.as_str() {
@@ -360,6 +376,11 @@ async fn main() -> Result<()> {
         );
         agent.register_module(ei_handle);
     }
+
+    // 12h. Tamper-protection watchdog (P3.3). Off unless
+    // `security.tamper.watchdog_interval_secs` is non-zero AND
+    // `$NOTIFY_SOCKET` is set by the service manager.
+    let _watchdog_handle = tamper::spawn_watchdog(&config.security.tamper);
 
     // 13. Start agent and wait for shutdown signal
     agent.start().await;
