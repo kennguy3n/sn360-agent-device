@@ -101,6 +101,17 @@ struct RunningSoftwareState {
     previous: HashMap<u32, ProcessEntry>,
 }
 
+/// Two [`ProcessEntry`] values refer to the same running process when
+/// they agree on the fields the OS would actually preserve across PID
+/// reuse — i.e. the resolved image name and, when known, the absolute
+/// executable path. `started_at` is deliberately ignored because Linux
+/// derives it from `clock_ticks_per_sec()` and short-lived processes
+/// can round-trip to the same tick boundary; PID reuse is always
+/// detectable via a different image name or binary path.
+fn same_process(a: &ProcessEntry, b: &ProcessEntry) -> bool {
+    a.name == b.name && a.path == b.path
+}
+
 /// Publish a single enhanced-inventory event on the shared bus.
 ///
 /// Returns `true` on success; logs a warning and returns `false` if the
@@ -166,8 +177,17 @@ async fn run_running_software_tick(bus: &EventBus, state: &mut RunningSoftwareSt
     let mut removed: Vec<&ProcessEntry> = Vec::new();
 
     for (pid, entry) in &current {
-        if !state.previous.contains_key(pid) {
-            added.push(entry);
+        match state.previous.get(pid) {
+            None => added.push(entry),
+            Some(prev) if !same_process(prev, entry) => {
+                // PID reuse — the kernel handed the same pid to a new
+                // process between ticks. Report it as a remove + add so
+                // the manager updates its view of that slot instead of
+                // silently keeping stale process metadata.
+                removed.push(prev);
+                added.push(entry);
+            }
+            Some(_) => {}
         }
     }
     for (pid, entry) in &state.previous {
@@ -340,6 +360,119 @@ mod tests {
             }
             other => panic!("unexpected event: {:?}", other),
         }
+    }
+
+    #[tokio::test]
+    async fn test_delta_detects_pid_reuse() {
+        // Seed `previous` with an entry that claims to be a different
+        // process at a PID we KNOW the current snapshot will also hold
+        // (our own test process). The next tick must see the same PID
+        // in both maps but detect that the name/path differ and emit
+        // both a remove (of the synthetic entry) and an add (of the
+        // real entry) for that slot.
+        let (bus, mut server_rx) = EventBus::new(16, 16);
+        let mut state = RunningSoftwareState::default();
+
+        let me = std::process::id();
+        state.baseline_sent = true;
+        state.previous.insert(
+            me,
+            ProcessEntry {
+                pid: me,
+                name: "impostor".into(),
+                path: Some("/definitely/not/this/binary".into()),
+                started_at: None,
+                publisher: None,
+            },
+        );
+
+        run_running_software_tick(&bus, &mut state).await;
+        let event = tokio::time::timeout(Duration::from_millis(500), server_rx.recv())
+            .await
+            .expect("expected a delta event")
+            .expect("server_rx closed");
+
+        match event.kind {
+            EventKind::EnhancedInventoryUpdate { category, data } => {
+                assert_eq!(category, "running_software");
+                assert_eq!(data["type"], "delta");
+                let removed = data["removed"].as_array().expect("removed must be array");
+                let added = data["added"].as_array().expect("added must be array");
+                assert!(
+                    removed
+                        .iter()
+                        .any(|p| p["pid"] == me && p["name"] == "impostor"),
+                    "PID-reused slot must appear in the removed list: {:?}",
+                    removed
+                );
+                assert!(
+                    added
+                        .iter()
+                        .any(|p| p["pid"] == me && p["name"] != "impostor"),
+                    "new process at the reused PID must appear in the added list: {:?}",
+                    added
+                );
+            }
+            other => panic!("unexpected event: {:?}", other),
+        }
+    }
+
+    #[test]
+    fn test_same_process_treats_matching_name_and_path_as_equal() {
+        let a = ProcessEntry {
+            pid: 1,
+            name: "foo".into(),
+            path: Some("/usr/bin/foo".into()),
+            started_at: Some("2026-04-20T06:30:00Z".into()),
+            publisher: None,
+        };
+        let b = ProcessEntry {
+            pid: 1,
+            name: "foo".into(),
+            path: Some("/usr/bin/foo".into()),
+            // Intentionally different started_at — we ignore it.
+            started_at: Some("2026-04-20T07:00:00Z".into()),
+            publisher: None,
+        };
+        assert!(same_process(&a, &b));
+    }
+
+    #[test]
+    fn test_same_process_rejects_differing_name() {
+        let a = ProcessEntry {
+            pid: 1,
+            name: "foo".into(),
+            path: None,
+            started_at: None,
+            publisher: None,
+        };
+        let b = ProcessEntry {
+            pid: 1,
+            name: "bar".into(),
+            path: None,
+            started_at: None,
+            publisher: None,
+        };
+        assert!(!same_process(&a, &b));
+    }
+
+    #[test]
+    fn test_same_process_rejects_differing_path() {
+        let a = ProcessEntry {
+            pid: 1,
+            name: "foo".into(),
+            path: Some("/usr/bin/foo".into()),
+            started_at: None,
+            publisher: None,
+        };
+        let b = ProcessEntry {
+            pid: 1,
+            name: "foo".into(),
+            path: Some("/tmp/foo".into()),
+            started_at: None,
+            publisher: None,
+        };
+        assert!(!same_process(&a, &b));
     }
 
     #[tokio::test]

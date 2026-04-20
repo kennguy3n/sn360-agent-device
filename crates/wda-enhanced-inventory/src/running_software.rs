@@ -255,12 +255,15 @@ mod linux_impl {
 #[cfg(target_os = "macos")]
 mod macos_impl {
     use super::ProcessEntry;
+    use chrono::{Local, NaiveDateTime, TimeZone};
     use std::process::Command;
 
     pub(super) fn enumerate() -> Vec<ProcessEntry> {
         // `ps -A -o pid=,comm=,lstart=` prints one line per process.
-        // `lstart` is a human-readable 5-field date ("Mon Apr 20
-        // 06:30:00 2026") — we keep it as-is in `started_at`.
+        // `lstart` is a human-readable 5-field date in the host's local
+        // timezone (e.g. "Mon Apr 20 06:30:00 2026"); `parse_line`
+        // converts it to RFC 3339 so every platform agrees on the
+        // `started_at` contract.
         let output = match Command::new("/bin/ps")
             .args(["-A", "-o", "pid=,comm=,lstart="])
             .output()
@@ -290,7 +293,7 @@ mod macos_impl {
         // split on the first whitespace for the remainder.
         let mut it = rest.splitn(2, char::is_whitespace);
         let comm = it.next()?.to_string();
-        let lstart = it.next().map(|s| s.trim().to_string());
+        let lstart_raw = it.next().map(|s| s.trim().to_string());
 
         let path_opt = if comm.starts_with('/') {
             Some(comm.clone())
@@ -303,13 +306,31 @@ mod macos_impl {
             .unwrap_or(&comm)
             .to_string();
 
+        let started_at = lstart_raw
+            .as_deref()
+            .filter(|s| !s.is_empty())
+            .and_then(lstart_to_rfc3339);
+
         Some(ProcessEntry {
             pid,
             name,
             path: path_opt,
-            started_at: lstart.filter(|s| !s.is_empty()),
+            started_at,
             publisher: None,
         })
+    }
+
+    /// Convert the `ps -o lstart=` string ("Mon Apr 20 06:30:00 2026",
+    /// local timezone) to an RFC 3339 timestamp. Returns `None` if the
+    /// string doesn't match the expected format or the local time is
+    /// invalid (e.g. during a DST fold).
+    fn lstart_to_rfc3339(s: &str) -> Option<String> {
+        // Collapse runs of whitespace — `lstart` space-pads the day so
+        // single-digit days produce a double space ("Mon Apr  7 ...").
+        let normalised = s.split_whitespace().collect::<Vec<_>>().join(" ");
+        let naive = NaiveDateTime::parse_from_str(&normalised, "%a %b %e %H:%M:%S %Y").ok()?;
+        let local = Local.from_local_datetime(&naive).single()?;
+        Some(local.to_utc().to_rfc3339())
     }
 
     #[cfg(test)]
@@ -317,27 +338,57 @@ mod macos_impl {
         use super::*;
 
         #[test]
-        fn test_parse_line_absolute_path_with_lstart() {
+        fn test_parse_line_absolute_path_with_lstart_produces_rfc3339() {
             let line = "  123 /bin/zsh Mon Apr 20 06:30:00 2026";
             let p = parse_line(line).unwrap();
             assert_eq!(p.pid, 123);
             assert_eq!(p.name, "zsh");
             assert_eq!(p.path.as_deref(), Some("/bin/zsh"));
-            assert_eq!(p.started_at.as_deref(), Some("Mon Apr 20 06:30:00 2026"));
+            let started = p.started_at.expect("started_at must be populated");
+            // RFC 3339 — date / time separated by 'T', ends with Z or
+            // a ±HH:MM offset. We can't assert the exact wall-clock
+            // string because the test runs under an unknown local
+            // timezone, but we can assert it's a valid RFC 3339 string
+            // that round-trips through chrono.
+            assert!(
+                chrono::DateTime::parse_from_rfc3339(&started).is_ok(),
+                "started_at must be RFC 3339: {started}"
+            );
+            assert!(
+                started.contains('T'),
+                "missing date/time separator: {started}"
+            );
         }
 
         #[test]
-        fn test_parse_line_name_only() {
+        fn test_parse_line_handles_space_padded_day() {
+            // `ps` space-pads the day of month, so single-digit days
+            // produce a double space after the month name.
+            let line = "7 /bin/launchd Mon Apr  7 06:30:00 2026";
+            let p = parse_line(line).expect("parse_line should succeed");
+            let started = p.started_at.expect("started_at must be populated");
+            assert!(chrono::DateTime::parse_from_rfc3339(&started).is_ok());
+        }
+
+        #[test]
+        fn test_parse_line_name_only_has_no_started_at() {
             let p = parse_line("9 launchd").unwrap();
             assert_eq!(p.pid, 9);
             assert_eq!(p.name, "launchd");
             assert!(p.path.is_none());
+            assert!(p.started_at.is_none());
         }
 
         #[test]
         fn test_parse_line_rejects_garbage() {
             assert!(parse_line("").is_none());
             assert!(parse_line("not-a-pid foo").is_none());
+        }
+
+        #[test]
+        fn test_lstart_to_rfc3339_rejects_unparseable() {
+            assert!(lstart_to_rfc3339("not a date").is_none());
+            assert!(lstart_to_rfc3339("").is_none());
         }
     }
 }
