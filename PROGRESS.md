@@ -159,11 +159,15 @@ raw numbers. Summary vs. proposal targets:
    enumerates adapters via `GetAdaptersAddresses` (`AF_UNSPEC`) and
    emits `dbsync_netiface` + `dbsync_netaddr` payloads for every
    adapter and unicast address, matching the Unix output format.
-7. **PAL `PowerMonitor` returns `Unknown`/`None` on macOS and
-   Windows.** Non-blocking for core telemetry — `wda-inventory` has
-   real hardware/OS implementations — but adaptive power-aware
-   scheduling (battery vs AC profile switching) is not yet wired up
-   outside Linux.
+7. ~~**PAL `PowerMonitor` returns `Unknown`/`None` on macOS and
+   Windows.**~~ **Fixed.** The `macos` and `windows_imp` submodules in
+   `crates/wda-pal/src/power.rs` now implement `power_state()`,
+   `battery_percentage()`, and `user_idle_duration()` using IOKit
+   `IOPSCopyPowerSourcesInfo` / CoreGraphics
+   `CGEventSourceSecondsSinceLastEventType` on macOS and
+   `GetSystemPowerStatus` / `GetLastInputInfo` + `GetTickCount` on
+   Windows. `PowerProfile::from_inputs` is now a public helper so the
+   classification is unit-testable on any host.
 
 ## Recommended Next Steps
 
@@ -172,8 +176,11 @@ Short list, ordered by impact:
 1. ~~**Trim unused features from `rusqlite` and `rustls`**~~ **Done.**
    The release binary is now 4.6 MB, under the < 5 MB target — see
    [`benchmark-results.md`](./benchmark-results.md).
-2. **Wire PAL `PowerMonitor` on macOS and Windows** so adaptive
-   battery-vs-AC scheduling works outside Linux.
+2. ~~**Wire PAL `PowerMonitor` on macOS and Windows**~~ **Done.**
+   macOS uses IOKit Power Sources + CoreGraphics event-source idle
+   timing; Windows uses `GetSystemPowerStatus` +
+   `GetLastInputInfo` / `GetTickCount`. Adaptive battery-vs-AC
+   scheduling now works on all three platforms.
 3. ~~**Implement rootcheck detection logic**~~ **Done (PR #32).**
    The `wda-rootcheck` crate now ships signature, hidden-process,
    and binary-integrity checks wired into the agent main loop —
@@ -200,8 +207,6 @@ prefixes for SCA/ActiveResponse were fixed in PR #33.
 
 ### Remaining Gaps
 
-- PAL `PowerMonitor` returns `Unknown`/`None` on macOS and Windows
-  (adaptive scheduling Linux-only).
 - macOS FIM burst test skipped due to kqueue event drops on CI
   (see
   [`docs/known-issues/fim-burst-workload-macos-ci.md`](./docs/known-issues/fim-burst-workload-macos-ci.md)).
@@ -221,7 +226,7 @@ Do these first, before moving to Phase 4.
 
 | # | Task | Details |
 |---|------|---------|
-| P1.1 | Wire PAL `PowerMonitor` on macOS and Windows | Implement `IOPSCopyPowerSourcesInfo` on macOS and `GetSystemPowerStatus` on Windows in `wda-pal`. Enable adaptive battery-vs-AC scheduling outside Linux. |
+| P1.1 | ~~Wire PAL `PowerMonitor` on macOS and Windows~~ **Done** | macOS uses IOKit `IOPSCopyPowerSourcesInfo`/`IOPSCopyPowerSourcesList` + CoreGraphics `CGEventSourceSecondsSinceLastEventType`. Windows uses `GetSystemPowerStatus` + `GetLastInputInfo` / `GetTickCount`. Adaptive battery-vs-AC scheduling now works on all three platforms. |
 | P1.2 | Add E2E tests for SCA and Rootcheck | Extend `tests/scripts/run-e2e.sh` to verify SCA policy evaluation results reach the manager. Add a rootcheck E2E test that plants a known signature file and verifies the alert is received. |
 | P1.3 | Investigate and fix macOS FIM burst test hang | Follow suggested steps in `docs/known-issues/fim-burst-workload-macos-ci.md`. Try `#[tokio::test(flavor = "multi_thread", worker_threads = 2)]` to rule out executor starvation. Re-enable on macOS CI once stable. |
 | P1.4 | Implement rootcheck content-based checks | Add content inspection for files like `/etc/ld.so.preload` (check for suspicious shared library entries), not just file-existence checks. |
