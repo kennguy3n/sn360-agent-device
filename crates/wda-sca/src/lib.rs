@@ -21,6 +21,7 @@ use tracing::{debug, error, info, warn};
 use wda_core::config::{AgentConfig, ScaConfig};
 use wda_core::module::{ModuleHandle, ModuleHealth, ModuleStatus};
 use wda_core::signal::ShutdownSignal;
+use wda_core::PowerProfileReceiver;
 use wda_event_bus::{Event, EventBus, EventKind, Priority};
 
 // Module-status encoding for atomic access.
@@ -184,13 +185,23 @@ impl ScaModule {
     /// [`ScaConfig::policy_dir`], runs one evaluation on startup, then
     /// re-evaluates every [`ScaConfig::scan_interval`] seconds until
     /// `shutdown` is signalled.
-    pub fn start(config: &AgentConfig, bus: EventBus, shutdown: ShutdownSignal) -> ModuleHandle {
+    ///
+    /// `power_rx` gates evaluations: when
+    /// [`PowerProfile::sca_enabled`] is `false` (e.g. the host is on
+    /// critical battery) the module skips scheduled evaluations and
+    /// resumes them as soon as the profile allows.
+    pub fn start(
+        config: &AgentConfig,
+        bus: EventBus,
+        shutdown: ShutdownSignal,
+        power_rx: PowerProfileReceiver,
+    ) -> ModuleHandle {
         let sca_config = config.modules.sca.clone();
         let status = Arc::new(AtomicU8::new(STATUS_INITIALIZED));
         let task_status = Arc::clone(&status);
 
         let task = tokio::spawn(async move {
-            if let Err(e) = run(sca_config, bus, shutdown, task_status.clone()).await {
+            if let Err(e) = run(sca_config, bus, shutdown, power_rx, task_status.clone()).await {
                 error!(error = %e, "SCA module failed");
                 task_status.store(STATUS_FAILED, Ordering::Relaxed);
                 return Err(e);
@@ -263,6 +274,7 @@ async fn run(
     sca_config: ScaConfig,
     bus: EventBus,
     mut shutdown: ShutdownSignal,
+    mut power_rx: PowerProfileReceiver,
     status: Arc<AtomicU8>,
 ) -> anyhow::Result<()> {
     info!("SCA module starting");
@@ -277,8 +289,19 @@ async fn run(
 
     status.store(STATUS_RUNNING, Ordering::Relaxed);
 
-    // Initial evaluation on startup.
-    module.evaluate_all(&bus).await;
+    let mut current_profile = *power_rx.borrow();
+
+    // Initial evaluation on startup — but only if the active profile
+    // permits SCA work. On critical battery we defer until the host
+    // recovers.
+    if current_profile.sca_enabled() {
+        module.evaluate_all(&bus).await;
+    } else {
+        info!(
+            profile = ?current_profile,
+            "skipping initial SCA evaluation: disabled under active power profile"
+        );
+    }
 
     let interval = Duration::from_secs(sca_config.scan_interval.max(1));
     let mut timer = tokio::time::interval(interval);
@@ -295,8 +318,32 @@ async fn run(
                 break;
             }
 
+            change = power_rx.changed() => {
+                if change.is_err() {
+                    debug!("power-profile sender dropped; SCA holding last profile");
+                    continue;
+                }
+                let new_profile = *power_rx.borrow();
+                if new_profile != current_profile {
+                    info!(
+                        previous = ?current_profile,
+                        current = ?new_profile,
+                        sca_enabled = new_profile.sca_enabled(),
+                        "SCA retuning for new power profile"
+                    );
+                    current_profile = new_profile;
+                }
+            }
+
             _ = timer.tick() => {
-                debug!("SCA scan timer fired");
+                if !current_profile.sca_enabled() {
+                    debug!(
+                        profile = ?current_profile,
+                        "SCA scan timer fired under disabled profile; skipping evaluation"
+                    );
+                    continue;
+                }
+                debug!(profile = ?current_profile, "SCA scan timer fired");
                 module.evaluate_all(&bus).await;
             }
         }

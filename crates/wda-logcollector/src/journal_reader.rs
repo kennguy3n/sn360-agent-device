@@ -14,7 +14,9 @@ use tracing::{debug, error, info, warn};
 
 use wda_core::config::LogSource;
 use wda_core::signal::ShutdownSignal;
-use wda_event_bus::{Event, EventBus, EventKind, Priority};
+use wda_event_bus::{Event, EventKind, Priority};
+
+use crate::batch::LogBatchSink;
 
 // ---------------------------------------------------------------------------
 // FFI bindings to libsystemd sd_journal_* functions
@@ -261,12 +263,12 @@ fn extract_entry(journal: &JournalHandle) -> Option<JournalEntry> {
 /// Reads new entries from the systemd journal using fd-based notifications.
 pub struct JournalReader {
     config: LogSource,
-    bus: EventBus,
+    bus: LogBatchSink,
 }
 
 impl JournalReader {
     /// Create a new journal reader for the given source configuration.
-    pub fn new(config: LogSource, bus: EventBus) -> Self {
+    pub fn new(config: LogSource, bus: LogBatchSink) -> Self {
         Self { config, bus }
     }
 
@@ -358,6 +360,7 @@ impl JournalReader {
 mod tests {
     use super::*;
     use wda_core::signal::ShutdownController;
+    use wda_event_bus::EventBus;
 
     #[test]
     fn test_journal_entry_display_with_identifier() {
@@ -394,7 +397,7 @@ mod tests {
             units: vec!["sshd.service".to_string()],
         };
         let (bus, _rx) = EventBus::new(256, 256);
-        let reader = JournalReader::new(source.clone(), bus);
+        let reader = JournalReader::new(source.clone(), LogBatchSink::immediate(bus));
         assert_eq!(reader.config.source_type, "journald");
         assert_eq!(reader.config.units.len(), 1);
     }
@@ -414,7 +417,7 @@ mod tests {
             units: vec![],
         };
         let (bus, _rx) = EventBus::new(256, 256);
-        let reader = JournalReader::new(source, bus);
+        let reader = JournalReader::new(source, LogBatchSink::immediate(bus));
 
         let (controller, signal) = ShutdownController::new();
 
@@ -445,7 +448,7 @@ mod tests {
             units: vec![],
         };
         let (bus, mut server_rx) = EventBus::new(256, 256);
-        let reader = JournalReader::new(source, bus);
+        let reader = JournalReader::new(source, LogBatchSink::immediate(bus));
 
         let (controller, signal) = ShutdownController::new();
 
@@ -503,7 +506,7 @@ mod tests {
             units: vec!["sshd.service".to_string(), "sudo.service".to_string()],
         };
         let (bus, _rx) = EventBus::new(256, 256);
-        let reader = JournalReader::new(source, bus);
+        let reader = JournalReader::new(source, LogBatchSink::immediate(bus));
 
         let (controller, signal) = ShutdownController::new();
 

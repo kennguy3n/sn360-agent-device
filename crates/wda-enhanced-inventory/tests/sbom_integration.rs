@@ -9,6 +9,7 @@
 use std::time::Duration;
 
 use wda_core::config::AgentConfig;
+use wda_core::power::{channel as power_channel, PowerProfile};
 use wda_core::signal::ShutdownController;
 use wda_enhanced_inventory::sbom::{generate_sbom, SPEC_VERSION};
 use wda_enhanced_inventory::EnhancedInventoryModule;
@@ -78,8 +79,9 @@ async fn module_lifecycle_publishes_sbom_snapshot() {
     let cfg = test_config();
     let (controller, signal) = ShutdownController::new();
     let (bus, mut server_rx) = EventBus::new(32, 32);
+    let (_power_tx, power_rx) = power_channel(PowerProfile::Normal);
 
-    let handle = EnhancedInventoryModule::start(&cfg, bus, signal);
+    let handle = EnhancedInventoryModule::start(&cfg, bus, signal, power_rx);
 
     // Collect events for a short window; the startup path fires the
     // SBOM tick before entering the select loop, so we expect the
@@ -134,8 +136,9 @@ async fn module_lifecycle_with_sbom_disabled_does_not_publish_sbom() {
 
     let (controller, signal) = ShutdownController::new();
     let (bus, mut server_rx) = EventBus::new(16, 16);
+    let (_power_tx, power_rx) = power_channel(PowerProfile::Normal);
 
-    let handle = EnhancedInventoryModule::start(&cfg, bus, signal);
+    let handle = EnhancedInventoryModule::start(&cfg, bus, signal, power_rx);
 
     // Give the module enough wall time to perform any initial work.
     tokio::time::sleep(Duration::from_millis(200)).await;

@@ -10,6 +10,7 @@ use tempfile::TempDir;
 use tokio::time::timeout;
 
 use wda_core::config::{AgentConfig, FimConfig, FimDirectory, ModulesConfig};
+use wda_core::power::{channel as power_channel, PowerProfile};
 use wda_core::signal::ShutdownController;
 use wda_event_bus::{EventBus, EventKind};
 use wda_fim::FimModule;
@@ -46,8 +47,9 @@ async fn test_fim_detects_file_creation() {
 
     let (bus, mut server_rx) = EventBus::new(256, 256);
     let (controller, signal) = ShutdownController::new();
+    let (_power_tx, power_rx) = power_channel(PowerProfile::Normal);
 
-    let _handle = FimModule::start(&config, bus, signal);
+    let _handle = FimModule::start(&config, bus, signal, power_rx);
 
     // Give the watcher time to register.
     tokio::time::sleep(Duration::from_millis(200)).await;
@@ -84,8 +86,9 @@ async fn test_fim_detects_file_modification() {
 
     let (bus, mut server_rx) = EventBus::new(256, 256);
     let (controller, signal) = ShutdownController::new();
+    let (_power_tx, power_rx) = power_channel(PowerProfile::Normal);
 
-    let _handle = FimModule::start(&config, bus, signal);
+    let _handle = FimModule::start(&config, bus, signal, power_rx);
     tokio::time::sleep(Duration::from_millis(200)).await;
 
     // Create the file first.
@@ -135,8 +138,9 @@ async fn test_fim_detects_file_deletion() {
 
     let (bus, mut server_rx) = EventBus::new(256, 256);
     let (controller, signal) = ShutdownController::new();
+    let (_power_tx, power_rx) = power_channel(PowerProfile::Normal);
 
-    let _handle = FimModule::start(&config, bus, signal);
+    let _handle = FimModule::start(&config, bus, signal, power_rx);
     tokio::time::sleep(Duration::from_millis(200)).await;
 
     // Create a file, then delete it.
@@ -193,8 +197,9 @@ async fn test_fim_sha256_is_correct() {
 
     let (bus, mut server_rx) = EventBus::new(256, 256);
     let (controller, signal) = ShutdownController::new();
+    let (_power_tx, power_rx) = power_channel(PowerProfile::Normal);
 
-    let _handle = FimModule::start(&config, bus, signal);
+    let _handle = FimModule::start(&config, bus, signal, power_rx);
     tokio::time::sleep(Duration::from_millis(200)).await;
 
     let file_path = tmp.path().join("hash_test.txt");
@@ -225,8 +230,9 @@ async fn test_fim_clean_shutdown() {
 
     let (bus, _server_rx) = EventBus::new(256, 256);
     let (controller, signal) = ShutdownController::new();
+    let (_power_tx, power_rx) = power_channel(PowerProfile::Normal);
 
-    let handle = FimModule::start(&config, bus, signal);
+    let handle = FimModule::start(&config, bus, signal, power_rx);
     tokio::time::sleep(Duration::from_millis(200)).await;
 
     // Trigger shutdown and verify the task completes without panicking.

@@ -16,6 +16,7 @@ use wda_comms::enrollment::{load_agent_key, save_agent_key, EnrollmentClient};
 use wda_comms::keepalive::run_keepalive_loop;
 use wda_comms::protocol::{MessageType, WazuhMessage};
 use wda_core::config::AgentConfig;
+use wda_core::power::{self, PowerProfile};
 use wda_core::Agent;
 use wda_event_bus::{Event, EventKind, Priority};
 
@@ -260,11 +261,22 @@ async fn main() -> Result<()> {
         info!("server receive loop stopped");
     });
 
+    // 10b. Spawn the shared power-profile watcher. The channel is
+    // seeded with `PowerProfile::Normal` so modules started before the
+    // first poll observe a sensible default; the background task will
+    // reclassify on each poll interval and broadcast changes.
+    let (power_tx, power_rx) = power::channel(PowerProfile::Normal);
+    let _power_handle = power::spawn_power_profile_task(power_tx, agent.shutdown_signal());
+
     // 11. Start FIM module if enabled
     if config.modules.fim.enabled {
         info!("starting FIM module");
-        let fim_handle =
-            wda_fim::FimModule::start(&config, agent.event_bus(), agent.shutdown_signal());
+        let fim_handle = wda_fim::FimModule::start(
+            &config,
+            agent.event_bus(),
+            agent.shutdown_signal(),
+            power_rx.clone(),
+        );
         agent.register_module(fim_handle);
     }
 
@@ -275,6 +287,7 @@ async fn main() -> Result<()> {
             &config,
             agent.event_bus(),
             agent.shutdown_signal(),
+            power_rx.clone(),
         );
         agent.register_module(lc_handle);
     }
@@ -286,6 +299,7 @@ async fn main() -> Result<()> {
             &config,
             agent.event_bus(),
             agent.shutdown_signal(),
+            power_rx.clone(),
         );
         agent.register_module(inv_handle);
     }
@@ -304,8 +318,12 @@ async fn main() -> Result<()> {
     // 12d. Start SCA module if enabled
     if config.modules.sca.enabled {
         info!("starting SCA module");
-        let sca_handle =
-            wda_sca::ScaModule::start(&config, agent.event_bus(), agent.shutdown_signal());
+        let sca_handle = wda_sca::ScaModule::start(
+            &config,
+            agent.event_bus(),
+            agent.shutdown_signal(),
+            power_rx.clone(),
+        );
         agent.register_module(sca_handle);
     }
 
@@ -338,6 +356,7 @@ async fn main() -> Result<()> {
             &config,
             agent.event_bus(),
             agent.shutdown_signal(),
+            power_rx.clone(),
         );
         agent.register_module(ei_handle);
     }

@@ -7,6 +7,7 @@ use std::time::Duration;
 
 use tempfile::TempDir;
 use wda_core::config::{AgentConfig, FimConfig, FimDirectory, ModulesConfig};
+use wda_core::power::{channel as power_channel, PowerProfile};
 use wda_core::signal::ShutdownController;
 use wda_event_bus::{EventBus, EventKind};
 use wda_fim::FimModule;
@@ -73,8 +74,9 @@ async fn test_baseline_scan_lifecycle() {
     let config = test_config(dir, 3);
     let (bus, mut server_rx) = EventBus::new(512, 512);
     let (controller, signal) = ShutdownController::new();
+    let (_power_tx, power_rx) = power_channel(PowerProfile::Normal);
 
-    let _handle = FimModule::start(&config, bus, signal);
+    let _handle = FimModule::start(&config, bus, signal, power_rx);
 
     // Wait for the initial baseline scan to complete (should run on startup).
     // Collect events over a generous window.
