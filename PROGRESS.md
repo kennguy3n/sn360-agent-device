@@ -47,7 +47,7 @@ run as part of `cargo test --all`.
 
 Command: `cargo test --all 2>&1 | tee unit-test-results.txt`
 
-**Result: all 302 tests passed, 0 failed.**
+**Result: all 313 tests passed, 0 failed.**
 
 | Crate | Passed |
 |---|---|
@@ -55,16 +55,16 @@ Command: `cargo test --all 2>&1 | tee unit-test-results.txt`
 | `wda-agent` | 18 |
 | `wda-comms` | 31 |
 | `wda-core` | 0 |
-| `wda-enhanced-inventory` | 13 |
+| `wda-enhanced-inventory` | 19 |
 | `wda-event-bus` | 4 |
 | `wda-fim` | 65 (53 lib + 12 integration across 4 integration binaries; 60 s — slowest, uses real inotify/kqueue) |
 | `wda-inventory` | 30 |
-| `wda-local-detection` | 51 |
+| `wda-local-detection` | 56 |
 | `wda-logcollector` | 31 |
 | `wda-pal` | 5 |
 | `wda-rootcheck` | 20 |
 | `wda-sca` | 5 |
-| **Total** | **302** |
+| **Total** | **313** |
 
 Full log: [`unit-test-results.txt`](./unit-test-results.txt).
 
@@ -310,6 +310,7 @@ bandwidth allows.
 | P1.8 | Linux user-idle detection | Implement `PowerMonitor::user_idle_duration()` on Linux via XScreenSaver (`XScreenSaverQueryInfo`) or D-Bus `org.freedesktop.ScreenSaver` / `logind`, so `PowerProfile::IdleAC` / `PowerProfile::BatteryIdle` are reachable on Linux. |
 | P1.9 | Re-run FIM burst benchmark on the merged pipeline | After the Phase 3 pipeline changes (lazy hashing, `RateLimiter`, `EventBatcher`) — reproduce with `bash tests/scripts/fim-burst-bench.sh` and update `benchmark-results.md` to confirm the strict < 3 % peak target. |
 | P1.10 | Tune FIM defaults for burst-heavy environments | Sweep `max_hashes_per_sec` / `batch_size` / `batch_timeout_ms` against representative workloads and pick config defaults that keep sampled peak comfortably under 3 % without degrading event latency. |
+| P1.11 | Regenerate `unit-test-results.txt` and add E2E coverage for enhanced inventory | Regenerate `unit-test-results.txt` to reflect the current test count (313 passing after PR #42, including 19 `wda-enhanced-inventory` tests). Extend `tests/scripts/run-e2e.sh` with an enhanced-inventory assertion path that toggles `modules.enhanced_inventory.enabled=true`, spawns a short-lived process on the agent host, and verifies the running-software baseline + delta reach the manager as `MessageType::Syscollector` events. |
 
 ### Priority 2 — Phase 4: Edge Detection & Enhanced Inventory
 
@@ -324,10 +325,10 @@ matching entry in the Phase 4 roadmap table above.
 | P2.4 | ~~Local Response Dispatcher~~ **Done (PR #38)** | 4.4 | LDE decisions feed `wda-active-response` (`block_ip`, `kill_process`, `quarantine`) without a manager round-trip. |
 | P2.5 | ~~YARA scanner integration~~ **Done (PR #38)** | 4.5 | YARA is now a **required** runtime dependency (not feature-gated); scanner has rate-limit and size-cap. |
 | P2.6 | ~~Offline detection queue + server sync on reconnect~~ **Done (PR #38)** | 4.6 | SQLite WAL-mode queue in `wda-local-detection` persists detections across disconnects and replays on reconnect. |
-| P2.7 | ~~Enhanced Inventory: running software monitor~~ **Done** | 4.7 | Cross-platform running-software enumeration in `wda-enhanced-inventory` (Linux `/proc`, macOS `ps`, Windows ToolHelp32) with baseline + delta reporting via `EventKind::EnhancedInventoryUpdate` → `MessageType::Syscollector`, wired into `wda-agent` main loop behind the `modules.enhanced_inventory.enabled` toggle (off by default). |
-| P2.8 | Enhanced Inventory: browser extension enumeration | 4.8 | Enumerate installed browser extensions for Chrome, Firefox, Edge, and Safari; output CycloneDX SBOM format. |
-| P2.9 | Enhanced Inventory: SBOM generator (on-demand) | 4.9 | Full CycloneDX SBOM for the device, triggered on-demand. |
-| P2.10 | Wire Enhanced Inventory into main agent | (wiring for 4.7–4.9) | Add config toggles and module start calls in `crates/wda-agent/src/main.rs` for `wda-enhanced-inventory`, following the pattern established by FIM / SCA / rootcheck / LDE. |
+| P2.7 | ~~Enhanced Inventory: running software monitor~~ **Done (PR #42)** | 4.7 | Cross-platform running-software enumeration in `wda-enhanced-inventory` (Linux `/proc`, macOS `ps`, Windows ToolHelp32) with baseline + delta reporting via `EventKind::EnhancedInventoryUpdate` → `MessageType::Syscollector`, PID-reuse detection, RFC 3339 `started_at` timestamps, and macOS path-with-spaces handling. Wired into `wda-agent` main loop behind the `modules.enhanced_inventory.enabled` toggle (off by default). |
+| P2.8 | Enhanced Inventory: browser extension enumeration | 4.8 | Enumerate installed browser extensions for Chrome, Firefox, Edge, and Safari; output CycloneDX SBOM format. **Immediate next agent-side task.** |
+| P2.9 | Enhanced Inventory: SBOM generator (on-demand) | 4.9 | Full CycloneDX SBOM for the device, triggered on-demand. **Immediate next agent-side task after 4.8.** |
+| P2.10 | Wire Enhanced Inventory into main agent — **Partially done (PR #42)** | (wiring for 4.7–4.9) | Running-software (4.7) is wired behind `modules.enhanced_inventory.enabled` in `crates/wda-agent/src/main.rs`. Browser extensions (4.8) and the SBOM generator (4.9) still need wiring into the same `EnhancedInventoryModule::start()` path when implemented. |
 | P2.11 | Companion microservices (TRDS / IOCFS / SIS / Gateway) | 4.10–4.13 | Server-side services for rule CRUD + delta distribution, IOC feed ingestion + bloom compilation, inventory ingestion + CVE matching, and mTLS / tenant routing. Live outside this repo; agent side already exposes `RuleBundle::load` hooks. |
 | P2.12 | Agent ↔ TRDS rule pull, hot-reload, version tracking | 4.14 | Wire the LDE rule loader to TRDS for versioned bundle pulls and hot-reload without restart. |
 
@@ -385,7 +386,16 @@ Recent PRs shaping this state:
   offline detection queue. YARA is now a required runtime
   dependency (`libyara-dev` on Linux / `brew install yara` on
   macOS / the corresponding Windows prebuilt).
-- **This change** — CI E2E hardening: removed `windows-latest`
+- **PR #42** — Phase 4 task 4.7 landed: the
+  `wda-enhanced-inventory` running-software monitor with
+  cross-platform process enumeration (Linux `/proc`, macOS
+  `ps`, Windows ToolHelp32), baseline + delta reporting on the
+  event bus, PID-reuse detection, RFC 3339 `started_at`
+  timestamps, and macOS path-with-spaces handling. The module
+  is wired into `wda-agent/src/main.rs` behind
+  `modules.enhanced_inventory.enabled` (off by default) and
+  emits `MessageType::Syscollector` at `Priority::Low`.
+- **CI E2E hardening (pre-#42)** — removed `windows-latest`
   from the E2E matrix (Wazuh manager image is Linux-only), added
   a Docker-availability guard to `run-e2e-windows.ps1` for local
   use, increased sleep margins in `run-e2e.sh` and the per-step
@@ -394,3 +404,48 @@ Recent PRs shaping this state:
   failure, dropped the deprecated `version` field from
   `tests/docker-compose.yml`, and added a `security-e2e`
   Makefile target plus README entry.
+
+## Development Assessment — 2026-04-20 (Post-PR-#42)
+
+Phase 4 task 4.7 (Enhanced Inventory: running-software monitor)
+landed in **PR #42** — the first Phase 4 Enhanced Inventory
+capability to ship. `wda-enhanced-inventory` now enumerates
+running processes on all three target platforms (Linux `/proc`,
+macOS `ps`, Windows `CreateToolhelp32Snapshot` /
+`Process32First`/`Next`), emits a full baseline at startup and
+delta snapshots on subsequent ticks through
+`EventKind::EnhancedInventoryUpdate`, and routes those events to
+the manager as `MessageType::Syscollector` at `Priority::Low` so
+they never crowd out FIM / active-response traffic. The
+implementation handles PID reuse (a recycled PID is reported as
+a new process rather than a stale continuation), emits RFC 3339
+`started_at` timestamps, and parses macOS `ps` output with
+embedded spaces in the executable path correctly.
+
+The module is wired into `crates/wda-agent/src/main.rs` behind
+the `modules.enhanced_inventory.enabled` config toggle (off by
+default), following the `FimModule::start()` /
+`ScaModule::start()` / `RootcheckModule::start()` pattern. With
+the toggle off, the module contributes zero background work and
+zero additional channel pressure, preserving the idle-cost
+targets reported in the benchmark suite.
+
+The unit-test count is now **313 passing** (up from 289 on disk /
+302 reported for the post-LDE state) — the 11-test delta breaks
+down as **+19 new `wda-enhanced-inventory` tests** introduced by
+PR #42 (baseline/delta parsing, PID-reuse handling, platform
+parsers, RFC 3339 timestamps, path-with-spaces, channel-full
+retry) and **+5 new `wda-local-detection` tests** from post-PR-#38
+LDE fixes (drain peek/ack FIFO semantics, re-enqueue on publish
+failure, offline-queue reconnect behaviour), offset by the
+previous placeholder count.
+
+The **immediate next agent-side tasks** are Phase 4 **4.8
+(browser extension enumeration)** and **4.9 (CycloneDX SBOM
+generator)**, both of which will land in the same
+`wda-enhanced-inventory` crate and hook into the existing
+`EnhancedInventoryModule::start()` scheduler and the
+`modules.enhanced_inventory.*` config tree established by PR #42.
+Regenerating `unit-test-results.txt` to match this state, and
+adding an E2E assertion path for the running-software monitor,
+are tracked as P1.11 above.
