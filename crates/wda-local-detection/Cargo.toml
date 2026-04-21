@@ -1,6 +1,6 @@
 [package]
 name = "wda-local-detection"
-description = "Local Detection Engine (LDE) for WDA — IOC matching, behavioral rules, YARA scanning"
+description = "Local Detection Engine (LDE) for SDA — IOC matching, behavioral rules, YARA scanning"
 version.workspace = true
 edition.workspace = true
 license.workspace = true

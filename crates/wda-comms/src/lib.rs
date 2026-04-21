@@ -1,4 +1,4 @@
-//! Communication layer for the Wazuh Desktop Agent.
+//! Communication layer for the SN360 Desktop Agent.
 //!
 //! Implements the Wazuh server protocol (v4.x compatible) with Blowfish-CBC
 //! or AES-256-CBC encryption, TCP/UDP transport, automatic reconnection,

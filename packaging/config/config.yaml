@@ -1,4 +1,4 @@
-# SN360 Device Agent — default configuration installed by packages.
+# SN360 Desktop Agent — default configuration installed by packages.
 #
 # See device-agent-proposal.md §11 for the complete configuration reference.
 
@@ -45,7 +45,7 @@ modules:
 
   sca:
     enabled: true
-    policy_dir: "/etc/wazuh-desktop-agent/sca"
+    policy_dir: "/etc/sn360-desktop-agent/sca"
     scan_interval: 43200
 
   active_response:

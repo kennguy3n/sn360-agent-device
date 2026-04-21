@@ -189,7 +189,7 @@ async fn platform_unblock_ip(ip: &str, timeout: Duration) -> ActionResult {
 #[cfg(target_os = "windows")]
 async fn platform_block_ip(ip: &str, timeout: Duration) -> ActionResult {
     let addr = strip_zone_id(ip);
-    let rule_name = format!("WDA Block {}", addr);
+    let rule_name = format!("SDA Block {}", addr);
     let result = executor::execute_command(
         "netsh",
         &[
@@ -222,7 +222,7 @@ async fn platform_block_ip(ip: &str, timeout: Duration) -> ActionResult {
 #[cfg(target_os = "windows")]
 async fn platform_unblock_ip(ip: &str, timeout: Duration) -> ActionResult {
     let addr = strip_zone_id(ip);
-    let rule_name = format!("WDA Block {}", addr);
+    let rule_name = format!("SDA Block {}", addr);
     let result = executor::execute_command(
         "netsh",
         &[

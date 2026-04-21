@@ -1,5 +1,5 @@
 #!/bin/bash
-# E2E test for Wazuh Desktop Agent on macOS.
+# E2E test for SN360 Desktop Agent on macOS.
 # Starts a real Wazuh manager via Docker Desktop, enrolls the agent,
 # triggers FIM and log collection events, then validates that alerts
 # appear on the server. Exits non-zero if ANY check fails.
@@ -68,7 +68,7 @@ cleanup() {
   [ -n "$AGENT_PID" ] && kill "$AGENT_PID" 2>/dev/null || true
   wait "$AGENT_PID" 2>/dev/null || true
   rm -rf /tmp/wda-e2e-fim /tmp/wda-e2e-logs
-  sudo rm -f /etc/wazuh-desktop-agent/client.keys
+  sudo rm -f /etc/sn360-desktop-agent/client.keys
   docker compose -f tests/docker-compose.yml down -v 2>/dev/null || true
 }
 trap cleanup EXIT
@@ -76,9 +76,9 @@ trap cleanup EXIT
 # ── Step 0: Clean up stale state from previous runs ────────────────
 echo "==> Step 0: Cleaning stale state..."
 rm -rf /tmp/wda-e2e-fim /tmp/wda-e2e-logs
-# wda-fim uses /var/lib/wazuh-desktop-agent/fim.db on all Unix platforms.
-sudo rm -f /var/lib/wazuh-desktop-agent/fim.db
-sudo rm -f /etc/wazuh-desktop-agent/client.keys
+# wda-fim uses /var/lib/sn360-desktop-agent/fim.db on all Unix platforms.
+sudo rm -f /var/lib/sn360-desktop-agent/fim.db
+sudo rm -f /etc/sn360-desktop-agent/client.keys
 # Remove ALL previously-enrolled agents from the running Wazuh container
 # so re-enrollment succeeds.  List agent IDs and remove each one.
 for STALE_ID in $(docker compose -f tests/docker-compose.yml exec -T wazuh-manager \
@@ -158,7 +158,7 @@ echo "    Test directories ready."
 
 # ── Step 5: Run the agent ───────────────────────────────────────────
 echo "==> Step 5: Starting agent..."
-sudo mkdir -p /etc/wazuh-desktop-agent
+sudo mkdir -p /etc/sn360-desktop-agent
 # gtimeout (from coreutils) is preferred on macOS; fall back to plain sudo
 # when it isn't installed, relying on the trap to kill the agent.
 if command -v gtimeout >/dev/null 2>&1; then

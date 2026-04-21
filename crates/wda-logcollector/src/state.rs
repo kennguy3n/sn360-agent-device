@@ -71,7 +71,7 @@ impl SeekState {
         }
         #[cfg(windows)]
         {
-            PathBuf::from(r"C:\ProgramData\WDA\logcollector_state.json")
+            PathBuf::from(r"C:\ProgramData\SN360DesktopAgent\logcollector_state.json")
         }
     }
 }

@@ -1,4 +1,4 @@
-//! Async event bus for inter-module communication in WDA.
+//! Async event bus for inter-module communication in SDA.
 //!
 //! Provides a lightweight, bounded, priority-aware channel system for
 //! passing events between agent modules with backpressure support.

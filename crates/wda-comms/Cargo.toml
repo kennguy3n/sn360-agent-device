@@ -1,6 +1,6 @@
 [package]
 name = "wda-comms"
-description = "Communication layer for WDA - Wazuh server protocol implementation"
+description = "Communication layer for SDA - Wazuh server protocol implementation"
 version.workspace = true
 edition.workspace = true
 license.workspace = true

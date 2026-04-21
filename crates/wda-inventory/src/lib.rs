@@ -1,4 +1,4 @@
-//! System inventory collection module for the Wazuh Desktop Agent.
+//! System inventory collection module for the SN360 Desktop Agent.
 //!
 //! Collects hardware, OS, package, network information and publishes
 //! `EventKind::InventoryUpdate` events to the event bus for each category.

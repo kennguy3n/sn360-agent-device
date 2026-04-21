@@ -266,11 +266,11 @@ pub fn keys_file_path(override_path: Option<&Path>) -> PathBuf {
     }
     #[cfg(unix)]
     {
-        PathBuf::from("/etc/wazuh-desktop-agent/client.keys")
+        PathBuf::from("/etc/sn360-desktop-agent/client.keys")
     }
     #[cfg(windows)]
     {
-        PathBuf::from(r"C:\Program Files\WazuhDesktopAgent\client.keys")
+        PathBuf::from(r"C:\Program Files\SN360DesktopAgent\client.keys")
     }
 }
 

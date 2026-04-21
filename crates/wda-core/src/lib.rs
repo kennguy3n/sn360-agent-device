@@ -1,4 +1,4 @@
-//! Core agent runtime for the Wazuh Desktop Agent.
+//! Core agent runtime for the SN360 Desktop Agent.
 //!
 //! Provides lifecycle management, configuration loading, signal handling,
 //! and module orchestration.

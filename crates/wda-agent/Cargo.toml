@@ -1,6 +1,6 @@
 [package]
 name = "wda-agent"
-description = "Binary entry point for Wazuh Desktop Agent"
+description = "Binary entry point for SN360 Desktop Agent"
 version.workspace = true
 edition.workspace = true
 license.workspace = true

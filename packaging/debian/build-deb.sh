@@ -27,12 +27,12 @@ trap 'rm -rf "$STAGE"' EXIT
 # File layout
 install -d -m 0755 "$STAGE/DEBIAN"
 install -d -m 0755 "$STAGE/usr/bin"
-install -d -m 0755 "$STAGE/etc/wazuh-desktop-agent/sca"
+install -d -m 0755 "$STAGE/etc/sn360-desktop-agent/sca"
 install -d -m 0755 "$STAGE/lib/systemd/system"
 
 install -m 0755 "$BIN" "$STAGE/usr/bin/wda-agent"
 install -m 0644 "$ROOT/packaging/config/config.yaml" \
-    "$STAGE/etc/wazuh-desktop-agent/config.yaml"
+    "$STAGE/etc/sn360-desktop-agent/config.yaml"
 install -m 0644 "$ROOT/packaging/systemd/wda-agent.service" \
     "$STAGE/lib/systemd/system/wda-agent.service"
 

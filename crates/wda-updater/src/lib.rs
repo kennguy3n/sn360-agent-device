@@ -1,4 +1,4 @@
-//! Self-update module for the Wazuh Desktop Agent (task P3.1).
+//! Self-update module for the SN360 Desktop Agent (task P3.1).
 //!
 //! The updater periodically polls a configured update-server URL for a
 //! signed manifest describing the latest agent build. When a newer

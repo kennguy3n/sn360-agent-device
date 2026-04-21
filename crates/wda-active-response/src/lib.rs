@@ -1,4 +1,4 @@
-//! Active response execution module for the Wazuh Desktop Agent.
+//! Active response execution module for the SN360 Desktop Agent.
 //!
 //! Receives and executes response actions from the Wazuh server
 //! (e.g., IP blocking, process termination) with sandboxing and

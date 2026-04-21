@@ -1,4 +1,4 @@
-# E2E test for Wazuh Desktop Agent on Windows.
+# E2E test for SN360 Desktop Agent on Windows.
 # Starts a real Wazuh manager via Docker Desktop, enrolls the agent,
 # triggers FIM and log collection events, then validates that alerts
 # appear on the server. Exits non-zero if ANY check fails.
@@ -9,9 +9,9 @@
 #   - no journald source (Windows has no systemd journal)
 #   - no apt-get based package install test
 #   - paths are Windows-style (C:\wda-e2e-*)
-#   - agent keys live under %PROGRAMDATA%\wazuh-desktop-agent\
+#   - agent keys live under %PROGRAMDATA%\sn360-desktop-agent\
 #     (note: current enrollment code still defaults to
-#      C:\Program Files\WazuhDesktopAgent\client.keys; this script
+#      C:\Program Files\SN360DesktopAgent\client.keys; this script
 #      cleans both locations for safety)
 
 $ErrorActionPreference = 'Stop'
@@ -48,9 +48,9 @@ $E2eEnrollPass = 'Test' + 'Pass' + 'word123'
 $FimDir   = 'C:\wda-e2e-fim'
 $LogDir   = 'C:\wda-e2e-logs'
 $LogFile  = Join-Path $LogDir 'test.log'
-$KeysDir1 = Join-Path $env:PROGRAMDATA 'wazuh-desktop-agent'
+$KeysDir1 = Join-Path $env:PROGRAMDATA 'sn360-desktop-agent'
 $KeysFile1 = Join-Path $KeysDir1 'client.keys'
-$KeysFile2 = 'C:\Program Files\WazuhDesktopAgent\client.keys'
+$KeysFile2 = 'C:\Program Files\SN360DesktopAgent\client.keys'
 $ConfigFile = 'tests\wazuh-test-config-windows.yaml'
 
 function Record {

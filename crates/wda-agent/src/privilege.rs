@@ -2,7 +2,7 @@
 //!
 //! Drops the agent from root (or Administrator on Windows) to a
 //! dedicated unprivileged account once privileged initialization
-//! (enrollment, key persistence in `/etc/wazuh-desktop-agent/`, binding
+//! (enrollment, key persistence in `/etc/sn360-desktop-agent/`, binding
 //! low-numbered ports) is complete. Detection modules — FIM,
 //! logcollector, inventory, SCA, rootcheck, LDE, enhanced-inventory —
 //! run under the unprivileged account. Active-response commands that

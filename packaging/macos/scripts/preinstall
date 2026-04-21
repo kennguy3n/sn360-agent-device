@@ -7,7 +7,7 @@
 
 set -e
 
-LAUNCHD_LABEL="com.wazuh.desktop-agent"
+LAUNCHD_LABEL="com.sn360.desktop-agent"
 LAUNCHD_PLIST="/Library/LaunchDaemons/${LAUNCHD_LABEL}.plist"
 
 if launchctl list "$LAUNCHD_LABEL" >/dev/null 2>&1; then

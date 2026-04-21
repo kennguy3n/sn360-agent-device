@@ -1,4 +1,4 @@
-//! Log collection module for the Wazuh Desktop Agent.
+//! Log collection module for the SN360 Desktop Agent.
 //!
 //! Collects logs from file-based sources using event-driven APIs
 //! (inotify/notify) with seek position tracking, and forwards them

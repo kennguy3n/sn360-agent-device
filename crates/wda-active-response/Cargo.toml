@@ -1,6 +1,6 @@
 [package]
 name = "wda-active-response"
-description = "Active response execution module for WDA"
+description = "Active response execution module for SDA"
 version.workspace = true
 edition.workspace = true
 license.workspace = true

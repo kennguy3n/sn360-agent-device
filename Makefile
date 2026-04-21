@@ -1,4 +1,4 @@
-# Convenience targets for building the Wazuh Desktop Agent.
+# Convenience targets for building the SN360 Desktop Agent.
 #
 # Usage:
 #   make build            — Debug build for the host platform

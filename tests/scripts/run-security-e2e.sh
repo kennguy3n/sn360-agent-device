@@ -1,5 +1,5 @@
 #!/bin/bash
-# Security-focused E2E tests for the Wazuh Desktop Agent.
+# Security-focused E2E tests for the SN360 Desktop Agent.
 # Extends the base E2E framework with 10 security-specific scenarios.
 # Requires a running Wazuh manager (via docker-compose) and enrolled agent.
 # Exits non-zero if ANY check fails.
@@ -46,7 +46,7 @@ cleanup() {
   [ -n "$AGENT_PID" ] && kill "$AGENT_PID" 2>/dev/null || true
   wait "$AGENT_PID" 2>/dev/null || true
   rm -rf /tmp/wda-e2e-fim /tmp/wda-e2e-logs /tmp/wda-e2e-security
-  sudo rm -f /etc/wazuh-desktop-agent/client.keys
+  sudo rm -f /etc/sn360-desktop-agent/client.keys
   docker compose -f tests/docker-compose.yml down -v 2>/dev/null || true
 }
 trap cleanup EXIT
@@ -54,8 +54,8 @@ trap cleanup EXIT
 # ── Setup: Start manager, build agent, enroll ─────────────────────────
 echo "==> Setup: Cleaning stale state..."
 rm -rf /tmp/wda-e2e-fim /tmp/wda-e2e-logs /tmp/wda-e2e-security
-sudo rm -f /var/lib/wazuh-desktop-agent/fim.db
-sudo rm -f /etc/wazuh-desktop-agent/client.keys
+sudo rm -f /var/lib/sn360-desktop-agent/fim.db
+sudo rm -f /etc/sn360-desktop-agent/client.keys
 for STALE_ID in $(docker compose -f tests/docker-compose.yml exec -T wazuh-manager \
   /var/ossec/bin/manage_agents -l 2>/dev/null \
   | grep -oP 'ID:\s*\K[0-9]+' || true); do
@@ -112,7 +112,7 @@ mkdir -p /tmp/wda-e2e-fim /tmp/wda-e2e-logs /tmp/wda-e2e-security
 touch /tmp/wda-e2e-logs/test.log
 
 echo "==> Setup: Starting agent..."
-sudo mkdir -p /etc/wazuh-desktop-agent
+sudo mkdir -p /etc/sn360-desktop-agent
 timeout 300 sudo ./target/release/wda-agent tests/wazuh-test-config.yaml &
 AGENT_PID=$!
 sleep 15

@@ -1,5 +1,5 @@
 #!/bin/bash
-# E2E test for Wazuh Desktop Agent.
+# E2E test for SN360 Desktop Agent.
 # Starts a real Wazuh manager, enrols the agent, triggers FIM and log
 # collection events, then validates that alerts appear on the server.
 # Exits non-zero if ANY check fails.
@@ -71,9 +71,9 @@ cleanup() {
   wait "$AGENT_PID" 2>/dev/null || true
   rm -rf /tmp/wda-e2e-fim /tmp/wda-e2e-logs
   rm -f /tmp/wda-e2e-rootkit-marker
-  sudo rm -f /etc/wazuh-desktop-agent/client.keys
-  sudo rm -rf /etc/wazuh-desktop-agent/sca
-  sudo rm -f /var/lib/wazuh-desktop-agent/rootcheck-baseline.json
+  sudo rm -f /etc/sn360-desktop-agent/client.keys
+  sudo rm -rf /etc/sn360-desktop-agent/sca
+  sudo rm -f /var/lib/sn360-desktop-agent/rootcheck-baseline.json
   docker compose -f tests/docker-compose.yml down -v 2>/dev/null || true
 }
 trap cleanup EXIT
@@ -82,10 +82,10 @@ trap cleanup EXIT
 echo "==> Step 0: Cleaning stale state..."
 rm -rf /tmp/wda-e2e-fim /tmp/wda-e2e-logs
 rm -f /tmp/wda-e2e-rootkit-marker
-sudo rm -f /var/lib/wazuh-desktop-agent/fim.db
-sudo rm -f /var/lib/wazuh-desktop-agent/rootcheck-baseline.json
-sudo rm -f /etc/wazuh-desktop-agent/client.keys
-sudo rm -rf /etc/wazuh-desktop-agent/sca
+sudo rm -f /var/lib/sn360-desktop-agent/fim.db
+sudo rm -f /var/lib/sn360-desktop-agent/rootcheck-baseline.json
+sudo rm -f /etc/sn360-desktop-agent/client.keys
+sudo rm -rf /etc/sn360-desktop-agent/sca
 # Remove ALL previously-enrolled agents from the running Wazuh container
 # so re-enrollment succeeds.  List agent IDs and remove each one.
 for STALE_ID in $(docker compose -f tests/docker-compose.yml exec -T wazuh-manager \
@@ -166,11 +166,11 @@ touch /tmp/wda-e2e-logs/test.log
 # existence of /etc/hostname — a file that always exists on Linux —
 # so the policy always evaluates to PASSED and the manager sees a
 # concrete SCA result on the `p:` queue.
-sudo mkdir -p /etc/wazuh-desktop-agent/sca
-sudo tee /etc/wazuh-desktop-agent/sca/e2e-test-policy.yaml >/dev/null <<'SCA_YAML'
+sudo mkdir -p /etc/sn360-desktop-agent/sca
+sudo tee /etc/sn360-desktop-agent/sca/e2e-test-policy.yaml >/dev/null <<'SCA_YAML'
 policy:
   id: wda_e2e_test_policy
-  name: WDA E2E Test Policy
+  name: SDA E2E Test Policy
   description: Minimal SCA policy exercised by the base E2E suite
 checks:
   - id: "1001"
@@ -190,7 +190,7 @@ echo "    Test directories, SCA policy, and rootkit marker ready."
 
 # ── Step 5: Run the agent ───────────────────────────────────────────
 echo "==> Step 5: Starting agent..."
-sudo mkdir -p /etc/wazuh-desktop-agent
+sudo mkdir -p /etc/sn360-desktop-agent
 # Enable `debug` for the enhanced-inventory module so its per-scanner
 # ticks emit a log line we can grep as a fallback oracle. The Wazuh
 # 4.9.2 manager's analysisd syscollector decoder only archives events

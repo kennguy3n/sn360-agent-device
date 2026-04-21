@@ -176,7 +176,7 @@ fn build_bom(
             "timestamp": timestamp,
             "tools": [
                 {
-                    "vendor": "wazuh-desktop-agent",
+                    "vendor": "sn360-desktop-agent",
                     "name": TOOL_NAME,
                     "version": TOOL_VERSION,
                 }

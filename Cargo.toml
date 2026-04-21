@@ -21,7 +21,7 @@ resolver = "2"
 version = "0.1.0"
 edition = "2021"
 license = "GPL-2.0-only"
-authors = ["Wazuh Desktop Agent Contributors"]
+authors = ["SN360 Desktop Agent Contributors"]
 rust-version = "1.75"
 
 [workspace.dependencies]

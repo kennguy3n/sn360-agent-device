@@ -1,4 +1,4 @@
-# SN360 Device Agent — Tests
+# SN360 Desktop Agent — Tests
 
 End-to-end tests and fixtures for `sn360-agent-device`. Unit tests
 live alongside each crate under `crates/*/src` and are exercised with
@@ -12,8 +12,8 @@ manager running in Docker.
 - **Rust 1.75+** — the harness builds `./target/release/wda-agent`
   on first run (and reuses any prebuilt binary on subsequent runs).
 - **`sudo`** — the agent writes its enrollment keys under
-  `/etc/wazuh-desktop-agent/` and its baseline databases under
-  `/var/lib/wazuh-desktop-agent/`.
+  `/etc/sn360-desktop-agent/` and its baseline databases under
+  `/var/lib/sn360-desktop-agent/`.
 - **Linux host** — `run-e2e.sh` uses `inotify`, `journald`, `logger`,
   and Docker-for-Linux specifics. macOS / Windows have their own
   platform-specific entry points (`run-e2e-macos.sh`,
@@ -83,7 +83,7 @@ skipped on CI).
   after pulling the image once (`docker compose -f
   tests/docker-compose.yml pull`).
 - **Stale `client.keys`** — the `cleanup` trap wipes
-  `/etc/wazuh-desktop-agent/client.keys` and any previously-enrolled
+  `/etc/sn360-desktop-agent/client.keys` and any previously-enrolled
   agents from the manager; if a run is killed with `SIGKILL` you may
   need to remove these by hand before the next run.
 - **Agent log** — each run tails `/tmp/wda-agent-e2e.log` into the

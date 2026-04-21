@@ -1,6 +1,6 @@
 [package]
 name = "wda-event-bus"
-description = "Async event bus for inter-module communication in WDA"
+description = "Async event bus for inter-module communication in SDA"
 version.workspace = true
 edition.workspace = true
 license.workspace = true

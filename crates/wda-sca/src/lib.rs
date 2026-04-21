@@ -1,4 +1,4 @@
-//! Security Configuration Assessment (SCA) module for the Wazuh Desktop Agent.
+//! Security Configuration Assessment (SCA) module for the SN360 Desktop Agent.
 //!
 //! Evaluates YAML-based security policies against system state,
 //! running checks during idle periods for minimal user impact.

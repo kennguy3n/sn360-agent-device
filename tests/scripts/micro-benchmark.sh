@@ -1,5 +1,5 @@
 #!/bin/bash
-# Micro-benchmark harness for WDA internal components.
+# Micro-benchmark harness for SDA internal components.
 # Runs Criterion benchmarks for crypto, hashing, and event bus throughput.
 # If Criterion benchmarks are not yet set up, falls back to basic timing tests.
 
@@ -11,7 +11,7 @@ REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 cd "$REPO_ROOT"
 
 echo "======================================================================"
-echo "           WDA Micro-Benchmark Suite"
+echo "           SDA Micro-Benchmark Suite"
 echo "======================================================================"
 echo ""
 

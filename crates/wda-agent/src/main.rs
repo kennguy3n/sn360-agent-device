@@ -1,4 +1,4 @@
-//! Wazuh Desktop Agent — binary entry point.
+//! SN360 Desktop Agent — binary entry point.
 //!
 //! Orchestrates startup, enrollment, server connection, keepalive,
 //! and graceful shutdown of the agent.
@@ -111,7 +111,7 @@ async fn main() -> Result<()> {
 
     // 5c. Privilege separation (P3.2): drop root now that enrollment and
     // key persistence (both of which want to write to root-owned paths
-    // under `/etc/wazuh-desktop-agent/`) are done. Port 1514 is
+    // under `/etc/sn360-desktop-agent/`) are done. Port 1514 is
     // unprivileged so the connection manager below still works fine
     // under the drop-to user.
     privilege::drop_privileges(&config.security).context("failed to drop privileges")?;
