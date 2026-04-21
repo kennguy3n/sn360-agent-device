@@ -11,7 +11,7 @@
 #
 # The script is designed to run non-interactively on a GitHub-hosted
 # ubuntu runner: it builds a release binary, starts the agent with
-# `tests/wazuh-test-config.yaml` pointing at loopback (no manager
+# `tests/sda-test-config.yaml` pointing at loopback (no manager
 # required — enrollment will retry forever but the idle metrics are
 # still meaningful), takes measurements, and exits non-zero if any
 # budget is exceeded. Results are written to
@@ -34,12 +34,12 @@ IDLE_MEASURE_SECS="${IDLE_MEASURE_SECS:-30}"
 FIM_FILE_COUNT="${FIM_FILE_COUNT:-1000}"
 # MUST match an FIM-monitored directory in $SDA_CONFIG, otherwise the
 # FIM module never sees the burst and the peak-CPU gate silently
-# measures idle CPU. tests/wazuh-test-config.yaml monitors
+# measures idle CPU. tests/sda-test-config.yaml monitors
 # /tmp/sda-e2e-fim.
 FIM_DIR="${FIM_DIR:-/tmp/sda-e2e-fim}"
 OUTPUT_DIR="${REGRESSION_OUTPUT_DIR:-$REPO_ROOT/target/benchmark-regression}"
 SDA_BIN="${SDA_BIN:-$REPO_ROOT/target/release/sda-agent}"
-SDA_CONFIG="${SDA_CONFIG:-$REPO_ROOT/tests/wazuh-test-config.yaml}"
+SDA_CONFIG="${SDA_CONFIG:-$REPO_ROOT/tests/sda-test-config.yaml}"
 
 mkdir -p "$OUTPUT_DIR"
 REPORT="$OUTPUT_DIR/benchmark-regression.txt"

@@ -16,7 +16,7 @@ FIM_FILE_COUNT=1000          # files to create for FIM scan benchmark
 FIM_DIR="/tmp/sda-benchmark-fim"
 WAZUH_AGENT_BIN="/var/ossec/bin/wazuh-agentd"
 SDA_BIN="./target/release/sda-agent"
-SDA_CONFIG="tests/wazuh-test-config.yaml"
+SDA_CONFIG="tests/sda-test-config.yaml"
 
 # ── Helper functions ──────────────────────────────────────────────────
 

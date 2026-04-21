@@ -51,7 +51,7 @@ $LogFile  = Join-Path $LogDir 'test.log'
 $KeysDir1 = Join-Path $env:PROGRAMDATA 'sn360-desktop-agent'
 $KeysFile1 = Join-Path $KeysDir1 'client.keys'
 $KeysFile2 = 'C:\Program Files\SN360DesktopAgent\client.keys'
-$ConfigFile = 'tests\wazuh-test-config-windows.yaml'
+$ConfigFile = 'tests\sda-test-config-windows.yaml'
 
 function Record {
     param(

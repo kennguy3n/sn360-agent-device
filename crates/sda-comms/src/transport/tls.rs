@@ -222,7 +222,10 @@ mod tests {
 
     #[test]
     fn build_fails_when_tls_disabled() {
-        let cfg = EnhancedProtocolConfig::default();
+        let cfg = EnhancedProtocolConfig {
+            tls: false,
+            ..Default::default()
+        };
         assert!(build_client_config(&cfg).is_err());
     }
 

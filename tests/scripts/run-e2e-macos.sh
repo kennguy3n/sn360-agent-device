@@ -162,9 +162,9 @@ sudo mkdir -p /etc/sn360-desktop-agent
 # gtimeout (from coreutils) is preferred on macOS; fall back to plain sudo
 # when it isn't installed, relying on the trap to kill the agent.
 if command -v gtimeout >/dev/null 2>&1; then
-  gtimeout 120 sudo ./target/release/sda-agent tests/wazuh-test-config-macos.yaml &
+  gtimeout 120 sudo ./target/release/sda-agent tests/sda-test-config-macos.yaml &
 else
-  sudo ./target/release/sda-agent tests/wazuh-test-config-macos.yaml &
+  sudo ./target/release/sda-agent tests/sda-test-config-macos.yaml &
 fi
 AGENT_PID=$!
 # Give the agent time to enrol and send first keepalive.

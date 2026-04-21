@@ -12,19 +12,20 @@ Status legend:
 
 ## Current Status
 
-Phases 1–6 are complete. Phase 5.6 enhanced protocol (opt-in
-TLS 1.3 + MessagePack + HTTP/2 under `server.enhanced`) shipped
-alongside the Phase 6 testing & release infrastructure: the E2E
-harness runs against both Wazuh 4.9.2 (`make e2e`) and Wazuh 4.7.5
-(`make e2e-compat`), the CI matrix covers Ubuntu 22.04/24.04,
-macOS 13/14, and Windows Server 2022, a `cargo audit` gate, a
-performance regression gate (`make benchmark-ci`), and a nightly
-`cargo-fuzz` matrix (5-minute budget per target) all run in CI,
-and the tag-triggered release workflow (`.github/workflows/release.yml`)
-builds `.deb` / `.rpm` / `.pkg` / `.msi` installers on matching OS
-runners and drafts a GitHub Release with `CHANGELOG.md` as the
-body. The user/admin/architecture/configuration docs landed under
-`docs/`, including the new [`docs/release-process.md`](./docs/release-process.md)
+Phases 1–6 are complete. Phase 5.6 enhanced protocol (TLS 1.3 +
+MessagePack + HTTP/2 under `server.enhanced`) shipped alongside
+the Phase 6 testing & release infrastructure: the E2E harness
+runs against a reference SIEM manager v4.9.2 (`make e2e`) and
+v4.7.5 (`make e2e-compat`), the CI matrix covers Ubuntu
+22.04/24.04, macOS 13/14, and Windows Server 2022, a `cargo audit`
+gate, a performance regression gate (`make benchmark-ci`), and a
+nightly `cargo-fuzz` matrix (5-minute budget per target) all run
+in CI, and the tag-triggered release workflow
+(`.github/workflows/release.yml`) builds `.deb` / `.rpm` /
+`.pkg` / `.msi` installers on matching OS runners and drafts a
+GitHub Release with `CHANGELOG.md` as the body. The
+user/admin/architecture/configuration docs landed under `docs/`,
+including the new [`docs/release-process.md`](./docs/release-process.md)
 runbook for tagging, signing, and promoting a draft. The only
 Phase 6 items not drivable from this repo are the beta tag
 (`v0.9.0-beta.1`) and signed-binary publication, which need
@@ -35,11 +36,13 @@ met. `cargo test --all` shows **431 passing / 0 failed** (adds
 15 rootcheck tests for content-based checks + cross-platform
 hidden-process detection and 5 PAL tests for the new Linux
 user-idle detector, on top of +20 tests that landed on `main`
-via PR #55 in `sda-comms`, `sda-agent`, and `sda-updater`), the base E2E harness passes **14/14**
-assertions against a local Wazuh 4.9.2 manager, and the security
-E2E suite passes **10/10** attack-scenario checks. Remaining
-work is the server-side TRDS / IOCFS / SIS / Gateway microservices
-(Phase 4.10–4.14, tracked in other repositories).
+via PR #55 in `sda-comms`, `sda-agent`, and `sda-updater`), the
+base E2E harness passes **14/14** assertions against a local
+reference SIEM manager, and the security E2E suite passes
+**10/10** attack-scenario checks. Remaining work is the
+server-side SN360 Control Plane microservices — TRDS, IOCFS, SIS,
+and the Agent Gateway (Phase 4.10–4.14, tracked in other
+repositories).
 
 ## Phase 1 — Core Plumbing (7/7)
 
@@ -47,8 +50,8 @@ work is the server-side TRDS / IOCFS / SIS / Gateway microservices
 |---|------|--------|
 | 1.1 | Workspace + crate skeleton (`sda-core`, `sda-comms`, `sda-event-bus`, `sda-pal`, modules) | Done |
 | 1.2 | Structured YAML config loading (`AgentConfig`) on all OSes | Done |
-| 1.3 | Enrollment against `authd` on 1515 with password auth, key persistence | Done |
-| 1.4 | Connection manager with TCP + UDP transports and Blowfish crypto | Done |
+| 1.3 | Enrollment via the legacy SIEM enrollment protocol on 1515 with password auth, key persistence (legacy adapter) | Done |
+| 1.4 | Connection manager with legacy SIEM transport adapter (TCP + UDP + Blowfish crypto) | Done |
 | 1.5 | Keepalive loop sending startup + periodic keepalives | Done |
 | 1.6 | Event bus with priority queues and back-pressure handling | Done |
 | 1.7 | Shutdown signal + task coordination (SIGINT / SIGTERM) | Done |
@@ -128,14 +131,17 @@ Command: `cargo test --all`
 Reproduce locally with `make test`. CI regenerates the result on every
 push across `ubuntu-latest`, `macos-latest`, and `windows-latest`.
 
-## E2E Tests vs. Local Wazuh 4.9.2
+## E2E Tests vs. Local SIEM Manager (v4.9.2)
 
 Command: `make e2e` (wraps `tests/scripts/run-e2e.sh`).
 
-The E2E harness brings up `wazuh/wazuh-manager:4.9.2` via
-`tests/docker-compose.yml`, enrolls the agent, exercises each module,
-then queries the manager's `syscheck`, `syscollector`, and
-archived-alerts for the expected events.
+The E2E harness brings up a reference SIEM manager container
+(`wazuh/wazuh-manager:4.9.2`) via `tests/docker-compose.yml`,
+enrolls the agent through the legacy adapter, exercises each
+module, then queries the manager's `syscheck`, `syscollector`,
+and archived-alerts streams for the expected events. The manager
+image is used purely as a public, publicly-available
+interoperability target for the legacy SIEM wire protocol.
 
 **Result: 14/14 assertions pass.**
 
@@ -158,19 +164,20 @@ archived-alerts for the expected events.
   RESULT: ALL CHECKS PASSED
 ```
 
-## Security E2E Tests vs. Local Wazuh 4.9.2
+## Security E2E Tests vs. Local SIEM Manager (v4.9.2)
 
 Command: `make security-e2e` (wraps
 `tests/scripts/run-security-e2e.sh`).
 
 Extends the base E2E harness with ten security-focused scenarios:
-malware file drop, brute-force SSH, privilege-escalation (sudo abuse),
-config-file tampering, ransomware simulation (bulk rename), active
-response `kill_process`, IP block (IPv4 + IPv6), unauthorized package
-install, system-binary tampering, and account-disable AR. The harness
-injects minimal `<active-response>` blocks into the stock
-`wazuh/wazuh-manager:4.9.2` image so `disable-account0` /
-`firewall-drop0` resolve correctly before the agent enrolls.
+malware file drop, brute-force SSH, privilege-escalation (sudo
+abuse), config-file tampering, ransomware simulation (bulk
+rename), active response `kill_process`, IP block (IPv4 + IPv6),
+unauthorized package install, system-binary tampering, and
+account-disable AR. The harness injects minimal
+`<active-response>` blocks into the stock reference SIEM manager
+image so `disable-account0` / `firewall-drop0` resolve correctly
+before the agent enrolls through the legacy adapter.
 
 **Result: 10/10 assertions pass.**
 
@@ -196,19 +203,19 @@ Unit tests and builds run on `ubuntu-latest`, `macos-latest`, and
 run on `ubuntu-latest`. A nightly benchmark job runs at `0 3 * * *`.
 
 The `e2e` job runs on push to `main` on `ubuntu-latest` only —
-`macos-latest` lacks Docker and the `wazuh/wazuh-manager:4.9.2` image
-is Linux-only, so macOS / Windows E2E runs are executed locally via
-`make e2e-macos` / `make e2e-windows`.
+`macos-latest` lacks Docker and the reference SIEM manager image
+is Linux-only, so macOS / Windows E2E runs are executed locally
+via `make e2e-macos` / `make e2e-windows`.
 
-## Benchmark vs. Wazuh Agent 4.9.2
+## Benchmark vs. Reference Legacy SIEM Agent (v4.9.2)
 
-See [`benchmark-results.md`](./benchmark-results.md) for methodology
-and raw numbers. Summary vs. proposal targets:
+See [`benchmark-results.md`](./benchmark-results.md) for
+methodology and raw numbers. Summary vs. proposal targets:
 
-| Metric | Target | Wazuh 4.9.2 | SN360 Desktop Agent (SDA) | Status |
+| Metric | Target | Reference legacy SIEM agent (v4.9.2) | SN360 Desktop Agent (SDA) | Status |
 |---|---|---|---|---|
 | Idle RAM (single process) | < 15 MB | ~56 MB across 5 daemons | 5.7 MB | Done |
-| Idle CPU | < 0.1 % | 0.45 % (`wazuh-agentd` only) | 0.00 % | Done |
+| Idle CPU | < 0.1 % | 0.45 % (primary agent daemon only) | 0.00 % | Done |
 | Shipped binary size | < 5 MB | 3.8 MB (5 daemons combined) | 4.6 MB | Done |
 | FIM scan peak CPU (1 000 files) | < 3 % | 9 % | 3 % (15 s avg 1.33 %) | Done |
 
@@ -296,9 +303,12 @@ All Priority 3 tasks have landed. Phase 5 is complete.
 
 ### Phase 5.6 detail — Enhanced protocol
 
-The enhanced protocol options live under `server.enhanced` in
-`AgentConfig` and default off so existing Wazuh 4.x deployments
-are unaffected. See
+The SN360 native protocol options live under `server.enhanced`
+in `AgentConfig` and default **on** in the proprietary
+distribution. When the optional `legacy-siem` adapter is enabled
+and talking to a legacy SIEM manager these knobs can be disabled
+to fall back to the legacy TCP/UDP + Blowfish path for that
+specific deployment. See
 [`docs/configuration-reference.md`](./docs/configuration-reference.md#server)
 and [`docs/architecture.md`](./docs/architecture.md#3-communication-layers)
 for the full surface.
@@ -321,7 +331,7 @@ platform hardening here).
 
 | # | Task | Status |
 |---|------|--------|
-| 6.1 | E2E integration testing vs Wazuh 4.x — `make e2e` (4.9.2) and `make e2e-compat` (4.7.5) harnesses + cleanup-hang fix (already in main via PR #54) | Done |
+| 6.1 | E2E integration testing vs a reference SIEM manager — `make e2e` (v4.9.2) and `make e2e-compat` (v4.7.5) harnesses + cleanup-hang fix (already in main via PR #54) | Done |
 | 6.2 | Platform testing — CI matrix expanded to `ubuntu-22.04` / `ubuntu-24.04` / `macos-13` / `macos-14` / `windows-2022`; Fedora/Arch documented in [`docs/platform-testing.md`](./docs/platform-testing.md) | Done |
 | 6.3 | Performance regression testing — `tests/scripts/benchmark-regression.sh` + `make benchmark-ci`; CI artifact upload with hard thresholds (idle RSS < 15 MB, idle CPU < 0.1 %, binary < 5 MB, FIM burst < 3 %) | Done |
 | 6.4 | Security audit — `cargo audit --deny warnings` CI job + `fuzz/` harness (cargo-fuzz targets for protocol decode, zlib decompress, msgpack event decode, rule-bundle msgpack); see [`docs/security-audit.md`](./docs/security-audit.md) | Done |

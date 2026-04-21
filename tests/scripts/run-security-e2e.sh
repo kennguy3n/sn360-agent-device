@@ -126,7 +126,7 @@ touch /tmp/sda-e2e-logs/test.log
 
 echo "==> Setup: Starting agent..."
 sudo mkdir -p /etc/sn360-desktop-agent
-timeout 300 sudo ./target/release/sda-agent tests/wazuh-test-config.yaml &
+timeout 300 sudo ./target/release/sda-agent tests/sda-test-config.yaml &
 AGENT_PID=$!
 sleep 15
 echo "    Agent started (PID $AGENT_PID)."

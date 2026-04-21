@@ -47,9 +47,9 @@ Exit codes:
 | Path | Purpose |
 |---|---|
 | `docker-compose.yml` | Wazuh 4.9.2 manager used by every E2E entry point |
-| `wazuh-test-config.yaml` | Linux agent config — enables every module the harness asserts on |
-| `wazuh-test-config-macos.yaml` | macOS agent config |
-| `wazuh-test-config-windows.yaml` | Windows agent config |
+| `sda-test-config.yaml` | Linux agent config — enables every module the harness asserts on |
+| `sda-test-config-macos.yaml` | macOS agent config |
+| `sda-test-config-windows.yaml` | Windows agent config |
 | `scripts/run-e2e.sh` | Base Linux E2E harness (14 assertions) |
 | `scripts/run-security-e2e.sh` | Linux security E2E harness (10 attack scenarios, injects `<active-response>` blocks) |
 | `scripts/run-e2e-macos.sh` | macOS E2E harness |

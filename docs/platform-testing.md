@@ -67,7 +67,7 @@ fanotify-based FIM permission handling.
    sudo install -m 0644 packaging/systemd/sda-agent.service \
      /etc/systemd/system/
    sudo mkdir -p /etc/sn360-desktop-agent
-   sudo install -m 0640 tests/wazuh-test-config.yaml \
+   sudo install -m 0640 tests/sda-test-config.yaml \
      /etc/sn360-desktop-agent/config.yaml
    sudo systemctl daemon-reload
    sudo systemctl enable --now sda-agent
