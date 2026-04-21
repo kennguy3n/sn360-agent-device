@@ -23,9 +23,9 @@ use std::time::Duration;
 use anyhow::{Context, Result};
 #[cfg(feature = "legacy-siem")]
 use tokio::sync::Mutex;
+use tracing::info;
 #[cfg(feature = "legacy-siem")]
 use tracing::{error, warn};
-use tracing::info;
 
 #[cfg(feature = "legacy-siem")]
 use sda_comms::connection::{ConnectionConfig, ConnectionManager, TransportProtocol};
