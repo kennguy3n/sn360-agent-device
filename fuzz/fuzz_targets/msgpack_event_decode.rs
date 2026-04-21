@@ -9,7 +9,7 @@ use libfuzzer_sys::fuzz_target;
 use sda_comms::msgpack::MessagePackSerializer;
 
 fuzz_target!(|data: &[u8]| {
-    let s = MessagePackSerializer::new();
+    let s = MessagePackSerializer;
     let _ = s.decode_event(data);
     let _ = s.decode_kind(data);
 });

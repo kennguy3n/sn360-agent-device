@@ -138,7 +138,7 @@ pub struct ServerConfig {
 /// The actual transport / serializer implementations live in
 /// `sda-comms` (see `transport::tls`, `transport::http2`) and
 /// `sda-comms::msgpack` respectively.
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct EnhancedProtocolConfig {
     /// Wrap the legacy TCP transport in TLS 1.3 (via `rustls`). Has
     /// no effect when `protocol == "udp"` (TLS requires a stream
@@ -165,6 +165,17 @@ pub struct EnhancedProtocolConfig {
     /// (via `rustls-native-certs`-style discovery in `sda-comms`).
     #[serde(default)]
     pub tls_ca_bundle_path: Option<PathBuf>,
+}
+
+impl Default for EnhancedProtocolConfig {
+    fn default() -> Self {
+        Self {
+            tls: false,
+            serialization: default_enhanced_serialization(),
+            tls_pinned_sha256: None,
+            tls_ca_bundle_path: None,
+        }
+    }
 }
 
 /// Enrollment configuration.
