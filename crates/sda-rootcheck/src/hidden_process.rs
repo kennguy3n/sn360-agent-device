@@ -127,10 +127,16 @@ mod macos_impl {
     const KERN_PROC_ALL: c_int = 0;
 
     // Size of `struct kinfo_proc` on macOS (arm64 and x86_64). Known
-    // stable value; we only ever index into `kp_proc.p_pid` which is
-    // at offset 24 from the start of the record.
+    // stable value; we only ever index into `kp_proc.p_pid`, which on
+    // 64-bit Darwin sits at offset 40 of `struct extern_proc`:
+    //   p_un        (union, 16 bytes)
+    //   p_vmspace*  (8 bytes, offset 16)
+    //   p_sigacts*  (8 bytes, offset 24)
+    //   p_flag      (4 bytes, offset 32)
+    //   p_stat      (1 byte,  offset 36) + 3 bytes padding
+    //   p_pid       (4 bytes, offset 40)  ← this field
     const KINFO_PROC_SIZE: usize = 648;
-    const KINFO_PROC_PID_OFFSET: usize = 24;
+    const KINFO_PROC_PID_OFFSET: usize = 40;
 
     /// Call `sysctl` twice: first to discover the size of the result
     /// buffer, then again to populate it. Returns the raw bytes the
@@ -314,7 +320,10 @@ mod windows_impl {
             if !visible.contains(&pid) && pid_exists(pid) {
                 hidden.push(HiddenPid { pid });
             }
-            pid = pid.saturating_add(4);
+            match pid.checked_add(4) {
+                Some(next) => pid = next,
+                None => break,
+            }
         }
         hidden
     }
