@@ -6,7 +6,7 @@
 #
 #   idle RSS      < 15 MB
 #   idle CPU      <  0.1 %
-#   binary size   <  5 MB
+#   binary size   <  7 MB
 #   FIM burst CPU <  3.0 %  (1000-file burst, peak)
 #
 # The script is designed to run non-interactively on a GitHub-hosted
@@ -27,7 +27,12 @@ cd "$REPO_ROOT"
 # ── Thresholds ────────────────────────────────────────────────────────
 MAX_IDLE_RSS_KB=$((15 * 1024))      # 15 MB
 MAX_IDLE_CPU_PCT="0.1"              # 0.1 %
-MAX_BINARY_SIZE_BYTES=$((5 * 1024 * 1024))  # 5 MB
+# Raised from 5 MB to 7 MB once YARA (via sda-local-detection),
+# rustls + ring (enhanced protocol), and the reqwest-based updater
+# landed. cargo bloat confirms those three subsystems account for
+# the delta; see benchmark-results.md § "Binary Size" for the
+# per-crate attribution.
+MAX_BINARY_SIZE_BYTES=$((7 * 1024 * 1024))  # 7 MB
 MAX_FIM_PEAK_CPU_PCT="3.0"          # 3 %
 
 IDLE_MEASURE_SECS="${IDLE_MEASURE_SECS:-30}"

@@ -162,7 +162,7 @@ Command: `make benchmark-ci` (invokes
 
 Enforces the hard budgets called out in
 [`benchmark-results.md`](./benchmark-results.md) — idle RSS
-< 15 MB, idle CPU < 0.1 %, release binary < 5 MB, FIM burst peak
+< 15 MB, idle CPU < 0.1 %, release binary < 7 MB, FIM burst peak
 < 3 %. Exits non-zero on any breach; the full output is written
 to `target/benchmark-regression/benchmark-regression.txt` and
 uploaded as a CI artifact by the nightly `benchmark-regression`

@@ -77,7 +77,7 @@ minor bump.
   `docs/platform-testing.md`.
 - **Performance regression gate.**
   `tests/scripts/benchmark-regression.sh` + `make benchmark-ci`
-  fails CI if idle RSS > 15 MB, idle CPU > 0.1 %, binary > 5 MB,
+  fails CI if idle RSS > 15 MB, idle CPU > 0.1 %, binary > 7 MB,
   or FIM burst peak > 3 %. Runs nightly on CI with artifact
   upload.
 - **Dependency audit gate.** `cargo audit --deny warnings` is
