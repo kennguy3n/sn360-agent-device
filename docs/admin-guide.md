@@ -160,7 +160,7 @@ remove; the new unit does not conflict with it.
 - **Metrics:** benchmark thresholds and CI results are tracked in
   [`benchmark-results.md`](../benchmark-results.md). The
   regression gate (`make benchmark-ci`) fails if idle RSS
-  > 15 MB, idle CPU > 0.1 %, binary > 5 MB, or FIM burst peak
+  > 15 MB, idle CPU > 0.1 %, binary > 7 MB, or FIM burst peak
   > 3 %.
 - **Health checks:** the agent writes a systemd watchdog ping
   every 30 s when `WatchdogSec=` is set in the unit file. The

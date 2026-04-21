@@ -138,7 +138,7 @@ All modules consult the power profile returned by
 profile transitions between `Normal`, `IdleAC`, `BatteryActive`,
 `BatteryIdle`, and `CriticalBattery` as described in § 9.4 of the
 proposal. Hard budgets (idle RSS < 15 MB, idle CPU < 0.1 %, binary
-< 5 MB, FIM burst peak < 3 %) are verified nightly by
+< 7 MB, FIM burst peak < 3 %) are verified nightly by
 `tests/scripts/benchmark-regression.sh`.
 
 ## 6. Testing layers

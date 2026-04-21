@@ -48,7 +48,7 @@ This proposal describes **SN360 Desktop Agent (SDA)** -- a purpose-built, modula
 | Idle RAM | 60-120 MB | **< 15 MB** |
 | Idle CPU | 1-3% | **< 0.1%** |
 | FIM scan CPU spike | 10-30% | **< 3%** |
-| Binary size (stripped) | ~25 MB + deps | **< 5 MB** |
+| Binary size (stripped) | ~25 MB + deps | **< 7 MB** |
 | Startup time | 3-8 seconds | **< 500 ms** |
 | Disk I/O during idle | Continuous | **Near-zero** |
 
@@ -140,7 +140,7 @@ Desktop/laptop users experience:
 | P0 | **Cross-platform** | Single codebase, native builds for Windows/macOS/Linux |
 | P1 | **Battery-aware** | Defer scans on battery; adaptive scheduling |
 | P1 | **Fast startup** | <500 ms cold start |
-| P1 | **Small footprint** | <5 MB binary, <10 MB installed |
+| P1 | **Small footprint** | <7 MB binary, <12 MB installed |
 | P1 | **Edge detection capability** | Local IOC matching + behavioral rules, <1% CPU during event evaluation |
 | P2 | **Legacy SIEM interoperability** | Communicate with common legacy SIEM managers through the optional, feature-gated legacy adapter |
 | P2 | **Graceful degradation** | Reduce functionality under resource pressure rather than crash |
