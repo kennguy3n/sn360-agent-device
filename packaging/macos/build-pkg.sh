@@ -15,7 +15,7 @@ ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 BIN="${BIN:-$ROOT/target/release/wda-agent}"
 VERSION="${VERSION:-$(grep -E '^version' "$ROOT/Cargo.toml" | head -n1 | cut -d'"' -f2)}"
 OUT_DIR="${OUT_DIR:-$ROOT/dist}"
-IDENT="com.wazuh.desktop-agent"
+IDENT="com.sn360.desktop-agent"
 
 if [ ! -x "$BIN" ]; then
     echo "error: binary not found at $BIN" >&2
@@ -34,13 +34,13 @@ trap 'rm -rf "$WORK"' EXIT
 # volume root that pkgbuild writes into).
 ROOTFS="$WORK/root"
 install -d -m 0755 "$ROOTFS/usr/local/bin"
-install -d -m 0755 "$ROOTFS/etc/wazuh-desktop-agent/sca"
+install -d -m 0755 "$ROOTFS/etc/sn360-desktop-agent/sca"
 install -d -m 0755 "$ROOTFS/Library/LaunchDaemons"
 install -m 0755 "$BIN" "$ROOTFS/usr/local/bin/wda-agent"
 install -m 0644 "$ROOT/packaging/config/config.yaml" \
-    "$ROOTFS/etc/wazuh-desktop-agent/config.yaml"
-install -m 0644 "$ROOT/packaging/macos/com.wazuh.desktop-agent.plist" \
-    "$ROOTFS/Library/LaunchDaemons/com.wazuh.desktop-agent.plist"
+    "$ROOTFS/etc/sn360-desktop-agent/config.yaml"
+install -m 0644 "$ROOT/packaging/macos/com.sn360.desktop-agent.plist" \
+    "$ROOTFS/Library/LaunchDaemons/com.sn360.desktop-agent.plist"
 
 # Scripts (pre/postinstall)
 SCRIPTS_DIR="$WORK/scripts"

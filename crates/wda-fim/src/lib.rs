@@ -1,4 +1,4 @@
-//! File Integrity Monitoring (FIM) module for the Wazuh Desktop Agent.
+//! File Integrity Monitoring (FIM) module for the SN360 Desktop Agent.
 //!
 //! Monitors filesystem changes using OS-native notification APIs
 //! (inotify/FSEvents/ReadDirectoryChangesW) and reports changes

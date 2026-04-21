@@ -3,13 +3,13 @@
 <plist version="1.0">
 <dict>
     <key>Label</key>
-    <string>com.wazuh.desktop-agent</string>
+    <string>com.sn360.desktop-agent</string>
 
     <key>ProgramArguments</key>
     <array>
         <string>/usr/local/bin/wda-agent</string>
         <string>--config</string>
-        <string>/etc/wazuh-desktop-agent/config.yaml</string>
+        <string>/etc/sn360-desktop-agent/config.yaml</string>
     </array>
 
     <key>RunAtLoad</key>
@@ -27,9 +27,9 @@
     <integer>5</integer>
 
     <key>StandardOutPath</key>
-    <string>/var/log/wazuh-desktop-agent/wda-agent.log</string>
+    <string>/var/log/sn360-desktop-agent/wda-agent.log</string>
     <key>StandardErrorPath</key>
-    <string>/var/log/wazuh-desktop-agent/wda-agent.err</string>
+    <string>/var/log/sn360-desktop-agent/wda-agent.err</string>
 
     <key>ProcessType</key>
     <string>Background</string>

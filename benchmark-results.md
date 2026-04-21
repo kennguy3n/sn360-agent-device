@@ -1,8 +1,8 @@
-# SN360 Device Agent vs Wazuh Agent 4.9.2 Benchmark Results
+# SN360 Desktop Agent (SDA) vs Wazuh Agent 4.9.2 Benchmark Results
 
 **Date:** 2026-04-19
 **Host:** Ubuntu Linux x86_64 (Docker in / sysstat installed)
-**SN360 Device Agent build:** `target/release/wda-agent` built with `cargo build --release`
+**SN360 Desktop Agent (SDA) build:** `target/release/wda-agent` built with `cargo build --release` (crate prefix `wda-` is historical; the product name is SDA)
 **Reference agent:** Wazuh Agent 4.9.2 (`wazuh-agent_4.9.2-1_amd64.deb`)
 **Reference manager:** `wazuh/wazuh-manager:4.9.2` running in Docker on `127.0.0.1:1514/1515`
 
@@ -21,14 +21,14 @@ Wazuh agent's functionality is split across five daemons
 (`wazuh-agentd`, `wazuh-syscheckd`, `wazuh-logcollector`, `wazuh-modulesd`,
 `wazuh-execd`). For the idle-RSS and binary-size comparisons the totals
 across **all five** daemons are reported. For idle-CPU / FIM peak CPU, the
-daemon most equivalent to the WDA responsibility is used
+daemon most equivalent to the SDA responsibility is used
 (`wazuh-agentd` for idle CPU, `wazuh-syscheckd`/`wazuh-agentd` for FIM).
 
 ## Results
 
 ### Binary Size
 
-| Component | Wazuh 4.9.2 | WDA |
+| Component | Wazuh 4.9.2 | SDA |
 |---|---|---|
 | `wazuh-agentd` / `wda-agent` (communications) | 752 KB | 4.6 MB |
 | `wazuh-syscheckd` (FIM) | 888 KB | *(integrated)* |
@@ -37,7 +37,7 @@ daemon most equivalent to the WDA responsibility is used
 | `wazuh-execd` (active response) | 724 KB | *(integrated)* |
 | **Total shipped binaries** | **3.8 MB** | **4.6 MB** |
 
-WDA is a single static binary that includes FIM, log collection,
+SDA is a single static binary that includes FIM, log collection,
 inventory, SCA, rootcheck, and active response. The Wazuh agent splits
 these responsibilities across five separate dynamically-linked ELF
 binaries that also depend on shipped shared libraries, Python, and
@@ -61,9 +61,9 @@ OpenSSL under `/var/ossec`.
 | `wazuh-modulesd` | 18 208 KB |
 | `wazuh-execd` | 3 572 KB |
 | **Wazuh 4.9.2 total** | **~56.5 MB** |
-| **WDA (single process)** | **~5.7 MB (5 792 KB)** |
+| **SDA (single process)** | **~5.7 MB (5 792 KB)** |
 
-> **Target: < 15 MB.** **Met.** WDA uses ~9.9× less resident memory than
+> **Target: < 15 MB.** **Met.** SDA uses ~9.9× less resident memory than
 > the combined Wazuh agent footprint and fits well inside the target
 > budget even with all modules (FIM, logcollector, inventory,
 > active_response) enabled.
@@ -73,9 +73,9 @@ OpenSSL under `/var/ossec`.
 | Agent | Avg %CPU |
 |---|---|
 | `wazuh-agentd` (communications daemon only) | 0.45 % |
-| WDA | 0.00 % |
+| SDA | 0.00 % |
 
-> **Target: < 0.1 %.** **Met.** WDA's single-threaded tokio runtime
+> **Target: < 0.1 %.** **Met.** SDA's single-threaded tokio runtime
 > registers 0.00 % CPU over a 60 s `pidstat` window at idle. Note the
 > Wazuh figure is only the communications daemon; the four other Wazuh
 > daemons add additional idle cost that was not aggregated here.
@@ -85,8 +85,8 @@ OpenSSL under `/var/ossec`.
 | Agent | Peak %CPU | 15 s avg %CPU |
 |---|---|---|
 | `wazuh-agentd` (while `wazuh-syscheckd` hashes) | 9 % | 1.60 % |
-| WDA (pre-optimization) | 8 % | 3.40 % |
-| **WDA (current)** | **3 %** | **1.33 %** |
+| SDA (pre-optimization) | 8 % | 3.40 % |
+| **SDA (current)** | **3 %** | **1.33 %** |
 
 > **Target: < 3 % peak.** **Met.** After the lazy-hashing /
 > rate-limiting / batching work landed in `crates/wda-fim` (see
@@ -106,7 +106,7 @@ OpenSSL under `/var/ossec`.
 
 ## Summary vs. Proposal Targets
 
-| Metric | Target | WDA observed | Status |
+| Metric | Target | SDA observed | Status |
 |---|---|---|---|
 | Idle RAM | < 15 MB | 5.7 MB | **Met** |
 | Idle CPU | < 0.1 % | 0.00 % | **Met** |
@@ -115,7 +115,7 @@ OpenSSL under `/var/ossec`.
 
 ## Caveats
 
-- Binary-size comparison is not strictly apples-to-apples: WDA is a
+- Binary-size comparison is not strictly apples-to-apples: SDA is a
   single static Rust binary; the Wazuh agent is five dynamically-linked
   daemons plus shared libraries under `/var/ossec/lib`. A more
   like-for-like comparison would measure the full install footprint

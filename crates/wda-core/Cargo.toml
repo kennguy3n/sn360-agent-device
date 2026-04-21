@@ -1,6 +1,6 @@
 [package]
 name = "wda-core"
-description = "Core agent runtime for Wazuh Desktop Agent"
+description = "Core agent runtime for SN360 Desktop Agent"
 version.workspace = true
 edition.workspace = true
 license.workspace = true

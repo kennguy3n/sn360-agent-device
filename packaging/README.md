@@ -1,6 +1,6 @@
 # Packaging
 
-Installer recipes for the Wazuh Desktop Agent across Linux, macOS, and
+Installer recipes for the SN360 Desktop Agent across Linux, macOS, and
 Windows. Each platform has a build script that takes an
 already-compiled release binary (`cargo build --release -p wda-agent`)
 and emits a ready-to-install package into `dist/`.
@@ -8,7 +8,7 @@ and emits a ready-to-install package into `dist/`.
 ```
 packaging/
 ├── config/
-│   └── config.yaml              # Default /etc/wazuh-desktop-agent/config.yaml
+│   └── config.yaml              # Default /etc/sn360-desktop-agent/config.yaml
 ├── systemd/
 │   └── wda-agent.service        # systemd unit (Type=simple, User=wda)
 ├── debian/
@@ -18,7 +18,7 @@ packaging/
 │   ├── wda-agent.spec
 │   └── build-rpm.sh             # rpmbuild driver
 ├── macos/
-│   ├── com.wazuh.desktop-agent.plist
+│   ├── com.sn360.desktop-agent.plist
 │   ├── scripts/{preinstall,postinstall}
 │   └── build-pkg.sh             # pkgbuild + productbuild driver
 └── windows/
@@ -32,13 +32,13 @@ packaging/
 |-------------------------------------------|------------------------------------------|----------|
 | `/usr/bin/wda-agent`                      | Agent binary                             | Linux    |
 | `/usr/local/bin/wda-agent`                | Agent binary                             | macOS    |
-| `C:\Program Files\WazuhDesktopAgent\wda-agent.exe` | Agent binary                  | Windows  |
-| `/etc/wazuh-desktop-agent/config.yaml`    | Main config (conffile, preserved on upgrade) | Linux/macOS |
-| `/etc/wazuh-desktop-agent/client.keys`    | Enrollment key, 0600 root:wda            | Linux/macOS |
-| `/etc/wazuh-desktop-agent/sca/`           | SCA policies                             | Linux/macOS |
-| `/var/lib/wazuh-desktop-agent/`           | State (FIM DB, rootcheck baseline, LDE)  | Linux/macOS |
-| `/var/log/wazuh-desktop-agent/`           | Log files                                | Linux/macOS |
-| `C:\ProgramData\WazuhDesktopAgent\`       | State                                    | Windows  |
+| `C:\Program Files\SN360DesktopAgent\wda-agent.exe` | Agent binary                  | Windows  |
+| `/etc/sn360-desktop-agent/config.yaml`    | Main config (conffile, preserved on upgrade) | Linux/macOS |
+| `/etc/sn360-desktop-agent/client.keys`    | Enrollment key, 0600 root:wda            | Linux/macOS |
+| `/etc/sn360-desktop-agent/sca/`           | SCA policies                             | Linux/macOS |
+| `/var/lib/sn360-desktop-agent/`           | State (FIM DB, rootcheck baseline, LDE)  | Linux/macOS |
+| `/var/log/sn360-desktop-agent/`           | Log files                                | Linux/macOS |
+| `C:\ProgramData\SN360DesktopAgent\`       | State                                    | Windows  |
 
 ## Service registration
 
@@ -46,10 +46,10 @@ packaging/
   `postinst`/`%post`). Unit runs as user `wda`, `Restart=on-failure`,
   `RestartSec=5`, hardened via `ProtectSystem=strict` and
   `NoNewPrivileges=true`.
-- **macOS** — launchd daemon `com.wazuh.desktop-agent`, loaded by the
+- **macOS** — launchd daemon `com.sn360.desktop-agent`, loaded by the
   `.pkg` postinstall script. `KeepAlive.Crashed=true` so launchd
   restarts the agent on unexpected exit.
-- **Windows** — Windows Service `WazuhDesktopAgent` registered by the
+- **Windows** — Windows Service `SN360DesktopAgent` registered by the
   MSI (`ServiceInstall`). Recovery configured to restart on first,
   second, and third failures with a 5-second delay (matches
   `RestartSec=5` on Linux).

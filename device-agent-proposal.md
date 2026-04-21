@@ -1,4 +1,4 @@
-# SN360 Device Agent (WDA): Architecture & Implementation Proposal
+# SN360 Desktop Agent (SDA): Architecture & Implementation Proposal
 
 > **Version:** 1.0 | **Date:** April 2026 | **Status:** Draft Proposal
 > **Target Platforms:** Windows 10/11, macOS 12+, Linux (Ubuntu/Fedora/Arch)
@@ -42,9 +42,9 @@
 
 The current Wazuh agent (v5.0.0-beta1) is a comprehensive, monolithic C/C++ application totaling ~247,000 lines of source code across agent modules. It was designed to serve all deployment contexts (servers, containers, endpoints, cloud) with a single binary. While feature-complete, this architecture carries unnecessary overhead for desktop/laptop/VM endpoints where user experience is paramount.
 
-This proposal describes **Wazuh Desktop Agent (WDA)** -- a purpose-built, modular rewrite optimized exclusively for end-user devices. The design targets:
+This proposal describes **SN360 Desktop Agent (SDA)** -- a purpose-built, modular rewrite optimized exclusively for end-user devices. The design targets:
 
-| Metric | Current Wazuh Agent | WDA Target |
+| Metric | Current Wazuh Agent | SDA Target |
 |---|---|---|
 | Idle RAM | 60-120 MB | **< 15 MB** |
 | Idle CPU | 1-3% | **< 0.1%** |
@@ -210,7 +210,7 @@ Desktop/laptop users experience:
 
 ```
 +------------------------------------------------------------------+
-|                    Wazuh Desktop Agent (WDA)                      |
+|                    SN360 Desktop Agent (SDA)                      |
 +------------------------------------------------------------------+
 |                                                                    |
 |  +--------------------+    +-------------------+                   |
@@ -256,7 +256,7 @@ Desktop/laptop users experience:
 
 Every module that can use OS-native notification APIs must do so:
 
-| Function | Current (Polling) | WDA (Event-Driven) |
+| Function | Current (Polling) | SDA (Event-Driven) |
 |---|---|---|
 | File changes | Scheduled full-disk hash scans | `inotify`/`fanotify` (Linux), `FSEvents` (macOS), `ReadDirectoryChangesW` (Windows) |
 | Log collection | Periodic file reads with seek tracking | `inotify` on log files + systemd journal subscription + macOS OSLog streaming |
@@ -317,7 +317,7 @@ Threads during FIM scan:
 
 **Current issues:** Full-disk scans hash every monitored file, causing CPU spikes up to 30%. The SQLite FIM database keeps full state in memory.
 
-**WDA Design:**
+**SDA Design:**
 
 ```
 FIM Module
@@ -351,7 +351,7 @@ FIM Module
 
 **Current issues:** 10,818 LoC with 17+ format-specific readers. Polling-based file reading. All readers always compiled in.
 
-**WDA Design:**
+**SDA Design:**
 
 ```
 Log Collector Module
@@ -384,7 +384,7 @@ Log Collector Module
 
 **Current issues:** Enumerates all packages, processes, ports, network interfaces, and hardware on every scan cycle. The data_provider module is 24K+ LoC with heavy platform-specific code.
 
-**WDA Design:**
+**SDA Design:**
 
 ```
 Inventory Module
@@ -417,7 +417,7 @@ Inventory Module
 
 **Current issues:** Lua-based policy evaluation engine. Runs all checks sequentially.
 
-**WDA Design:**
+**SDA Design:**
 
 ```
 SCA Module
@@ -445,7 +445,7 @@ SCA Module
 
 **Current issues:** Separate daemon (os_execd) that forks processes to run scripts.
 
-**WDA Design:**
+**SDA Design:**
 
 ```
 Active Response Module
@@ -470,7 +470,7 @@ Active Response Module
 
 **Current issues:** Scans for known rootkit files/directories, checks `/dev`, verifies system binaries.
 
-**WDA Design:**
+**SDA Design:**
 
 This module is retained but significantly simplified for desktops:
 
@@ -635,7 +635,7 @@ Distribution:
 
 ### 8.1 Wazuh Protocol Compatibility
 
-The WDA maintains backward compatibility with Wazuh server protocol:
+SDA maintains backward compatibility with Wazuh server protocol:
 
 ```
 +---+---+---+---+---+---+---+---+---+---+---+---+
@@ -654,7 +654,7 @@ The WDA maintains backward compatibility with Wazuh server protocol:
 
 ### 8.2 Enhanced Mode (opt-in)
 
-When communicating with WDA-aware servers, an enhanced protocol is available:
+When communicating with SDA-aware servers, an enhanced protocol is available:
 
 - **TLS 1.3** transport (replacing custom AES-CBC wrapping)
 - **MessagePack** serialization (50-70% smaller than JSON for events)
@@ -815,10 +815,10 @@ Windows:
 
 ### 11.1 Configuration Format
 
-WDA uses YAML configuration (with backward-compatible XML config reader):
+SDA uses YAML configuration (with backward-compatible XML config reader):
 
 ```yaml
-# /etc/wazuh-desktop-agent/config.yaml
+# /etc/sn360-desktop-agent/config.yaml
 agent:
   server:
     address: "wazuh-server.example.com"
@@ -1144,7 +1144,7 @@ The Phase 4 companion microservices run server-side within the SN360 Control Pla
 +-----------------------------------------------------------------------+
                                 |
                     +-----------v-----------+
-                    |   WDA Agents (edge)    |
+                    |   SDA Agents (edge)    |
                     +-----------------------+
 ```
 
@@ -1279,10 +1279,10 @@ The Agent Gateway is the single entry point for all agent-to-server communicatio
 
 ### 13.5 Updated Resource Budget
 
-With the LDE and Enhanced Inventory modules, the WDA memory projection is updated:
+With the LDE and Enhanced Inventory modules, the SDA memory projection is updated:
 
 ```
-WDA (projected, with Phase 4 modules):
+SDA (projected, with Phase 4 modules):
   RSS: ~15 MB (without YARA), ~17 MB (with YARA)
     - Agent core + runtime:       2.0 MB
     - SQLite FIM DB (mmap):       3.0 MB
@@ -1428,7 +1428,7 @@ CMakeLists.txt agent target dependencies:
 
 ### B. Lines of Code Summary
 
-| Component | LoC (C/C++) | WDA Estimate (Rust) | Reduction |
+| Component | LoC (C/C++) | SDA Estimate (Rust) | Reduction |
 |---|---|---|---|
 | client-agent | 4,236 | ~2,000 | 53% |
 | syscheckd | 6,033 | ~3,000 | 50% |
@@ -1457,7 +1457,7 @@ Current Wazuh Agent (typical Linux endpoint):
     - Event buffers:       5 MB
     - Other:               9 MB
 
-WDA (projected same endpoint):
+SDA (projected same endpoint):
   RSS: ~12 MB
     - Agent core + runtime:  2 MB
     - SQLite FIM DB (mmap):  3 MB
@@ -1473,7 +1473,7 @@ WDA (projected same endpoint):
 
 ## 16. Local Wazuh Server Test Environment
 
-This section describes how to stand up a **local Wazuh server** for development and integration testing of the WDA agent. The recommended approach uses the official Wazuh Docker deployment — it is the fastest way to get the full stack (manager, indexer, dashboard) running on a single machine.
+This section describes how to stand up a **local Wazuh server** for development and integration testing of the SDA agent. The recommended approach uses the official Wazuh Docker deployment — it is the fastest way to get the full stack (manager, indexer, dashboard) running on a single machine.
 
 ### 16.1 Prerequisites
 
@@ -1501,7 +1501,7 @@ docker compose -f generate-indexer-certs.yml run --rm generator
 docker compose up -d
 ```
 
-> **Note:** The stack includes three containers — `wazuh.manager`, `wazuh.indexer`, and `wazuh.dashboard`. The manager is the component the WDA agent communicates with.
+> **Note:** The stack includes three containers — `wazuh.manager`, `wazuh.indexer`, and `wazuh.dashboard`. The manager is the component the SDA agent communicates with.
 >
 > **Default credentials:** `admin` / `SecretPassword` (for the dashboard at https://localhost:443).
 
@@ -1515,7 +1515,7 @@ docker compose ps
 curl -k -u admin:SecretPassword https://localhost:55000/?pretty
 ```
 
-### 16.4 Configure the Server for WDA Testing
+### 16.4 Configure the Server for SDA Testing
 
 **Retrieve the enrollment password** from the manager container:
 
@@ -1537,7 +1537,7 @@ docker exec -it single-node-wazuh.manager-1 \
   /var/ossec/bin/wazuh-control status
 ```
 
-### 16.5 Enroll & Connect the WDA Agent
+### 16.5 Enroll & Connect the SDA Agent
 
 Create a test configuration file (`test-config.yaml`) pointing at the local Docker server:
 
@@ -1632,7 +1632,7 @@ This installs the full stack (manager + indexer + dashboard) on a single machine
 
 ## 17. Summary
 
-The Wazuh Desktop Agent (WDA) is a ground-up reimagining of the Wazuh endpoint agent for user-facing devices. By leveraging Rust's zero-cost abstractions, event-driven OS APIs, adaptive resource management, and a modular architecture that loads only what's needed, WDA achieves a 7-10x reduction in memory usage and near-invisible CPU impact compared to the current agent.
+The SN360 Desktop Agent (SDA) is a ground-up reimagining of the Wazuh endpoint agent for user-facing devices. By leveraging Rust's zero-cost abstractions, event-driven OS APIs, adaptive resource management, and a modular architecture that loads only what's needed, SDA achieves a 7-10x reduction in memory usage and near-invisible CPU impact compared to the current agent.
 
 The 30-week implementation roadmap breaks the work into six clear phases, each with concrete milestones and deliverables. The architecture maintains protocol compatibility with existing Wazuh servers while providing an upgrade path to enhanced communication modes.
 

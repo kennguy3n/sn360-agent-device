@@ -6,18 +6,23 @@
 
 set -e
 
-LAUNCHD_LABEL="com.wazuh.desktop-agent"
+LAUNCHD_LABEL="com.sn360.desktop-agent"
 LAUNCHD_PLIST="/Library/LaunchDaemons/${LAUNCHD_LABEL}.plist"
-WDA_HOME="/var/lib/wazuh-desktop-agent"
-WDA_LOG="/var/log/wazuh-desktop-agent"
-WDA_CONF="/etc/wazuh-desktop-agent"
+SDA_HOME="/var/lib/sn360-desktop-agent"
+SDA_LOG="/var/log/sn360-desktop-agent"
+SDA_CONF="/etc/sn360-desktop-agent"
 
-mkdir -p "$WDA_HOME" "$WDA_LOG" "$WDA_CONF" "$WDA_CONF/sca"
-chown -R root:wheel "$WDA_HOME" "$WDA_LOG"
-chmod 0750 "$WDA_HOME" "$WDA_LOG"
-chmod 0755 "$WDA_CONF" "$WDA_CONF/sca"
-if [ -f "$WDA_CONF/config.yaml" ]; then
-    chmod 0644 "$WDA_CONF/config.yaml"
+# Legacy wazuh-desktop-agent -> sn360-desktop-agent path migration and
+# legacy launchd label cleanup run in the preinstall script, before
+# pkgbuild expands the new payload into place. See
+# packaging/macos/scripts/preinstall.
+
+mkdir -p "$SDA_HOME" "$SDA_LOG" "$SDA_CONF" "$SDA_CONF/sca"
+chown -R root:wheel "$SDA_HOME" "$SDA_LOG"
+chmod 0750 "$SDA_HOME" "$SDA_LOG"
+chmod 0755 "$SDA_CONF" "$SDA_CONF/sca"
+if [ -f "$SDA_CONF/config.yaml" ]; then
+    chmod 0644 "$SDA_CONF/config.yaml"
 fi
 
 # Unload any previous version before reloading, so upgrades pick up

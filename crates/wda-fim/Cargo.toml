@@ -1,6 +1,6 @@
 [package]
 name = "wda-fim"
-description = "File Integrity Monitoring module for WDA"
+description = "File Integrity Monitoring module for SDA"
 version.workspace = true
 edition.workspace = true
 license.workspace = true

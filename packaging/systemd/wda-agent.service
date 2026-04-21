@@ -1,5 +1,5 @@
 [Unit]
-Description=Wazuh Desktop Agent
+Description=SN360 Desktop Agent
 Documentation=https://github.com/kennguy3n/sn360-agent-device
 After=network-online.target
 Wants=network-online.target
@@ -8,19 +8,19 @@ Wants=network-online.target
 Type=simple
 User=wda
 Group=wda
-ExecStart=/usr/bin/wda-agent --config /etc/wazuh-desktop-agent/config.yaml
+ExecStart=/usr/bin/wda-agent --config /etc/sn360-desktop-agent/config.yaml
 Restart=on-failure
 RestartSec=5
 TimeoutStopSec=30
 
 # State & logging directories (created by systemd if missing)
-StateDirectory=wazuh-desktop-agent
+StateDirectory=sn360-desktop-agent
 StateDirectoryMode=0750
-LogsDirectory=wazuh-desktop-agent
+LogsDirectory=sn360-desktop-agent
 LogsDirectoryMode=0750
 
 # Read-only paths for config.
-ReadOnlyPaths=/etc/wazuh-desktop-agent
+ReadOnlyPaths=/etc/sn360-desktop-agent
 
 # Sandboxing. These are deliberately conservative — the agent still
 # needs broad filesystem read access for FIM, rootcheck, and
@@ -37,7 +37,7 @@ RestrictSUIDSGID=true
 RestrictRealtime=true
 LockPersonality=true
 MemoryDenyWriteExecute=true
-ReadWritePaths=/var/lib/wazuh-desktop-agent /var/log/wazuh-desktop-agent /etc/wazuh-desktop-agent
+ReadWritePaths=/var/lib/sn360-desktop-agent /var/log/sn360-desktop-agent /etc/sn360-desktop-agent
 
 # Capabilities needed by FIM real-time watchers and active response.
 AmbientCapabilities=CAP_DAC_READ_SEARCH CAP_NET_ADMIN

@@ -67,11 +67,11 @@ impl SeekState {
     pub fn default_path() -> PathBuf {
         #[cfg(unix)]
         {
-            PathBuf::from("/var/lib/wda/logcollector_state.json")
+            PathBuf::from("/var/lib/sn360-desktop-agent/logcollector_state.json")
         }
         #[cfg(windows)]
         {
-            PathBuf::from(r"C:\ProgramData\WDA\logcollector_state.json")
+            PathBuf::from(r"C:\ProgramData\SN360DesktopAgent\logcollector_state.json")
         }
     }
 }

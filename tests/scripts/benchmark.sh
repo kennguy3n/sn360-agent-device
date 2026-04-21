@@ -1,5 +1,5 @@
 #!/bin/bash
-# Benchmark harness: compares WDA vs original Wazuh agent resource usage.
+# Benchmark harness: compares SDA vs original Wazuh agent resource usage.
 # Measures idle RSS, CPU, binary size, startup time, and FIM scan impact.
 # Outputs a comparison table.
 
@@ -15,8 +15,8 @@ MEASURE_DURATION=60          # seconds to measure idle metrics
 FIM_FILE_COUNT=1000          # files to create for FIM scan benchmark
 FIM_DIR="/tmp/wda-benchmark-fim"
 WAZUH_AGENT_BIN="/var/ossec/bin/wazuh-agentd"
-WDA_BIN="./target/release/wda-agent"
-WDA_CONFIG="tests/wazuh-test-config.yaml"
+SDA_BIN="./target/release/wda-agent"
+SDA_CONFIG="tests/wazuh-test-config.yaml"
 
 # ── Helper functions ──────────────────────────────────────────────────
 
@@ -85,10 +85,10 @@ kb_to_mb() {
 
 # ── Results storage ───────────────────────────────────────────────────
 declare -A WAZUH_METRICS
-declare -A WDA_METRICS
+declare -A SDA_METRICS
 
-# ── Step 1: Build WDA ────────────────────────────────────────────────
-echo "==> Step 1: Building WDA..."
+# ── Step 1: Build SDA ────────────────────────────────────────────────
+echo "==> Step 1: Building SDA..."
 cargo build --release
 echo "    Build complete."
 
@@ -146,22 +146,22 @@ else
   WAZUH_METRICS[fim_peak_cpu]="N/A"
 fi
 
-# ── Step 3: Measure WDA ──────────────────────────────────────────────
-echo "==> Step 3: Measuring WDA..."
+# ── Step 3: Measure SDA ──────────────────────────────────────────────
+echo "==> Step 3: Measuring SDA..."
 
-WDA_METRICS[binary_size]=$(measure_binary_size "$WDA_BIN")
+SDA_METRICS[binary_size]=$(measure_binary_size "$SDA_BIN")
 
-echo "    Starting WDA..."
-sudo mkdir -p /etc/wazuh-desktop-agent
-sudo "$WDA_BIN" "$WDA_CONFIG" &>/dev/null &
-WDA_PID=$!
+echo "    Starting SDA..."
+sudo mkdir -p /etc/sn360-desktop-agent
+sudo "$SDA_BIN" "$SDA_CONFIG" &>/dev/null &
+SDA_PID=$!
 sleep 10
 
-if kill -0 "$WDA_PID" 2>/dev/null; then
-  WDA_METRICS[idle_rss]=$(measure_rss "$WDA_PID")
-  echo "    WDA PID: $WDA_PID, RSS: ${WDA_METRICS[idle_rss]} KB"
+if kill -0 "$SDA_PID" 2>/dev/null; then
+  SDA_METRICS[idle_rss]=$(measure_rss "$SDA_PID")
+  echo "    SDA PID: $SDA_PID, RSS: ${SDA_METRICS[idle_rss]} KB"
   echo "    Measuring CPU for ${MEASURE_DURATION}s..."
-  WDA_METRICS[idle_cpu]=$(measure_cpu_avg "$WDA_PID" "$MEASURE_DURATION")
+  SDA_METRICS[idle_cpu]=$(measure_cpu_avg "$SDA_PID" "$MEASURE_DURATION")
 
   # FIM scan benchmark
   echo "    Creating $FIM_FILE_COUNT files for FIM scan test..."
@@ -171,27 +171,27 @@ if kill -0 "$WDA_PID" 2>/dev/null; then
     echo "benchmark content $i" > "$FIM_DIR/file_${i}.txt"
   done
   sleep 5
-  WDA_METRICS[fim_peak_cpu]="N/A"
+  SDA_METRICS[fim_peak_cpu]="N/A"
   if command -v pidstat &>/dev/null; then
-    PEAK_CPU=$(pidstat -p "$WDA_PID" 1 30 2>/dev/null \
+    PEAK_CPU=$(pidstat -p "$SDA_PID" 1 30 2>/dev/null \
       | awk '!/^#/ && !/Average/ && $8 ~ /[0-9]/ { if ($8+0 > max) max=$8+0 } END { print max+0 }' || echo "N/A")
-    WDA_METRICS[fim_peak_cpu]="$PEAK_CPU"
+    SDA_METRICS[fim_peak_cpu]="$PEAK_CPU"
   fi
 
-  sudo kill "$WDA_PID" 2>/dev/null || true
-  wait "$WDA_PID" 2>/dev/null || true
+  sudo kill "$SDA_PID" 2>/dev/null || true
+  wait "$SDA_PID" 2>/dev/null || true
 else
-  echo "    WARNING: WDA did not start properly"
-  WDA_METRICS[idle_rss]="N/A"
-  WDA_METRICS[idle_cpu]="N/A"
-  WDA_METRICS[fim_peak_cpu]="N/A"
+  echo "    WARNING: SDA did not start properly"
+  SDA_METRICS[idle_rss]="N/A"
+  SDA_METRICS[idle_cpu]="N/A"
+  SDA_METRICS[fim_peak_cpu]="N/A"
 fi
 
 # ── Step 4: Startup time comparison ──────────────────────────────────
 echo "==> Step 4: Measuring startup times..."
 
-WDA_METRICS[startup_ms]=$(measure_startup_time sudo "$WDA_BIN" "$WDA_CONFIG")
-echo "    WDA startup: ${WDA_METRICS[startup_ms]} ms"
+SDA_METRICS[startup_ms]=$(measure_startup_time sudo "$SDA_BIN" "$SDA_CONFIG")
+echo "    SDA startup: ${SDA_METRICS[startup_ms]} ms"
 
 if [ -x "$WAZUH_AGENT_BIN" ]; then
   WAZUH_METRICS[startup_ms]=$(measure_startup_time sudo "$WAZUH_AGENT_BIN")
@@ -218,28 +218,28 @@ calc_improvement() {
   fi
 }
 
-WDA_RSS_MB=$(kb_to_mb "${WDA_METRICS[idle_rss]:-0}")
+SDA_RSS_MB=$(kb_to_mb "${SDA_METRICS[idle_rss]:-0}")
 WAZUH_RSS_MB=$(kb_to_mb "${WAZUH_METRICS[idle_rss]:-0}")
-WDA_BIN_MB=$(bytes_to_mb "${WDA_METRICS[binary_size]:-0}")
+SDA_BIN_MB=$(bytes_to_mb "${SDA_METRICS[binary_size]:-0}")
 WAZUH_BIN_MB=$(bytes_to_mb "${WAZUH_METRICS[binary_size]:-0}")
 
-RSS_IMP=$(calc_improvement "${WAZUH_METRICS[idle_rss]:-N/A}" "${WDA_METRICS[idle_rss]:-N/A}")
-CPU_IMP=$(calc_improvement "${WAZUH_METRICS[idle_cpu]:-N/A}" "${WDA_METRICS[idle_cpu]:-N/A}")
-BIN_IMP=$(calc_improvement "${WAZUH_METRICS[binary_size]:-N/A}" "${WDA_METRICS[binary_size]:-N/A}")
-STARTUP_IMP=$(calc_improvement "${WAZUH_METRICS[startup_ms]:-N/A}" "${WDA_METRICS[startup_ms]:-N/A}")
+RSS_IMP=$(calc_improvement "${WAZUH_METRICS[idle_rss]:-N/A}" "${SDA_METRICS[idle_rss]:-N/A}")
+CPU_IMP=$(calc_improvement "${WAZUH_METRICS[idle_cpu]:-N/A}" "${SDA_METRICS[idle_cpu]:-N/A}")
+BIN_IMP=$(calc_improvement "${WAZUH_METRICS[binary_size]:-N/A}" "${SDA_METRICS[binary_size]:-N/A}")
+STARTUP_IMP=$(calc_improvement "${WAZUH_METRICS[startup_ms]:-N/A}" "${SDA_METRICS[startup_ms]:-N/A}")
 
-printf "| %-20s | %-15s | %-15s | %-12s |\n" "Metric" "Wazuh Original" "WDA" "Improvement"
+printf "| %-20s | %-15s | %-15s | %-12s |\n" "Metric" "Wazuh Original" "SDA" "Improvement"
 printf "|%-22s|%-17s|%-17s|%-14s|\n" "----------------------" "-----------------" "-----------------" "--------------"
 printf "| %-20s | %-15s | %-15s | %-12s |\n" \
-  "Idle RSS (MB)" "${WAZUH_RSS_MB}" "${WDA_RSS_MB}" "${RSS_IMP}x"
+  "Idle RSS (MB)" "${WAZUH_RSS_MB}" "${SDA_RSS_MB}" "${RSS_IMP}x"
 printf "| %-20s | %-15s | %-15s | %-12s |\n" \
-  "Idle CPU (%)" "${WAZUH_METRICS[idle_cpu]:-N/A}" "${WDA_METRICS[idle_cpu]:-N/A}" "${CPU_IMP}x"
+  "Idle CPU (%)" "${WAZUH_METRICS[idle_cpu]:-N/A}" "${SDA_METRICS[idle_cpu]:-N/A}" "${CPU_IMP}x"
 printf "| %-20s | %-15s | %-15s | %-12s |\n" \
-  "Binary Size (MB)" "${WAZUH_BIN_MB}" "${WDA_BIN_MB}" "${BIN_IMP}x"
+  "Binary Size (MB)" "${WAZUH_BIN_MB}" "${SDA_BIN_MB}" "${BIN_IMP}x"
 printf "| %-20s | %-15s | %-15s | %-12s |\n" \
-  "Startup (ms)" "${WAZUH_METRICS[startup_ms]:-N/A}" "${WDA_METRICS[startup_ms]:-N/A}" "${STARTUP_IMP}x"
+  "Startup (ms)" "${WAZUH_METRICS[startup_ms]:-N/A}" "${SDA_METRICS[startup_ms]:-N/A}" "${STARTUP_IMP}x"
 printf "| %-20s | %-15s | %-15s | %-12s |\n" \
-  "FIM Peak CPU (%)" "${WAZUH_METRICS[fim_peak_cpu]:-N/A}" "${WDA_METRICS[fim_peak_cpu]:-N/A}" "—"
+  "FIM Peak CPU (%)" "${WAZUH_METRICS[fim_peak_cpu]:-N/A}" "${SDA_METRICS[fim_peak_cpu]:-N/A}" "—"
 
 echo ""
 echo "======================================================================"

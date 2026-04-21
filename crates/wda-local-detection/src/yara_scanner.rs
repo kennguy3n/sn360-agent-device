@@ -268,12 +268,12 @@ mod tests {
         let rule = write_rule(
             dir.path(),
             "match.yar",
-            r#"rule FindMarker { strings: $a = "WDA-LDE-MARKER" condition: $a }"#,
+            r#"rule FindMarker { strings: $a = "SDA-LDE-MARKER" condition: $a }"#,
         );
         let scanner = YaraScanner::new(&[rule], 100, 10).unwrap();
 
         let target = dir.path().join("payload.bin");
-        std::fs::write(&target, b"prefix WDA-LDE-MARKER suffix").unwrap();
+        std::fs::write(&target, b"prefix SDA-LDE-MARKER suffix").unwrap();
         let hits = scanner.scan_file(&target).await.unwrap();
         assert_eq!(hits.len(), 1);
         assert_eq!(hits[0].rule_id, "FindMarker");
@@ -285,7 +285,7 @@ mod tests {
         let rule = write_rule(
             dir.path(),
             "match.yar",
-            r#"rule FindMarker { strings: $a = "WDA-LDE-MARKER" condition: $a }"#,
+            r#"rule FindMarker { strings: $a = "SDA-LDE-MARKER" condition: $a }"#,
         );
         let scanner = YaraScanner::new(&[rule], 100, 10).unwrap();
         let target = dir.path().join("clean.bin");
@@ -300,12 +300,12 @@ mod tests {
         let rule = write_rule(
             dir.path(),
             "match.yar",
-            r#"rule FindMarker { strings: $a = "WDA-LDE-MARKER" condition: $a }"#,
+            r#"rule FindMarker { strings: $a = "SDA-LDE-MARKER" condition: $a }"#,
         );
         // max_file_size_mb=0 → any non-empty file is skipped.
         let scanner = YaraScanner::new(&[rule], 100, 0).unwrap();
         let target = dir.path().join("payload.bin");
-        std::fs::write(&target, b"WDA-LDE-MARKER content").unwrap();
+        std::fs::write(&target, b"SDA-LDE-MARKER content").unwrap();
         let hits = scanner.scan_file(&target).await.unwrap();
         assert!(hits.is_empty(), "oversized file should be skipped");
     }

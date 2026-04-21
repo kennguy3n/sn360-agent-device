@@ -142,8 +142,8 @@ pub struct EnrollmentConfig {
     pub groups: Option<Vec<String>>,
 
     /// Override for the `client.keys` file location. When unset the
-    /// platform default is used (`/etc/wazuh-desktop-agent/client.keys`
-    /// on Unix, `C:\Program Files\WazuhDesktopAgent\client.keys` on Windows).
+    /// platform default is used (`/etc/sn360-desktop-agent/client.keys`
+    /// on Unix, `C:\Program Files\SN360DesktopAgent\client.keys` on Windows).
     pub keys_file: Option<PathBuf>,
 }
 
@@ -643,11 +643,11 @@ fn default_inventory_collect() -> Vec<String> {
 fn default_sca_policy_dir() -> PathBuf {
     #[cfg(unix)]
     {
-        PathBuf::from("/etc/wazuh-desktop-agent/sca")
+        PathBuf::from("/etc/sn360-desktop-agent/sca")
     }
     #[cfg(windows)]
     {
-        PathBuf::from(r"C:\Program Files\WazuhDesktopAgent\sca")
+        PathBuf::from(r"C:\Program Files\SN360DesktopAgent\sca")
     }
     #[cfg(not(any(unix, windows)))]
     {
@@ -666,11 +666,11 @@ fn default_rootcheck_max_pid() -> u32 {
 fn default_rootcheck_baseline_path() -> PathBuf {
     #[cfg(unix)]
     {
-        PathBuf::from("/var/lib/wazuh-desktop-agent/rootcheck-baseline.json")
+        PathBuf::from("/var/lib/sn360-desktop-agent/rootcheck-baseline.json")
     }
     #[cfg(windows)]
     {
-        PathBuf::from(r"C:\ProgramData\WazuhDesktopAgent\rootcheck-baseline.json")
+        PathBuf::from(r"C:\ProgramData\SN360DesktopAgent\rootcheck-baseline.json")
     }
     #[cfg(not(any(unix, windows)))]
     {
@@ -743,11 +743,11 @@ fn default_lde_behavioral_max_tracked_entities() -> usize {
 fn default_lde_rule_bundle_path() -> PathBuf {
     #[cfg(unix)]
     {
-        PathBuf::from("/var/lib/wazuh-desktop-agent/lde-rules.msgpack")
+        PathBuf::from("/var/lib/sn360-desktop-agent/lde-rules.msgpack")
     }
     #[cfg(windows)]
     {
-        PathBuf::from(r"C:\ProgramData\WazuhDesktopAgent\lde-rules.msgpack")
+        PathBuf::from(r"C:\ProgramData\SN360DesktopAgent\lde-rules.msgpack")
     }
     #[cfg(not(any(unix, windows)))]
     {
@@ -757,11 +757,11 @@ fn default_lde_rule_bundle_path() -> PathBuf {
 fn default_lde_offline_queue_path() -> PathBuf {
     #[cfg(unix)]
     {
-        PathBuf::from("/var/lib/wazuh-desktop-agent/lde-offline-queue.db")
+        PathBuf::from("/var/lib/sn360-desktop-agent/lde-offline-queue.db")
     }
     #[cfg(windows)]
     {
-        PathBuf::from(r"C:\ProgramData\WazuhDesktopAgent\lde-offline-queue.db")
+        PathBuf::from(r"C:\ProgramData\SN360DesktopAgent\lde-offline-queue.db")
     }
     #[cfg(not(any(unix, windows)))]
     {
@@ -777,11 +777,11 @@ fn default_lde_offline_drain_batch() -> usize {
 fn default_lde_quarantine_dir() -> PathBuf {
     #[cfg(unix)]
     {
-        PathBuf::from("/var/lib/wazuh-desktop-agent/quarantine")
+        PathBuf::from("/var/lib/sn360-desktop-agent/quarantine")
     }
     #[cfg(windows)]
     {
-        PathBuf::from(r"C:\ProgramData\WazuhDesktopAgent\quarantine")
+        PathBuf::from(r"C:\ProgramData\SN360DesktopAgent\quarantine")
     }
     #[cfg(not(any(unix, windows)))]
     {
@@ -1049,11 +1049,11 @@ impl AgentConfig {
     pub fn default_config_path() -> PathBuf {
         #[cfg(unix)]
         {
-            PathBuf::from("/etc/wazuh-desktop-agent/config.yaml")
+            PathBuf::from("/etc/sn360-desktop-agent/config.yaml")
         }
         #[cfg(windows)]
         {
-            PathBuf::from(r"C:\Program Files\WazuhDesktopAgent\config.yaml")
+            PathBuf::from(r"C:\Program Files\SN360DesktopAgent\config.yaml")
         }
     }
 

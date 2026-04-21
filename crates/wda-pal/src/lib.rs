@@ -1,4 +1,4 @@
-//! Platform Abstraction Layer (PAL) for the Wazuh Desktop Agent.
+//! Platform Abstraction Layer (PAL) for the SN360 Desktop Agent.
 //!
 //! Provides cross-platform traits and implementations for filesystem watching,
 //! system information, power status, and service management.

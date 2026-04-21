@@ -1,6 +1,6 @@
 [package]
 name = "wda-logcollector"
-description = "Log collection module for WDA"
+description = "Log collection module for SDA"
 version.workspace = true
 edition.workspace = true
 license.workspace = true

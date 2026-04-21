@@ -1,6 +1,6 @@
 [package]
 name = "wda-rootcheck"
-description = "Rootkit detection module for WDA"
+description = "Rootkit detection module for SDA"
 version.workspace = true
 edition.workspace = true
 license.workspace = true

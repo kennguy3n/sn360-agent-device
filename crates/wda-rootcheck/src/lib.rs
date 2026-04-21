@@ -1,4 +1,4 @@
-//! Rootkit detection module for the Wazuh Desktop Agent.
+//! Rootkit detection module for the SN360 Desktop Agent.
 //!
 //! Performs three classes of checks during idle periods:
 //!

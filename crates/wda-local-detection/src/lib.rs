@@ -1,4 +1,4 @@
-//! Local Detection Engine (LDE) for the Wazuh Desktop Agent.
+//! Local Detection Engine (LDE) for the SN360 Desktop Agent.
 //!
 //! Evaluates detection rules locally at the edge — IOC matching via
 //! Aho-Corasick + bloom filters, behavioural rule state machines, and

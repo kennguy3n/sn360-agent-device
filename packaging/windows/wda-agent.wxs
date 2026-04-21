@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
-  WiX 3.x installer manifest for Wazuh Desktop Agent.
+  WiX 3.x installer manifest for SN360 Desktop Agent.
 
   Build with:
       candle -nologo -dVersion=0.1.0 -dBinary=..\..\target\x86_64-pc-windows-msvc\release\wda-agent.exe wda-agent.wxs
@@ -12,31 +12,31 @@
 <Wix xmlns="http://schemas.microsoft.com/wix/2006/wi"
      xmlns:util="http://schemas.microsoft.com/wix/UtilExtension">
   <Product Id="*"
-           Name="Wazuh Desktop Agent"
+           Name="SN360 Desktop Agent"
            Language="1033"
            Version="$(var.Version)"
-           Manufacturer="Wazuh Desktop Agent Contributors"
+           Manufacturer="SN360 Desktop Agent Contributors"
            UpgradeCode="4b7e4b47-3e5d-4a9b-9f5f-8a7e0e1c0c11">
 
     <Package InstallerVersion="500"
              Compressed="yes"
              InstallScope="perMachine"
-             Description="Wazuh Desktop Agent $(var.Version)"
+             Description="SN360 Desktop Agent $(var.Version)"
              Comments="Lightweight Wazuh-compatible security agent"/>
 
-    <MajorUpgrade DowngradeErrorMessage="A newer version of Wazuh Desktop Agent is already installed."/>
+    <MajorUpgrade DowngradeErrorMessage="A newer version of SN360 Desktop Agent is already installed."/>
     <MediaTemplate EmbedCab="yes"/>
 
     <Property Id="ARPPRODUCTICON" Value="wda-agent.ico"/>
 
     <Directory Id="TARGETDIR" Name="SourceDir">
       <Directory Id="ProgramFiles64Folder">
-        <Directory Id="INSTALLFOLDER" Name="WazuhDesktopAgent">
+        <Directory Id="INSTALLFOLDER" Name="SN360DesktopAgent">
           <Directory Id="SCADIR" Name="sca"/>
         </Directory>
       </Directory>
       <Directory Id="CommonAppDataFolder">
-        <Directory Id="WDA_DATA" Name="WazuhDesktopAgent"/>
+        <Directory Id="WDA_DATA" Name="SN360DesktopAgent"/>
       </Directory>
     </Directory>
 
@@ -48,8 +48,8 @@
               KeyPath="yes"/>
         <ServiceInstall Id="WDAService"
                         Type="ownProcess"
-                        Name="WazuhDesktopAgent"
-                        DisplayName="Wazuh Desktop Agent"
+                        Name="SN360DesktopAgent"
+                        DisplayName="SN360 Desktop Agent"
                         Description="Lightweight Wazuh-compatible security agent."
                         Start="auto"
                         Account="LocalSystem"
@@ -65,7 +65,7 @@
                               ResetPeriodInDays="1"/>
         </ServiceInstall>
         <ServiceControl Id="WDAServiceControl"
-                        Name="WazuhDesktopAgent"
+                        Name="SN360DesktopAgent"
                         Start="install"
                         Stop="both"
                         Remove="uninstall"
@@ -83,7 +83,7 @@
     </ComponentGroup>
 
     <Feature Id="Complete"
-             Title="Wazuh Desktop Agent"
+             Title="SN360 Desktop Agent"
              Level="1">
       <ComponentGroupRef Id="ProductComponents"/>
     </Feature>

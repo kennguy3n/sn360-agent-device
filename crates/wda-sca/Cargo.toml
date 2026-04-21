@@ -1,6 +1,6 @@
 [package]
 name = "wda-sca"
-description = "Security Configuration Assessment module for WDA"
+description = "Security Configuration Assessment module for SDA"
 version.workspace = true
 edition.workspace = true
 license.workspace = true

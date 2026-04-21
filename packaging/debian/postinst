@@ -7,36 +7,40 @@
 
 set -e
 
-WDA_USER=wda
-WDA_GROUP=wda
-WDA_HOME=/var/lib/wazuh-desktop-agent
-WDA_LOG=/var/log/wazuh-desktop-agent
-WDA_CONF=/etc/wazuh-desktop-agent
+SDA_USER=wda
+SDA_GROUP=wda
+SDA_HOME=/var/lib/sn360-desktop-agent
+SDA_LOG=/var/log/sn360-desktop-agent
+SDA_CONF=/etc/sn360-desktop-agent
 
 case "$1" in
     configure)
-        if ! getent group "$WDA_GROUP" >/dev/null; then
-            addgroup --system "$WDA_GROUP"
+        if ! getent group "$SDA_GROUP" >/dev/null; then
+            addgroup --system "$SDA_GROUP"
         fi
-        if ! getent passwd "$WDA_USER" >/dev/null; then
-            adduser --system --ingroup "$WDA_GROUP" \
-                    --home "$WDA_HOME" --shell /usr/sbin/nologin \
-                    --no-create-home --gecos "Wazuh Desktop Agent" \
-                    "$WDA_USER"
+        if ! getent passwd "$SDA_USER" >/dev/null; then
+            adduser --system --ingroup "$SDA_GROUP" \
+                    --home "$SDA_HOME" --shell /usr/sbin/nologin \
+                    --no-create-home --gecos "SN360 Desktop Agent" \
+                    "$SDA_USER"
         fi
 
-        mkdir -p "$WDA_HOME" "$WDA_LOG" "$WDA_CONF" "$WDA_CONF/sca"
-        chown -R "$WDA_USER:$WDA_GROUP" "$WDA_HOME" "$WDA_LOG"
-        chmod 0750 "$WDA_HOME" "$WDA_LOG"
-        chmod 0755 "$WDA_CONF" "$WDA_CONF/sca"
+        # Legacy wazuh-desktop-agent -> sn360-desktop-agent migration runs in
+        # the preinst script, before dpkg extracts the payload and creates
+        # the new directories. See packaging/debian/preinst.
+
+        mkdir -p "$SDA_HOME" "$SDA_LOG" "$SDA_CONF" "$SDA_CONF/sca"
+        chown -R "$SDA_USER:$SDA_GROUP" "$SDA_HOME" "$SDA_LOG"
+        chmod 0750 "$SDA_HOME" "$SDA_LOG"
+        chmod 0755 "$SDA_CONF" "$SDA_CONF/sca"
         # Config is world-readable metadata; the secret lives in
         # client.keys, which is owned by the agent user only.
-        if [ -f "$WDA_CONF/config.yaml" ]; then
-            chmod 0644 "$WDA_CONF/config.yaml"
+        if [ -f "$SDA_CONF/config.yaml" ]; then
+            chmod 0644 "$SDA_CONF/config.yaml"
         fi
-        if [ -f "$WDA_CONF/client.keys" ]; then
-            chown "$WDA_USER:$WDA_GROUP" "$WDA_CONF/client.keys"
-            chmod 0600 "$WDA_CONF/client.keys"
+        if [ -f "$SDA_CONF/client.keys" ]; then
+            chown "$SDA_USER:$SDA_GROUP" "$SDA_CONF/client.keys"
+            chmod 0600 "$SDA_CONF/client.keys"
         fi
 
         if [ -d /run/systemd/system ]; then

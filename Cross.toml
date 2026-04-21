@@ -1,4 +1,4 @@
-# Cross-compilation configuration for the Wazuh Desktop Agent.
+# Cross-compilation configuration for the SN360 Desktop Agent.
 # Use with `cross` (https://github.com/cross-rs/cross) to build for
 # targets that are not natively available on the host.
 #

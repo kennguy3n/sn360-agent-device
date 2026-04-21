@@ -1,4 +1,4 @@
-//! Enhanced Software Inventory module for the Wazuh Desktop Agent.
+//! Enhanced Software Inventory module for the SN360 Desktop Agent.
 //!
 //! Extends the base inventory ([`wda-inventory`]) with:
 //!

@@ -1,6 +1,6 @@
 [package]
 name = "wda-updater"
-description = "Self-update module for the Wazuh Desktop Agent"
+description = "Self-update module for the SN360 Desktop Agent"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
