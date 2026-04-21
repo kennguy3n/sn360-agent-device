@@ -95,7 +95,7 @@ windows = { version = "0.58", features = [
 sda-core = { path = "crates/sda-core" }
 sda-pal = { path = "crates/sda-pal" }
 sda-event-bus = { path = "crates/sda-event-bus" }
-sda-comms = { path = "crates/sda-comms" }
+sda-comms = { path = "crates/sda-comms", default-features = false }
 sda-fim = { path = "crates/sda-fim" }
 sda-logcollector = { path = "crates/sda-logcollector" }
 sda-inventory = { path = "crates/sda-inventory" }

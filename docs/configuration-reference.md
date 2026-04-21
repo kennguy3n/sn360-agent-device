@@ -17,7 +17,6 @@ modules:           # optional — per-module toggles, defaults enable all
 updater:           # optional — self-update configuration
 resource_limits:   # optional — per-host budget overrides
 logging:           # optional — RUST_LOG-style filter override
-legacy_adapter:    # optional — only relevant when built with the `legacy-siem` Cargo feature
 ```
 
 ## `server`
@@ -206,32 +205,20 @@ and overrides `RUST_LOG` if both are set.
 
 ---
 
-## `legacy_adapter`
+## `legacy_adapter` *(planned — not yet implemented)*
 
-The legacy SIEM protocol adapter is **optional** and compiled in
-only when `sda-comms` is built with the `legacy-siem` Cargo
-feature. When that feature is off, this stanza is ignored with a
-warning. When it is on, use this block to pin a deployment to the
-legacy path while migrating onto the SN360 native protocol:
-
-```yaml
-legacy_adapter:
-  enabled: false                    # default: false
-  manager_address: "siem.example.com"
-  manager_port: 1514                # legacy TCP/UDP port
-  transport: "tcp"                  # "tcp" | "udp"
-  enrollment_port: 1515             # authd-compatible enrolment port
-```
-
-Switching `legacy_adapter.enabled: true` implies
-`server.enhanced.tls = false`, `server.enhanced.serialization =
-"json"`, and `server.protocol = "tcp"` for that deployment’s
-session — the adapter cannot negotiate the SN360 native protocol
-knobs. See
+A `legacy_adapter` configuration section is planned for a future
+release to allow explicit control over the legacy SIEM protocol
+adapter when the `legacy-siem` Cargo feature is enabled. The
+section has not yet been wired into [`AgentConfig`](../crates/sda-core/src/config.rs);
+no `legacy_adapter:` key is parsed today. For the current release,
+configure the legacy path through the existing `server:` and
+`enrollment:` stanzas, and build with (or without)
+`--no-default-features` on the `sda-agent` crate to toggle the
+adapter at compile time. See
 [`proprietary-licensing-rationale.md`](./proprietary-licensing-rationale.md)
 for the clean-room interoperability statement and the
-[revised phase plan](./revised-phase-plan.md) for the deprecation
-timeline.
+[revised phase plan](./revised-phase-plan.md) for the timeline.
 
 ---
 

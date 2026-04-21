@@ -20,7 +20,7 @@ cargo-fuzz = true
 
 [dependencies]
 libfuzzer-sys = "0.4"
-sda-comms = { path = "../crates/sda-comms" }
+sda-comms = { path = "../crates/sda-comms", features = ["legacy-siem"] }
 sda-local-detection = { path = "../crates/sda-local-detection" }
 sda-updater = { path = "../crates/sda-updater" }
 
