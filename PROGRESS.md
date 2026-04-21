@@ -1,4 +1,4 @@
-# SN360 Device Agent — Development Progress
+# SN360 Desktop Agent — Development Progress
 
 Tracks the implementation status of `sn360-agent-device` against the
 roadmap in
@@ -14,15 +14,16 @@ Status legend:
 
 Phases 1–3 are complete, and the agent-side Phase 4 work (Local
 Detection Engine tasks 4.1–4.6 and Enhanced Inventory tasks 4.7–4.9)
-has landed. All four proposal benchmark targets (idle RSS 5.7 MB,
-idle CPU 0.00 %, shipped binary 4.6 MB, FIM scan peak 3 %) are met.
-`cargo test --all` shows **361 passing / 0 failed**, the base E2E
-harness passes **14/14** assertions against a local Wazuh 4.9.2
-manager, and the security E2E suite passes **10/10** attack-scenario
-checks. Remaining work is the server-side TRDS / IOCFS / SIS /
-Gateway microservices (Phase 4.10–4.14, tracked in other
-repositories) and Phase 5 platform hardening (self-update,
-tamper-protection, installers).
+has landed. Phase 5 platform hardening is also complete: self-update
+(PR #49), privilege separation + tamper protection (PR #50), and
+installer / packaging (PR #48). All four proposal benchmark targets
+(idle RSS 5.7 MB, idle CPU 0.00 %, shipped binary 4.6 MB, FIM scan
+peak 3 %) are met. `cargo test --all` shows **361 passing / 0
+failed**, the base E2E harness passes **14/14** assertions against a
+local Wazuh 4.9.2 manager, and the security E2E suite passes
+**10/10** attack-scenario checks. Remaining work is the server-side
+TRDS / IOCFS / SIS / Gateway microservices (Phase 4.10–4.14, tracked
+in other repositories).
 
 ## Phase 1 — Core Plumbing (7/7)
 
@@ -187,7 +188,7 @@ is Linux-only, so macOS / Windows E2E runs are executed locally via
 See [`benchmark-results.md`](./benchmark-results.md) for methodology
 and raw numbers. Summary vs. proposal targets:
 
-| Metric | Target | Wazuh 4.9.2 | SN360 Device Agent | Status |
+| Metric | Target | Wazuh 4.9.2 | SN360 Desktop Agent (SDA) | Status |
 |---|---|---|---|---|
 | Idle RAM (single process) | < 15 MB | ~56 MB across 5 daemons | 5.7 MB | Done |
 | Idle CPU | < 0.1 % | 0.45 % (`wazuh-agentd` only) | 0.00 % | Done |
@@ -258,9 +259,20 @@ work is unstruck.
 
 ### Priority 3 — Phase 5: Platform Hardening
 
-| # | Task |
-|---|------|
-| P3.1 | Self-update mechanism (signed download, atomic replace, rollback) |
-| P3.2 | Privilege separation — run detection modules with minimal privileges |
-| P3.3 | Tamper protection — protect binary / config / keys; watchdog restart |
-| P3.4 | Installer / packaging — MSI (Windows), `.deb` / `.rpm` (Linux), `.pkg` (macOS) |
+All Priority 3 tasks have landed. Phase 5 is complete.
+
+| # | Task | Status |
+|---|------|--------|
+| P3.1 | Self-update mechanism (signed download, atomic replace, rollback) | Done (PR #49) |
+| P3.2 | Privilege separation — run detection modules with minimal privileges | Done (PR #50) |
+| P3.3 | Tamper protection — protect binary / config / keys; watchdog restart | Done (PR #50) |
+| P3.4 | Installer / packaging — MSI (Windows), `.deb` / `.rpm` (Linux), `.pkg` (macOS) | Done (PR #48) |
+
+## Phase 5 detailed status
+
+| Deliverable | Status | PR |
+|---|---|---|
+| Self-update module (signed manifest + rollback) | Done | [#49](https://github.com/kennguy3n/sn360-agent-device/pull/49) |
+| Privilege separation (drop-privileges, minimal caps per module) | Done | [#50](https://github.com/kennguy3n/sn360-agent-device/pull/50) |
+| Tamper protection (binary / config / keys integrity + watchdog) | Done | [#50](https://github.com/kennguy3n/sn360-agent-device/pull/50) |
+| Installers — `.deb`, `.rpm`, `.pkg`, `.msi`, hardened systemd unit | Done | [#48](https://github.com/kennguy3n/sn360-agent-device/pull/48) |

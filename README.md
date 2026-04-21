@@ -1,9 +1,11 @@
-# SN360 Device Agent (WDA)
+# SN360 Desktop Agent (SDA)
 
 [![License: GPL v2](https://img.shields.io/badge/License-GPLv2-blue.svg)](https://www.gnu.org/licenses/old-licenses/gpl-2.0.en.html)
 [![CI](https://github.com/kennguy3n/sn360-agent-device/actions/workflows/ci.yml/badge.svg)](https://github.com/kennguy3n/sn360-agent-device/actions/workflows/ci.yml)
 
-A lightweight, cross-platform security agent for desktop and laptop endpoints, built in Rust. The SN360 Device Agent (internally referred to as WDA — the crate prefix used throughout the workspace) is a modular rewrite of the Wazuh agent, optimized for end-user devices and targeting sub-15 MB RAM, <0.1% idle CPU, and near-invisible operation.
+A lightweight, cross-platform security agent for desktop and laptop endpoints, built in Rust. SDA is a modular rewrite of the Wazuh agent, optimized for end-user devices and targeting sub-15 MB RAM, <0.1% idle CPU, and near-invisible operation.
+
+> Crates use the `wda-` prefix (historical; the product name is SN360 Desktop Agent / SDA).
 
 See [`device-agent-proposal.md`](./device-agent-proposal.md) for the full architecture and implementation proposal.
 
@@ -132,7 +134,7 @@ make all-targets
 
 ## Configuration
 
-The SN360 Device Agent uses YAML configuration files. See the test configs for working examples:
+SN360 Desktop Agent (SDA) uses YAML configuration files. See the test configs for working examples:
 
 - [`tests/wazuh-test-config.yaml`](./tests/wazuh-test-config.yaml) — Linux
 - [`tests/wazuh-test-config-macos.yaml`](./tests/wazuh-test-config-macos.yaml) — macOS
@@ -142,7 +144,7 @@ For the full configuration reference, see the [Configuration section in `device-
 
 ## Project Status
 
-**Phases 1–3 complete. Phase 4 agent-side tasks (4.1–4.9) complete.** See [`PROGRESS.md`](./PROGRESS.md) for detailed task status, test results, and benchmarks.
+**Phases 1–3 complete. Phase 4 agent-side tasks (4.1–4.9) complete. Phase 5 platform hardening complete (self-update, privilege separation, tamper protection, installers).** See [`PROGRESS.md`](./PROGRESS.md) for detailed task status, test results, and benchmarks.
 
 ## Documentation
 
