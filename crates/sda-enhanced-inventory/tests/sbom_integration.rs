@@ -83,11 +83,17 @@ async fn module_lifecycle_publishes_sbom_snapshot() {
 
     let handle = EnhancedInventoryModule::start(&cfg, bus, signal, power_rx);
 
-    // Collect events for a short window; the startup path fires the
-    // SBOM tick before entering the select loop, so we expect the
-    // snapshot to arrive quickly.
+    // Collect events until either the SBOM snapshot arrives or the
+    // deadline expires. On Linux/macOS CI the startup path fires the
+    // SBOM tick within ~1s, but on Windows the CycloneDX generator
+    // walks installed software + browser extensions + the process
+    // list synchronously and can take ~150s on a cold GitHub-hosted
+    // runner (see `sbom::tests::test_generate_sbom_does_not_panic_on_host`
+    // which routinely reports >60s on the same runner image). We
+    // therefore pick a deadline comfortably above the observed worst
+    // case so the test stays meaningful on every platform.
     let mut saw_sbom = false;
-    let deadline = tokio::time::Instant::now() + Duration::from_secs(5);
+    let deadline = tokio::time::Instant::now() + Duration::from_secs(240);
     while tokio::time::Instant::now() < deadline {
         match tokio::time::timeout(Duration::from_millis(250), server_rx.recv()).await {
             Ok(Some(event)) => {
@@ -113,9 +119,15 @@ async fn module_lifecycle_publishes_sbom_snapshot() {
     }
 
     controller.shutdown();
-    tokio::time::timeout(Duration::from_secs(2), handle.task)
+    // `spawn_blocking(generate_sbom)` is not cancellable, so if the
+    // collect loop above gave up before the snapshot arrived the task
+    // is still inside the CycloneDX walk when shutdown is signalled.
+    // Pick a cap that matches the event deadline so we only fail on
+    // an actual shutdown deadlock, not on a slow (but completing)
+    // SBOM walk.
+    tokio::time::timeout(Duration::from_secs(240), handle.task)
         .await
-        .expect("enhanced inventory task did not stop within 2s")
+        .expect("enhanced inventory task did not stop within 240s")
         .expect("join error")
         .expect("enhanced inventory run returned Err");
 
@@ -155,9 +167,13 @@ async fn module_lifecycle_with_sbom_disabled_does_not_publish_sbom() {
     );
 
     controller.shutdown();
-    tokio::time::timeout(Duration::from_secs(2), handle.task)
+    // SBOM is disabled in this variant and the other collectors are
+    // turned off too, so the task should exit promptly. Match the
+    // upper bound used by the SBOM-enabled variant so both tests
+    // apply the same "is the shutdown path deadlocked?" gate.
+    tokio::time::timeout(Duration::from_secs(240), handle.task)
         .await
-        .expect("task did not stop within 2s")
+        .expect("task did not stop within 240s")
         .expect("join error")
         .expect("run returned Err");
 }

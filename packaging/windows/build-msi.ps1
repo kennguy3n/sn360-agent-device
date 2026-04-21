@@ -10,7 +10,12 @@
 # Output: dist\sda-agent-<version>.msi
 [CmdletBinding()]
 param(
-    [string]$Binary = "target\x86_64-pc-windows-msvc\release\sda-agent.exe",
+    # Default path matches `make release` / `cargo build --release -p sda-agent`
+    # output on a Windows host (host-triple directory), not the explicit
+    # `x86_64-pc-windows-msvc` target directory that only appears when
+    # building with `--target`. The explicit target path is still
+    # accepted — callers can pass `-Binary` if they cross-compiled.
+    [string]$Binary = "target\release\sda-agent.exe",
     [string]$OutDir = "dist"
 )
 

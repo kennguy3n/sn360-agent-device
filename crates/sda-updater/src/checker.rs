@@ -72,13 +72,21 @@ pub async fn check_for_update(
 ///
 /// Splits on `.`, parses each segment as a `u64`, and compares
 /// lexicographically. Missing trailing segments are treated as zero,
-/// so `"0.2" > "0.1.99"`. Non-numeric segments compare as 0 which
-/// gives a sensible answer for release tags like `"0.2.0-rc1"` (they
-/// evaluate equal to the final release) without pulling in a full
-/// semver parser.
+/// so `"0.2" == "0.2.0"` and `"0.2.1" > "0.2"`. Non-numeric segments
+/// compare as 0 which gives a sensible answer for release tags like
+/// `"0.2.0-rc1"` (they evaluate equal to the final release) without
+/// pulling in a full semver parser.
+///
+/// Both parsed vectors are padded with trailing zeros to the same
+/// length before comparison so that `"0.2"` and `"0.2.0"` are treated
+/// as equal rather than `"0.2.0"` being considered strictly newer
+/// just because it has an extra explicit `0` segment.
 pub(crate) fn is_newer(candidate: &str, current: &str) -> bool {
-    let a = parse_version(candidate);
-    let b = parse_version(current);
+    let mut a = parse_version(candidate);
+    let mut b = parse_version(current);
+    let len = a.len().max(b.len());
+    a.resize(len, 0);
+    b.resize(len, 0);
     a > b
 }
 
@@ -117,6 +125,20 @@ mod tests {
     fn missing_trailing_segments_default_to_zero() {
         assert!(is_newer("0.2", "0.1.99"));
         assert!(!is_newer("0.2", "0.2.0"));
+    }
+
+    /// Regression test for the trailing-zero comparison bug (A2).
+    ///
+    /// `"0.2.0"` and `"0.2"` must compare equal, and `"0.2.1"` must
+    /// be strictly newer than `"0.2"` — otherwise an operator running
+    /// the advertised `"0.2.0"` against a manifest that reports
+    /// `"0.2"` would flap into a re-download loop every tick.
+    #[test]
+    fn trailing_zero_segments_compare_equal() {
+        assert!(!is_newer("0.2.0", "0.2"));
+        assert!(!is_newer("0.2", "0.2.0"));
+        assert!(is_newer("0.2.1", "0.2"));
+        assert!(!is_newer("0.2", "0.2.1"));
     }
 
     #[test]

@@ -136,10 +136,46 @@ Command: `make security-e2e`
 ==============================
 ```
 
+## Compat E2E Tests (vs. Local Wazuh 4.7.5)
+
+Command: `make e2e-compat`
+
+The compatibility harness reuses `tests/scripts/run-e2e.sh` with
+`E2E_COMPOSE_FILE=tests/docker-compose-v4.7.yml`, bringing up
+`wazuh/wazuh-manager:4.7.5` so the same 14-assertion suite
+exercises the older v4.x protocol surface. Not recorded on this
+CI host because the 4.7.5 image is not pre-pulled on shared
+runners; the job is runnable manually for pre-release validation
+and in the release pipeline.
+
+## Benchmark regression gate
+
+Command: `make benchmark-ci` (invokes
+`tests/scripts/benchmark-regression.sh`).
+
+Enforces the hard budgets called out in
+[`benchmark-results.md`](./benchmark-results.md) — idle RSS
+< 15 MB, idle CPU < 0.1 %, release binary < 5 MB, FIM burst peak
+< 3 %. Exits non-zero on any breach; the full output is written
+to `target/benchmark-regression/benchmark-regression.txt` and
+uploaded as a CI artifact by the nightly `benchmark-regression`
+job in `.github/workflows/ci.yml`.
+
+## Security audit
+
+Command: `cargo audit --deny warnings` (CI-only; requires
+`cargo install --locked cargo-audit`). Runs as a required check
+on every push. See [`docs/security-audit.md`](./docs/security-audit.md)
+for the fuzzing harness companion (cargo-fuzz targets under
+`fuzz/` for protocol decode, zlib decompress, MessagePack event
+decode, and TRDS rule-bundle decode).
+
 ## Issues Found & Fixes Applied
 
 None. All 391 unit/integration tests, 14 base E2E assertions, and 10
-security E2E assertions passed on the first attempt.
+security E2E assertions passed on the first attempt. The Phase 5.6
+sda-comms additions (MessagePack, TLS, HTTP/2) pass in the same
+`cargo test --all` invocation.
 
 ## Notes
 

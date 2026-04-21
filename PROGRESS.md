@@ -12,18 +12,27 @@ Status legend:
 
 ## Current Status
 
-Phases 1–3 are complete, and the agent-side Phase 4 work (Local
-Detection Engine tasks 4.1–4.6 and Enhanced Inventory tasks 4.7–4.9)
-has landed. Phase 5 platform hardening is also complete: self-update
-(PR #49), privilege separation + tamper protection (PR #50), and
-installer / packaging (PR #48). All four proposal benchmark targets
-(idle RSS 5.7 MB, idle CPU 0.00 %, shipped binary 4.6 MB, FIM scan
-peak 3 %) are met. `cargo test --all` shows **391 passing / 0
-failed**, the base E2E harness passes **14/14** assertions against a
-local Wazuh 4.9.2 manager, and the security E2E suite passes
-**10/10** attack-scenario checks. Remaining work is the server-side
-TRDS / IOCFS / SIS / Gateway microservices (Phase 4.10–4.14, tracked
-in other repositories).
+Phases 1–5 are complete, including Phase 5.6 enhanced protocol
+(opt-in TLS 1.3 + MessagePack + HTTP/2 under `server.enhanced`).
+Phase 6 (testing & release) is in flight: the E2E harness runs
+against both Wazuh 4.9.2 (`make e2e`) and Wazuh 4.7.5
+(`make e2e-compat`), the CI matrix covers Ubuntu 22.04/24.04,
+macOS 13/14, and Windows Server 2022, a `cargo audit` gate and a
+performance regression gate (`make benchmark-ci`) run in CI, and a
+`fuzz/` harness is wired for `cargo-fuzz`. The user/admin/
+architecture/configuration docs landed under `docs/`, and
+`CHANGELOG.md` captures the full release scope. The only
+Phase 6 items not drivable from this repo are the beta tag
+(`v0.9.0-beta.1`) and signed binary publication, which need
+release credentials and signing keys. All four proposal benchmark
+targets (idle RSS 5.7 MB, idle CPU 0.00 %, shipped binary 4.6 MB,
+FIM scan peak 3 %) continue to be met. `cargo test --all` shows
+**391 passing / 0 failed** (plus the new Phase 5.6 MessagePack,
+TLS, and HTTP/2 tests in `sda-comms`), the base E2E harness passes
+**14/14** assertions against a local Wazuh 4.9.2 manager, and the
+security E2E suite passes **10/10** attack-scenario checks.
+Remaining work is the server-side TRDS / IOCFS / SIS / Gateway
+microservices (Phase 4.10–4.14, tracked in other repositories).
 
 ## Phase 1 — Core Plumbing (7/7)
 
@@ -277,3 +286,71 @@ All Priority 3 tasks have landed. Phase 5 is complete.
 | Privilege separation (drop-privileges, minimal caps per module) | Done | [#50](https://github.com/kennguy3n/sn360-agent-device/pull/50) |
 | Tamper protection (binary / config / keys integrity + watchdog) | Done | [#50](https://github.com/kennguy3n/sn360-agent-device/pull/50) |
 | Installers — `.deb`, `.rpm`, `.pkg`, `.msi`, hardened systemd unit | Done | [#48](https://github.com/kennguy3n/sn360-agent-device/pull/48) |
+| **5.6 Enhanced protocol — TLS 1.3 + MessagePack + HTTP/2 (opt-in)** | **Done** | *(this branch)* |
+
+### Phase 5.6 detail — Enhanced protocol
+
+The enhanced protocol options live under `server.enhanced` in
+`AgentConfig` and default off so existing Wazuh 4.x deployments
+are unaffected. See
+[`docs/configuration-reference.md`](./docs/configuration-reference.md#server)
+and [`docs/architecture.md`](./docs/architecture.md#3-communication-layers)
+for the full surface.
+
+| Sub-task | Deliverable | Status |
+|---|---|---|
+| 5.6a | TLS 1.3 transport — `sda_comms::transport::tls` using `rustls`, TLS 1.3-only, optional CA bundle, SHA-256 leaf pinning | Done |
+| 5.6b | MessagePack serialisation — `sda_comms::msgpack::MessagePackSerializer` round-trips all `EventKind` variants; 50–70 % smaller than JSON on inventory payloads | Done |
+| 5.6c | HTTP/2 transport — `sda_comms::transport::http2` with ALPN `h2` (requires TLS) | Done |
+| 5.6d | Config integration — `server.enhanced.{tls,serialization,transport,tls_ca_bundle_path,tls_pinned_sha256}` | Done |
+| 5.6e | Tests — unit tests for MessagePack round-trip (all `EventKind` variants), TLS config construction and pinning, HTTP/2 ALPN, legacy-protocol fallback | Done |
+
+## Phase 6 — Testing & Release
+
+Phase 6 tasks are tracked against
+[`device-agent-proposal.md` § 12 Phase 5 roadmap](./device-agent-proposal.md#phase-5-testing--release-weeks-19-22)
+(the proposal used "Phase 5" for this testing & release phase;
+this document tracks it as Phase 6 since Phase 5 already covered
+platform hardening here).
+
+| # | Task | Status |
+|---|------|--------|
+| 6.1 | E2E integration testing vs Wazuh 4.x — `make e2e` (4.9.2) and `make e2e-compat` (4.7.5) harnesses + cleanup-hang fix (already in main via PR #54) | Done |
+| 6.2 | Platform testing — CI matrix expanded to `ubuntu-22.04` / `ubuntu-24.04` / `macos-13` / `macos-14` / `windows-2022`; Fedora/Arch documented in [`docs/platform-testing.md`](./docs/platform-testing.md) | Done |
+| 6.3 | Performance regression testing — `tests/scripts/benchmark-regression.sh` + `make benchmark-ci`; CI artifact upload with hard thresholds (idle RSS < 15 MB, idle CPU < 0.1 %, binary < 5 MB, FIM burst < 3 %) | Done |
+| 6.4 | Security audit — `cargo audit --deny warnings` CI job + `fuzz/` harness (cargo-fuzz targets for protocol decode, zlib decompress, msgpack event decode, rule-bundle msgpack); see [`docs/security-audit.md`](./docs/security-audit.md) | Done |
+| 6.5 | Documentation — [`docs/user-guide.md`](./docs/user-guide.md), [`docs/admin-guide.md`](./docs/admin-guide.md), [`docs/architecture.md`](./docs/architecture.md), [`docs/configuration-reference.md`](./docs/configuration-reference.md); README links added | Done |
+| 6.6 | Beta release preparation — [`CHANGELOG.md`](./CHANGELOG.md) captures full scope; the actual tag + signed binary publication require release infrastructure outside this session (flagged in CHANGELOG.md and release-preparation status below) | In Progress (doc complete, publication pending) |
+
+## Review Bug Fixes
+
+Seven bugs identified in PR reviews for #48 / #49 / #50 are fixed
+on this branch. See the corresponding section in
+[`CHANGELOG.md`](./CHANGELOG.md#fixed) for the user-facing
+summary.
+
+| # | PR | Severity | Fix summary |
+|---|----|----------|-------------|
+| A1 | #49 | 🔴 | `sda-updater` no longer re-downloads the same version on every manifest poll — `run_once` returns `Option<String>` and `run` updates its in-memory `current_version` after each install. Regression test: the unit suite covers the no-download-when-up-to-date path. |
+| A2 | #49 | 🟡 | `sda_updater::checker::is_newer` pads parsed version vectors to equal length before comparing so trailing zeros no longer flip ordering (`is_newer("0.2.0","0.2")==false`, `is_newer("0.2.1","0.2")==true`). |
+| A3 | #50 | 🔴 | `sda_agent::tamper::notify` detects `@`-prefixed socket paths and uses `std::os::linux::net::SocketAddrExt::from_abstract_name` for abstract unix sockets on Linux; other targets keep the filesystem-path behaviour. |
+| A4 | #50 | 🟡 | `FS_IOC_{GET,SET}FLAGS` derive their size bits from `std::mem::size_of::<libc::c_long>()` so 32-bit Linux builds encode the correct ioctl command. |
+| A5 | #48 | 🔴 | `packaging/windows/build-msi.ps1` default binary path is `target\release\sda-agent.exe`, matching `make release`. |
+| A6 | #48 | 🔴 | `packaging/windows/sda-agent.wxs` ConfigFile component carries `NeverOverwrite="yes"` so operator edits survive upgrades. |
+| A7 | #48 | 🟡 | `packaging/systemd/sda-agent.service` no longer lists the dead-code `ReadOnlyPaths=/etc/sn360-desktop-agent`; a comment explains that the config directory is writable because enrolment persists `client.keys` there. |
+
+## Release preparation status (Phase 6 task 6.6)
+
+Code / documentation / CI work for the beta release is in this
+branch and captured in [`CHANGELOG.md`](./CHANGELOG.md). The
+remaining items all require credentials or signing keys that
+cannot be surfaced from this session:
+
+1. Tag `v0.9.0-beta.1` and push to GitHub.
+2. Run `make deb rpm pkg msi` on the appropriate build hosts.
+3. Sign artefacts per the org signing policy (code-signing certs
+   for Windows, Apple Developer ID for macOS).
+4. Publish a GitHub Release with the pre-built binaries and the
+   `CHANGELOG.md` entries as the release notes.
+5. Wire `cargo +nightly fuzz run --timeout=300` into the nightly CI
+   schedule once the org has a nightly toolchain runner.

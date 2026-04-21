@@ -109,13 +109,77 @@ pub struct ServerConfig {
     #[serde(default = "default_server_port")]
     pub port: u16,
 
-    /// Transport protocol (tcp or udp).
+    /// Transport protocol. Legacy values `"tcp"` and `"udp"` speak the
+    /// Wazuh-compatible AES/Blowfish-over-TCP/UDP protocol. `"http2"`
+    /// speaks the enhanced HTTP/2 protocol (Phase 5.6 / § 8.2 in the
+    /// proposal) and only works against SDA-aware servers. Defaults to
+    /// `"tcp"` for backward compatibility.
     #[serde(default = "default_protocol")]
     pub protocol: String,
 
     /// Keepalive interval in seconds.
     #[serde(default = "default_keepalive")]
     pub keepalive_interval: u64,
+
+    /// Enhanced-protocol toggles (Phase 5.6). All fields are off by
+    /// default so an unmodified config keeps speaking the legacy
+    /// Wazuh protocol.
+    #[serde(default)]
+    pub enhanced: EnhancedProtocolConfig,
+}
+
+/// Enhanced-protocol options (Phase 5.6).
+///
+/// These knobs enable opt-in TLS 1.3, MessagePack event serialization,
+/// and HTTP/2 transport. None of them are on by default — Wazuh 4.x
+/// servers don't understand any of them, so turning them on requires
+/// an SDA-aware server endpoint.
+///
+/// The actual transport / serializer implementations live in
+/// `sda-comms` (see `transport::tls`, `transport::http2`) and
+/// `sda-comms::msgpack` respectively.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct EnhancedProtocolConfig {
+    /// Wrap the legacy TCP transport in TLS 1.3 (via `rustls`). Has
+    /// no effect when `protocol == "udp"` (TLS requires a stream
+    /// transport) or when `protocol == "http2"` (HTTP/2 already
+    /// negotiates TLS via ALPN).
+    #[serde(default)]
+    pub tls: bool,
+
+    /// Event serialization format. `"json"` (the default) preserves
+    /// Wazuh compatibility; `"msgpack"` produces significantly
+    /// smaller frames and is only understood by SDA-aware servers.
+    #[serde(default = "default_enhanced_serialization")]
+    pub serialization: String,
+
+    /// Expected SHA-256 fingerprint of the server's leaf certificate
+    /// (lowercase hex, no colons). When set, the TLS client performs
+    /// certificate pinning in addition to the standard chain
+    /// validation. Leave empty to disable pinning.
+    #[serde(default)]
+    pub tls_pinned_sha256: Option<String>,
+
+    /// Path to a PEM-encoded bundle of trust anchors used when
+    /// `tls == true`. When `None`, the Mozilla `webpki-roots`
+    /// bundle compiled into the agent binary is used (this is a
+    /// static copy of the public-web CA list, NOT the host OS
+    /// trust store). Operators running against a private CA MUST
+    /// set this path — custom CAs added to the host trust store
+    /// alone are NOT picked up.
+    #[serde(default)]
+    pub tls_ca_bundle_path: Option<PathBuf>,
+}
+
+impl Default for EnhancedProtocolConfig {
+    fn default() -> Self {
+        Self {
+            tls: false,
+            serialization: default_enhanced_serialization(),
+            tls_pinned_sha256: None,
+            tls_ca_bundle_path: None,
+        }
+    }
 }
 
 /// Enrollment configuration.
@@ -584,6 +648,9 @@ fn default_server_port() -> u16 {
 fn default_protocol() -> String {
     "tcp".to_string()
 }
+fn default_enhanced_serialization() -> String {
+    "json".to_string()
+}
 fn default_keepalive() -> u64 {
     600
 }
@@ -805,6 +872,7 @@ impl Default for ServerConfig {
             port: default_server_port(),
             protocol: default_protocol(),
             keepalive_interval: default_keepalive(),
+            enhanced: EnhancedProtocolConfig::default(),
         }
     }
 }

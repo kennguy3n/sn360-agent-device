@@ -9,4 +9,6 @@ pub mod connection;
 pub mod crypto;
 pub mod enrollment;
 pub mod keepalive;
+pub mod msgpack;
 pub mod protocol;
+pub mod transport;
