@@ -15,6 +15,10 @@ members = [
     "crates/sda-enhanced-inventory",
     "crates/sda-updater",
 ]
+# fuzz/ has its own [workspace] stanza and is not part of the main
+# build. Keeping it excluded avoids pulling libfuzzer-sys (and the
+# nightly toolchain it requires) into stable CI builds.
+exclude = ["fuzz"]
 resolver = "2"
 
 [workspace.package]
@@ -32,6 +36,8 @@ tokio = { version = "1", features = ["rt", "io-util", "net", "time", "process", 
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 serde_yaml = "0.9"
+# MessagePack event serialization (opt-in via config.server.enhanced.serialization, Phase 5.6).
+rmp-serde = "1"
 
 # Crypto
 ring = "0.17"
@@ -44,6 +50,8 @@ cbc = "0.1"
 # workspace dependency used elsewhere in the project.
 rustls = { version = "0.23", default-features = false, features = ["ring", "logging", "std", "tls12"] }
 tokio-rustls = { version = "0.26", default-features = false, features = ["ring", "logging", "tls12"] }
+rustls-pemfile = "2"
+webpki-roots = "0.26"
 
 # Logging
 tracing = "0.1"

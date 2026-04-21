@@ -11,6 +11,7 @@ sda-event-bus = { workspace = true }
 tokio = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
+rmp-serde = { workspace = true }
 tracing = { workspace = true }
 thiserror = { workspace = true }
 anyhow = { workspace = true }
@@ -19,6 +20,8 @@ aes = { workspace = true }
 cbc = { workspace = true }
 rustls = { workspace = true }
 tokio-rustls = { workspace = true }
+rustls-pemfile = { workspace = true }
+webpki-roots = { workspace = true }
 bytes = { workspace = true }
 flate2 = { workspace = true }
 chrono = { workspace = true }
@@ -28,3 +31,4 @@ socket2 = { workspace = true }
 
 [dev-dependencies]
 tokio = { workspace = true, features = ["test-util"] }
+tempfile = { workspace = true }

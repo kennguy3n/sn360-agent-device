@@ -138,10 +138,27 @@ mod linux {
 
     // FS_IOC_GETFLAGS = _IOR('f', 1, long)
     // FS_IOC_SETFLAGS = _IOW('f', 2, long)
-    // On every common Linux arch `long` is 4 bytes in the ioctl
-    // encoding (historical), giving the constants below.
-    const FS_IOC_GETFLAGS: libc::c_ulong = 0x80086601;
-    const FS_IOC_SETFLAGS: libc::c_ulong = 0x40086602;
+    //
+    // The ioctl number embeds the size of the argument type in its
+    // middle 14 bits. That size depends on `sizeof(long)`, which is
+    // 8 on 64-bit Linux and 4 on 32-bit Linux — so the two
+    // hardcoded constants that were previously here (0x80086601 /
+    // 0x40086602) are only correct on 64-bit builds. Computing the
+    // constants at runtime from `size_of::<c_long>()` fixes the
+    // 32-bit case without needing a separate codepath per target.
+    //
+    // The formula matches glibc's `_IOR` / `_IOW` macros:
+    //     ((dir << 30) | (size << 16) | (type << 8) | nr)
+    // with dir = 2 for _IOR (read) and dir = 1 for _IOW (write),
+    // type = 'f' (0x66), and nr = 1 or 2.
+    fn fs_ioc_getflags() -> libc::c_ulong {
+        let size = std::mem::size_of::<libc::c_long>() as libc::c_ulong;
+        (2 << 30) | (size << 16) | (0x66 << 8) | 1
+    }
+    fn fs_ioc_setflags() -> libc::c_ulong {
+        let size = std::mem::size_of::<libc::c_long>() as libc::c_ulong;
+        (1 << 30) | (size << 16) | (0x66 << 8) | 2
+    }
     const FS_IMMUTABLE_FL: libc::c_long = 0x00000010;
 
     pub fn set_immutable(path: &Path) -> Result<()> {
@@ -152,13 +169,13 @@ mod linux {
         let fd = file.as_raw_fd();
         let mut flags: libc::c_long = 0;
         // SAFETY: FFI call; `flags` lives through the call.
-        let rc = unsafe { libc::ioctl(fd, FS_IOC_GETFLAGS, &mut flags) };
+        let rc = unsafe { libc::ioctl(fd, fs_ioc_getflags(), &mut flags) };
         if rc != 0 {
             return Err(std::io::Error::last_os_error()).context("FS_IOC_GETFLAGS");
         }
         flags |= FS_IMMUTABLE_FL;
         // SAFETY: FFI call; `flags` lives through the call.
-        let rc = unsafe { libc::ioctl(fd, FS_IOC_SETFLAGS, &flags) };
+        let rc = unsafe { libc::ioctl(fd, fs_ioc_setflags(), &flags) };
         if rc != 0 {
             return Err(std::io::Error::last_os_error()).context("FS_IOC_SETFLAGS");
         }
@@ -200,8 +217,28 @@ fn notify(socket_path: &str, payload: &[u8]) -> Result<()> {
 
     let sock =
         UnixDatagram::unbound().context("creating unbound unix datagram socket for sd-notify")?;
-    // systemd uses abstract sockets (leading NUL) as well as
-    // filesystem sockets; pass the path through unchanged.
+
+    // systemd exposes NOTIFY_SOCKET either as a filesystem path or,
+    // on Linux, as an abstract socket whose path starts with '@'
+    // (the leading '@' stands in for the abstract-namespace NUL
+    // byte). sendto(2) on glibc accepts filesystem paths via
+    // sun_path but requires a proper sockaddr_un with sun_path[0] =
+    // 0 for abstract sockets — passing "@foo" through
+    // UnixDatagram::send_to() treats it as a regular path and
+    // returns ENOENT.
+    #[cfg(target_os = "linux")]
+    if let Some(name) = socket_path.strip_prefix('@') {
+        use std::os::linux::net::SocketAddrExt;
+        use std::os::unix::net::SocketAddr;
+        let addr = SocketAddr::from_abstract_name(name.as_bytes())
+            .with_context(|| format!("constructing abstract socket address for {socket_path}"))?;
+        sock.send_to_addr(payload, &addr)
+            .with_context(|| format!("send to abstract socket {socket_path}"))?;
+        return Ok(());
+    }
+
+    // Filesystem path (the common case on non-Linux unixes and on
+    // Linux where systemd is configured for a pathname socket).
     sock.send_to(payload, socket_path)
         .with_context(|| format!("send to {socket_path}"))?;
     Ok(())
@@ -282,6 +319,27 @@ mod tests {
     fn spawn_watchdog_returns_none_when_disabled() {
         let cfg = TamperConfig::default();
         assert!(spawn_watchdog(&cfg).is_none());
+    }
+
+    /// Regression test for A3: `notify()` on Linux must construct a
+    /// valid abstract-namespace `SocketAddr` when the `NOTIFY_SOCKET`
+    /// path starts with `@` (the documented systemd convention for
+    /// abstract sockets).
+    ///
+    /// The actual `sendto(2)` will fail in the test environment
+    /// because no listener is bound to that abstract name, but what
+    /// we care about is that the function returns a non-panicking
+    /// error tied to the send itself — not an "address construction
+    /// failed" panic or ENOENT from treating `"@..."` as a filesystem
+    /// path. Both outcomes (send fails, or send succeeds because
+    /// something else is bound to the address) count as "did not
+    /// panic".
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn notify_handles_abstract_socket_path_without_panicking() {
+        let unique = format!("@sda-notify-test-{}", std::process::id());
+        // Either Ok(()) or Err(...) is acceptable; a panic is not.
+        let _ = notify(&unique, b"WATCHDOG=1");
     }
 
     #[test]

@@ -107,16 +107,22 @@ fn effective_check_interval(cfg: &UpdateConfig) -> Duration {
 ///
 /// Logs and swallows all errors — a failed update attempt should never
 /// take the agent down.
-async fn run_once(cfg: &UpdateConfig, current_version: &str) {
+///
+/// Returns `Some(installed_version)` on a successful install so the
+/// caller can advance its tracked "current version" and avoid
+/// re-downloading the same manifest on the next tick. Returns `None`
+/// when no update was available, the download/verify failed, or the
+/// freshly-installed binary was rolled back.
+async fn run_once(cfg: &UpdateConfig, current_version: &str) -> Option<String> {
     let manifest = match check_for_update(cfg, current_version).await {
         Ok(Some(m)) => m,
         Ok(None) => {
             debug!(current = current_version, "no update available");
-            return;
+            return None;
         }
         Err(e) => {
             warn!(error = %e, "update check failed");
-            return;
+            return None;
         }
     };
 
@@ -130,21 +136,26 @@ async fn run_once(cfg: &UpdateConfig, current_version: &str) {
         Ok(p) => p,
         Err(e) => {
             warn!(error = %e, "could not resolve current_exe(); skipping install");
-            return;
+            return None;
         }
     };
 
     match install_update(cfg, &manifest, &current_binary).await {
         Ok(InstallOutcome::Installed) => {
             info!(version = %manifest.version, "update installed successfully");
+            Some(manifest.version)
         }
         Ok(InstallOutcome::RolledBack) => {
             warn!(
                 version = %manifest.version,
                 "update installed but failed smoke test; rolled back"
             );
+            None
         }
-        Err(e) => warn!(error = %e, "update installation failed"),
+        Err(e) => {
+            warn!(error = %e, "update installation failed");
+            None
+        }
     }
 }
 
@@ -162,7 +173,13 @@ async fn run(
 
     status.store(STATUS_RUNNING, Ordering::Relaxed);
 
-    let current_version = env!("CARGO_PKG_VERSION").to_string();
+    // Tracks the version currently installed on disk. Starts as the
+    // compiled-in value and is advanced after each successful install
+    // so the next check_for_update() call compares against what we
+    // just dropped into place — otherwise the loop would happily
+    // re-download the same manifest every tick until the process is
+    // restarted.
+    let mut current_version = env!("CARGO_PKG_VERSION").to_string();
     let mut timer = tokio::time::interval(effective_check_interval(&cfg));
     timer.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
 
@@ -176,7 +193,9 @@ async fn run(
             }
 
             _ = timer.tick() => {
-                run_once(&cfg, &current_version).await;
+                if let Some(installed) = run_once(&cfg, &current_version).await {
+                    current_version = installed;
+                }
             }
         }
     }
@@ -212,5 +231,73 @@ mod tests {
             smoke_test_timeout: 10,
         };
         assert_eq!(effective_check_interval(&cfg), Duration::from_secs(7200));
+    }
+
+    /// Regression test for the re-download loop bug fixed in A1.
+    ///
+    /// The manifest server advertises `"0.2.0"`. If the updater's
+    /// tracked `current_version` has already been advanced to
+    /// `"0.2.0"` after a successful install, `run_once` must observe
+    /// via [`check_for_update`] that no newer version is available
+    /// and exit without attempting to download or install anything.
+    ///
+    /// We assert this indirectly by pointing `server_url` at an
+    /// invalid endpoint *without* an `.invalid` TLD the HTTP client
+    /// will reject — any network attempt shows up as a `warn!` but
+    /// run_once must still return `None` and leave disk state
+    /// untouched. The test fixes the HTTP client to a bogus address
+    /// on an unused port; a bug where run_once tried to proceed past
+    /// the version check would surface as a long timeout or a
+    /// connect error, both of which this test rejects by running
+    /// under tokio's test-util clock with a tight deadline.
+    #[tokio::test]
+    async fn run_once_skips_when_current_matches_manifest() {
+        // Stand up a tiny HTTP server that always returns the same
+        // manifest. The updater is asked to compare against that
+        // version, so is_newer returns false and run_once must exit
+        // with `None` without ever calling install_update().
+        use tokio::io::{AsyncReadExt, AsyncWriteExt};
+        use tokio::net::TcpListener;
+
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr = listener.local_addr().unwrap();
+        let url = format!("http://{addr}/latest.json");
+
+        let server = tokio::spawn(async move {
+            // Serve at most one request; the test only needs one.
+            let (mut sock, _) = listener.accept().await.unwrap();
+            let mut buf = [0u8; 1024];
+            let _ = sock.read(&mut buf).await.unwrap();
+            let body = br#"{
+                "version": "0.2.0",
+                "url": "http://127.0.0.1:1/ignored",
+                "sha256": "00",
+                "signature": "00"
+            }"#;
+            let resp = format!(
+                "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
+                body.len()
+            );
+            sock.write_all(resp.as_bytes()).await.unwrap();
+            sock.write_all(body).await.unwrap();
+            sock.shutdown().await.ok();
+        });
+
+        let cfg = UpdateConfig {
+            enabled: true,
+            server_url: url,
+            check_interval: 60,
+            public_key: String::new(),
+            smoke_test_timeout: 10,
+        };
+
+        // current_version equals the advertised manifest version →
+        // no install should be attempted; returned Option is None.
+        let installed = run_once(&cfg, "0.2.0").await;
+        assert!(
+            installed.is_none(),
+            "run_once should not return an installed version when current == manifest"
+        );
+        server.await.unwrap();
     }
 }

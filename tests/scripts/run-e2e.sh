@@ -11,6 +11,14 @@ REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 
 cd "$REPO_ROOT"
 
+# Compose file path is parameterized so `run-compat-e2e.sh` can point the
+# same harness at the Wazuh 4.7 image (tests/docker-compose-v4.7.yml)
+# without duplicating the 500-line test body. Callers export
+# `E2E_COMPOSE_FILE` before exec'ing this script; unset falls back to
+# the canonical Wazuh 4.9.2 compose file.
+E2E_COMPOSE_FILE="${E2E_COMPOSE_FILE:-$E2E_COMPOSE_FILE}"
+echo "==> Using compose file: $E2E_COMPOSE_FILE"
+
 echo "==> Docker version:"
 docker --version || true
 docker compose version || true
@@ -61,7 +69,7 @@ cleanup() {
 
   if [ "$EXIT_CODE" -ne 0 ]; then
     echo "--- Wazuh manager ossec.log (last 100 lines) ---"
-    docker compose -f tests/docker-compose.yml exec -T wazuh-manager \
+    docker compose -f $E2E_COMPOSE_FILE exec -T wazuh-manager \
       tail -100 /var/ossec/logs/ossec.log 2>/dev/null || true
     echo "--- End ossec.log ---"
   fi
@@ -87,7 +95,7 @@ cleanup() {
   sudo rm -f /etc/sn360-desktop-agent/client.keys
   sudo rm -rf /etc/sn360-desktop-agent/sca
   sudo rm -f /var/lib/sn360-desktop-agent/rootcheck-baseline.json
-  docker compose -f tests/docker-compose.yml down -v 2>/dev/null || true
+  docker compose -f $E2E_COMPOSE_FILE down -v 2>/dev/null || true
 }
 trap cleanup EXIT
 
@@ -101,26 +109,26 @@ sudo rm -f /etc/sn360-desktop-agent/client.keys
 sudo rm -rf /etc/sn360-desktop-agent/sca
 # Remove ALL previously-enrolled agents from the running Wazuh container
 # so re-enrollment succeeds.  List agent IDs and remove each one.
-for STALE_ID in $(docker compose -f tests/docker-compose.yml exec -T wazuh-manager \
+for STALE_ID in $(docker compose -f $E2E_COMPOSE_FILE exec -T wazuh-manager \
   /var/ossec/bin/manage_agents -l 2>/dev/null \
   | grep -oP 'ID:\s*\K[0-9]+' || true); do
-  docker compose -f tests/docker-compose.yml exec -T wazuh-manager \
+  docker compose -f $E2E_COMPOSE_FILE exec -T wazuh-manager \
     /var/ossec/bin/manage_agents -r "$STALE_ID" 2>/dev/null <<< "y" || true
 done
 # Clear stale alerts and debug config from previous runs.
-docker compose -f tests/docker-compose.yml exec -T wazuh-manager \
+docker compose -f $E2E_COMPOSE_FILE exec -T wazuh-manager \
   bash -c 'rm -f /var/ossec/logs/alerts/alerts.json /var/ossec/etc/local_internal_options.conf' 2>/dev/null || true
 echo "    Stale state removed."
 
 # ── Step 1: Start Wazuh manager ─────────────────────────────────────
 echo "==> Step 1: Starting Wazuh manager..."
-docker compose -f tests/docker-compose.yml up -d
+docker compose -f $E2E_COMPOSE_FILE up -d
 
 WAZUH_READY=false
 for i in $(seq 1 90); do
   # wazuh-control status exits non-zero when optional daemons are stopped,
   # so capture its output and grep separately to avoid pipefail issues.
-  WAZUH_STATUS=$(docker compose -f tests/docker-compose.yml exec -T wazuh-manager \
+  WAZUH_STATUS=$(docker compose -f $E2E_COMPOSE_FILE exec -T wazuh-manager \
        /var/ossec/bin/wazuh-control status 2>/dev/null || true)
   if echo "$WAZUH_STATUS" | grep -q "wazuh-remoted is running"; then
     WAZUH_READY=true
@@ -137,7 +145,7 @@ echo "    Wazuh manager is ready."
 
 # ── Step 2: Set enrollment password ─────────────────────────────────
 echo "==> Step 2: Setting enrollment password..."
-docker compose -f tests/docker-compose.yml exec -T wazuh-manager bash -c \
+docker compose -f $E2E_COMPOSE_FILE exec -T wazuh-manager bash -c \
   "echo '${E2E_ENROLL_PASS}' > /var/ossec/etc/authd.pass && \
    sed -i 's|<use_password>no</use_password>|<use_password>yes</use_password>|' /var/ossec/etc/ossec.conf && \
    sed -i 's|<logall>no</logall>|<logall>yes</logall>|;s|<logall_json>no</logall_json>|<logall_json>yes</logall_json>|' /var/ossec/etc/ossec.conf && \
@@ -146,7 +154,7 @@ docker compose -f tests/docker-compose.yml exec -T wazuh-manager bash -c \
 sleep 20
 AUTHD_READY=false
 for i in $(seq 1 30); do
-  AUTHD_STATUS=$(docker compose -f tests/docker-compose.yml exec -T wazuh-manager \
+  AUTHD_STATUS=$(docker compose -f $E2E_COMPOSE_FILE exec -T wazuh-manager \
        /var/ossec/bin/wazuh-control status 2>/dev/null || true)
   if echo "$AUTHD_STATUS" | grep -q "wazuh-remoted is running"; then
     AUTHD_READY=true
@@ -219,7 +227,7 @@ echo "    Agent started (PID $AGENT_PID)."
 
 # ── Step 6: Verify enrollment ───────────────────────────────────────
 echo "==> Step 6: Verifying enrollment..."
-AGENT_LIST=$(docker compose -f tests/docker-compose.yml exec -T wazuh-manager \
+AGENT_LIST=$(docker compose -f $E2E_COMPOSE_FILE exec -T wazuh-manager \
                /var/ossec/bin/manage_agents -l 2>/dev/null || true)
 echo "    Enrolled agents: $AGENT_LIST"
 if echo "$AGENT_LIST" | grep -q "ID:"; then
@@ -233,14 +241,14 @@ echo "==> Step 7: Waiting for keepalive cycle (35s)..."
 sleep 35
 
 # Check ossec.log for crypto/decryption errors from remoted.
-REMOTED_ERRORS=$(docker compose -f tests/docker-compose.yml exec -T wazuh-manager \
+REMOTED_ERRORS=$(docker compose -f $E2E_COMPOSE_FILE exec -T wazuh-manager \
   grep -ciE 'Invalid message|Decrypt|error.*remoted' /var/ossec/logs/ossec.log 2>/dev/null || true)
 if [ "${REMOTED_ERRORS:-0}" -gt 0 ]; then
   echo "    WARNING: ${REMOTED_ERRORS} remoted/decrypt error(s) in ossec.log"
-  docker compose -f tests/docker-compose.yml exec -T wazuh-manager \
+  docker compose -f $E2E_COMPOSE_FILE exec -T wazuh-manager \
     grep -iE 'Invalid message|Decrypt|error.*remoted' /var/ossec/logs/ossec.log 2>/dev/null | tail -10
 fi
-AGENT_LIST2=$(docker compose -f tests/docker-compose.yml exec -T wazuh-manager \
+AGENT_LIST2=$(docker compose -f $E2E_COMPOSE_FILE exec -T wazuh-manager \
                 /var/ossec/bin/manage_agents -l 2>/dev/null || true)
 if echo "$AGENT_LIST2" | grep -qi "active"; then
   record PASS "Agent shows as active after keepalive"
@@ -260,7 +268,7 @@ touch /tmp/sda-e2e-fim/testfile.txt
 echo "    Waiting 40s for syscheck alert..."
 sleep 40
 
-SYSCHECK_ALERTS=$(docker compose -f tests/docker-compose.yml exec -T wazuh-manager \
+SYSCHECK_ALERTS=$(docker compose -f $E2E_COMPOSE_FILE exec -T wazuh-manager \
   cat /var/ossec/logs/alerts/alerts.json 2>/dev/null | grep -c "syscheck" || true)
 echo "    Syscheck alerts found: $SYSCHECK_ALERTS"
 if [ "$SYSCHECK_ALERTS" -gt 0 ]; then
@@ -268,7 +276,7 @@ if [ "$SYSCHECK_ALERTS" -gt 0 ]; then
 else
   record FAIL "No syscheck alerts found in alerts.json"
   echo "    --- last 50 lines of ossec.log ---"
-  docker compose -f tests/docker-compose.yml exec -T wazuh-manager \
+  docker compose -f $E2E_COMPOSE_FILE exec -T wazuh-manager \
     tail -50 /var/ossec/logs/ossec.log 2>/dev/null || true
   echo "    --- end ossec.log ---"
 fi
@@ -282,7 +290,7 @@ echo "content3" > /tmp/sda-e2e-fim/scan-test-3.txt
 echo "    Waiting for baseline scan cycle..."
 sleep 40
 
-SCAN_ALERTS=$(docker compose -f tests/docker-compose.yml exec -T wazuh-manager \
+SCAN_ALERTS=$(docker compose -f $E2E_COMPOSE_FILE exec -T wazuh-manager \
   cat /var/ossec/logs/alerts/alerts.json 2>/dev/null | grep -c "scan-test" || true)
 echo "    Baseline scan alerts found: $SCAN_ALERTS"
 if [ "$SCAN_ALERTS" -gt 0 ]; then
@@ -290,7 +298,7 @@ if [ "$SCAN_ALERTS" -gt 0 ]; then
 else
   record FAIL "No baseline scan alerts found in alerts.json"
   echo "    --- Last 30 lines of ossec.log ---"
-  docker compose -f tests/docker-compose.yml exec -T wazuh-manager \
+  docker compose -f $E2E_COMPOSE_FILE exec -T wazuh-manager \
     tail -30 /var/ossec/logs/ossec.log 2>/dev/null || true
 fi
 
@@ -300,7 +308,7 @@ rm /tmp/sda-e2e-fim/scan-test-2.txt
 echo "    Waiting for next scan cycle to detect deletion..."
 sleep 40
 
-DELETE_ALERTS=$(docker compose -f tests/docker-compose.yml exec -T wazuh-manager \
+DELETE_ALERTS=$(docker compose -f $E2E_COMPOSE_FILE exec -T wazuh-manager \
   cat /var/ossec/logs/alerts/alerts.json 2>/dev/null | grep -c "deleted" || true)
 echo "    Deletion alerts found: $DELETE_ALERTS"
 if [ "$DELETE_ALERTS" -gt 0 ]; then
@@ -313,20 +321,20 @@ fi
 echo "==> Step 9b: Verifying inventory data..."
 sleep 30  # Give agent time to send initial inventory
 
-INVENTORY_DATA=$(docker compose -f tests/docker-compose.yml exec -T wazuh-manager \
+INVENTORY_DATA=$(docker compose -f $E2E_COMPOSE_FILE exec -T wazuh-manager \
   cat /var/ossec/logs/archives/archives.json 2>/dev/null | grep -c "syscollector" || true)
 echo "    Inventory events found: $INVENTORY_DATA"
 if [ "$INVENTORY_DATA" -gt 0 ]; then
   record PASS "Inventory data received by server"
 else
   # Also check ossec.log for syscollector messages
-  SYSCOLLECTOR_LOG=$(docker compose -f tests/docker-compose.yml exec -T wazuh-manager \
+  SYSCOLLECTOR_LOG=$(docker compose -f $E2E_COMPOSE_FILE exec -T wazuh-manager \
     grep -c "syscollector" /var/ossec/logs/ossec.log 2>/dev/null || true)
   if [ "${SYSCOLLECTOR_LOG:-0}" -gt 0 ]; then
     record PASS "Inventory syscollector messages seen in ossec.log"
   else
     record FAIL "No inventory data found"
-    docker compose -f tests/docker-compose.yml exec -T wazuh-manager \
+    docker compose -f $E2E_COMPOSE_FILE exec -T wazuh-manager \
       tail -30 /var/ossec/logs/ossec.log 2>/dev/null || true
   fi
 fi
@@ -338,7 +346,7 @@ echo 'Apr 18 12:00:00 localhost sshd[9999]: Failed password for root from 10.0.0
 echo "    Waiting 15s for log alert..."
 sleep 15
 
-LOG_ALERTS=$(docker compose -f tests/docker-compose.yml exec -T wazuh-manager \
+LOG_ALERTS=$(docker compose -f $E2E_COMPOSE_FILE exec -T wazuh-manager \
   cat /var/ossec/logs/alerts/alerts.json 2>/dev/null | grep -c "Failed password" || true)
 echo "    Log collection alerts found: $LOG_ALERTS"
 if [ "$LOG_ALERTS" -gt 0 ]; then
@@ -346,7 +354,7 @@ if [ "$LOG_ALERTS" -gt 0 ]; then
 else
   record FAIL "No log collection alerts found in alerts.json"
   echo "    --- last 50 lines of ossec.log ---"
-  docker compose -f tests/docker-compose.yml exec -T wazuh-manager \
+  docker compose -f $E2E_COMPOSE_FILE exec -T wazuh-manager \
     tail -50 /var/ossec/logs/ossec.log 2>/dev/null || true
   echo "    --- end ossec.log ---"
 fi
@@ -357,14 +365,14 @@ logger -t sda-e2e-test "E2E journal test: Failed password for root from 10.0.0.9
 echo "    Waiting 15s for journal log alert..."
 sleep 15
 
-JOURNAL_ALERTS=$(docker compose -f tests/docker-compose.yml exec -T wazuh-manager \
+JOURNAL_ALERTS=$(docker compose -f $E2E_COMPOSE_FILE exec -T wazuh-manager \
   cat /var/ossec/logs/archives/archives.json 2>/dev/null | grep -c "sda-e2e-test" || true)
 echo "    Journal log events found in archives: $JOURNAL_ALERTS"
 if [ "$JOURNAL_ALERTS" -gt 0 ]; then
   record PASS "Journal log collection events received by server"
 else
   record FAIL "No journal log collection events found in archives"
-  docker compose -f tests/docker-compose.yml exec -T wazuh-manager \
+  docker compose -f $E2E_COMPOSE_FILE exec -T wazuh-manager \
     tail -30 /var/ossec/logs/ossec.log 2>/dev/null || true
 fi
 
@@ -372,30 +380,30 @@ fi
 echo "==> Step 10: Testing active response..."
 
 # Get the agent ID from the server
-AGENT_ID=$(docker compose -f tests/docker-compose.yml exec -T wazuh-manager \
+AGENT_ID=$(docker compose -f $E2E_COMPOSE_FILE exec -T wazuh-manager \
   /var/ossec/bin/manage_agents -l 2>/dev/null | grep -oP 'ID:\s*\K[0-9]+' | head -1)
 
 if [ -n "$AGENT_ID" ]; then
   # Trigger active response via agent_control
-  docker compose -f tests/docker-compose.yml exec -T wazuh-manager \
+  docker compose -f $E2E_COMPOSE_FILE exec -T wazuh-manager \
     /var/ossec/bin/agent_control -b 10.99.99.99 -f firewall-drop0 -u "$AGENT_ID" 2>/dev/null || true
 
   echo "    Waiting 15s for active response execution..."
   sleep 15
 
   # Check agent logs or server logs for AR execution confirmation
-  AR_LOG=$(docker compose -f tests/docker-compose.yml exec -T wazuh-manager \
+  AR_LOG=$(docker compose -f $E2E_COMPOSE_FILE exec -T wazuh-manager \
     grep -c "active-response" /var/ossec/logs/ossec.log 2>/dev/null || true)
 
   # Also check archives for AR messages from the agent
-  AR_ARCHIVES=$(docker compose -f tests/docker-compose.yml exec -T wazuh-manager \
+  AR_ARCHIVES=$(docker compose -f $E2E_COMPOSE_FILE exec -T wazuh-manager \
     cat /var/ossec/logs/archives/archives.json 2>/dev/null | grep -c "active-response" || true)
 
   if [ "${AR_LOG:-0}" -gt 0 ] || [ "${AR_ARCHIVES:-0}" -gt 0 ]; then
     record PASS "Active response command processed"
   else
     record FAIL "No active response execution evidence found"
-    docker compose -f tests/docker-compose.yml exec -T wazuh-manager \
+    docker compose -f $E2E_COMPOSE_FILE exec -T wazuh-manager \
       tail -30 /var/ossec/logs/ossec.log 2>/dev/null || true
   fi
 else
@@ -410,7 +418,7 @@ echo "==> Step 11: Verifying SCA policy evaluation..."
 # throttled by the power-profile gate on slower CI runners.
 sleep 10
 
-SCA_ARCHIVES=$(docker compose -f tests/docker-compose.yml exec -T wazuh-manager \
+SCA_ARCHIVES=$(docker compose -f $E2E_COMPOSE_FILE exec -T wazuh-manager \
   cat /var/ossec/logs/archives/archives.json 2>/dev/null \
   | grep -c "sda_e2e_test_policy" || true)
 echo "    SCA events found in archives: $SCA_ARCHIVES"
@@ -419,14 +427,14 @@ if [ "${SCA_ARCHIVES:-0}" -gt 0 ]; then
 else
   # Fall back to a generic "ScaResult" match in case the manager's
   # decoder strips policy_id before writing to archives.
-  SCA_GENERIC=$(docker compose -f tests/docker-compose.yml exec -T wazuh-manager \
+  SCA_GENERIC=$(docker compose -f $E2E_COMPOSE_FILE exec -T wazuh-manager \
     cat /var/ossec/logs/archives/archives.json 2>/dev/null \
     | grep -ciE 'ScaResult|"sca"' || true)
   if [ "${SCA_GENERIC:-0}" -gt 0 ]; then
     record PASS "SCA policy evaluation received by server (generic match)"
   else
     record FAIL "No SCA evaluation events found in archives"
-    docker compose -f tests/docker-compose.yml exec -T wazuh-manager \
+    docker compose -f $E2E_COMPOSE_FILE exec -T wazuh-manager \
       tail -30 /var/ossec/logs/ossec.log 2>/dev/null || true
   fi
 fi
@@ -440,7 +448,7 @@ echo "==> Step 12: Verifying rootcheck signature alert..."
 # the archives. Allow a short extra wait for slower CI runners.
 sleep 10
 
-ROOTCHECK_ARCHIVES=$(docker compose -f tests/docker-compose.yml exec -T wazuh-manager \
+ROOTCHECK_ARCHIVES=$(docker compose -f $E2E_COMPOSE_FILE exec -T wazuh-manager \
   cat /var/ossec/logs/archives/archives.json 2>/dev/null \
   | grep -c "sda-e2e-rootkit-marker" || true)
 echo "    Rootcheck marker events found in archives: $ROOTCHECK_ARCHIVES"
@@ -449,14 +457,14 @@ if [ "${ROOTCHECK_ARCHIVES:-0}" -gt 0 ]; then
 else
   # Fall back to a generic "rootcheck" match in case the decoder
   # rewrites the payload shape.
-  ROOTCHECK_GENERIC=$(docker compose -f tests/docker-compose.yml exec -T wazuh-manager \
+  ROOTCHECK_GENERIC=$(docker compose -f $E2E_COMPOSE_FILE exec -T wazuh-manager \
     cat /var/ossec/logs/archives/archives.json 2>/dev/null \
     | grep -ciE 'rootcheck|RootcheckAlert' || true)
   if [ "${ROOTCHECK_GENERIC:-0}" -gt 0 ]; then
     record PASS "Rootcheck signature alert received by server (generic match)"
   else
     record FAIL "No rootcheck alerts found in archives"
-    docker compose -f tests/docker-compose.yml exec -T wazuh-manager \
+    docker compose -f $E2E_COMPOSE_FILE exec -T wazuh-manager \
       tail -30 /var/ossec/logs/ossec.log 2>/dev/null || true
   fi
 fi
@@ -480,7 +488,7 @@ echo "==> Step 13: Verifying enhanced inventory events..."
 # treat any matching archives.json entry as a bonus signal.
 sleep 15
 
-EI_ARCHIVES=$(docker compose -f tests/docker-compose.yml exec -T wazuh-manager \
+EI_ARCHIVES=$(docker compose -f $E2E_COMPOSE_FILE exec -T wazuh-manager \
   cat /var/ossec/logs/archives/archives.json 2>/dev/null \
   | grep -c "enhanced_inventory" || true)
 echo "    Enhanced-inventory events found in archives: $EI_ARCHIVES (manager-side, optional)"

@@ -113,6 +113,32 @@ OpenSSL under `/var/ossec`.
 | Binary size | < 5 MB | 4.6 MB | **Met** (down from 8.0 MB → 5.5 MB → 4.6 MB) |
 | FIM scan CPU peak | < 3 % | 3 % | **Met** (down from 8 % pre-optimization) |
 
+## Automated regression gate (Phase 6 task 6.3)
+
+These four budgets are enforced in CI by
+`tests/scripts/benchmark-regression.sh` (invoked via `make
+benchmark-ci`). The script builds the release binary, samples
+idle RSS and CPU via `pidstat`, measures the binary size from
+`ls`, runs a FIM burst against a temporary watched directory, and
+exits non-zero on the first breach. Results land in
+`target/benchmark-regression/benchmark-regression.txt` and are
+uploaded as the `benchmark-regression` CI artifact from the
+nightly schedule (see `.github/workflows/ci.yml`). Hard
+thresholds encoded in the script:
+
+- `MAX_IDLE_RSS_KB=15360` (15 MB)
+- `MAX_IDLE_CPU_PCT=0.1`
+- `MAX_BINARY_SIZE_BYTES=5242880` (5 MB)
+- `MAX_FIM_PEAK_CPU_PCT=3.0`
+
+Reproduce locally:
+
+```
+sudo apt-get install -y sysstat bc
+make benchmark-ci
+cat target/benchmark-regression/benchmark-regression.txt
+```
+
 ## Caveats
 
 - Binary-size comparison is not strictly apples-to-apples: SDA is a

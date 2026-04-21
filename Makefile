@@ -20,8 +20,8 @@ TARGETS := \
 	aarch64-apple-darwin \
 	x86_64-pc-windows-msvc
 
-.PHONY: build release test lint fmt clippy all-targets clean e2e e2e-macos e2e-windows security-e2e \
-        deb rpm pkg msi
+.PHONY: build release test lint fmt clippy all-targets clean e2e e2e-compat e2e-macos e2e-windows security-e2e \
+        benchmark-ci deb rpm pkg msi
 
 build:
 	$(CARGO) build
@@ -47,6 +47,17 @@ build-%:
 
 e2e:
 	bash tests/scripts/run-e2e.sh
+
+# Run the same 14-assertion E2E suite against an older Wazuh 4.x
+# manager (4.7.x by default) to catch v4.x protocol drift.
+e2e-compat:
+	bash tests/scripts/run-compat-e2e.sh
+
+# Performance regression gate used by CI. Exits non-zero if idle RSS,
+# idle CPU, binary size, or FIM burst CPU exceed the thresholds in
+# benchmark-results.md. Results land in target/benchmark-regression/.
+benchmark-ci:
+	bash tests/scripts/benchmark-regression.sh
 
 e2e-macos:
 	bash tests/scripts/run-e2e-macos.sh

@@ -19,8 +19,13 @@ StateDirectoryMode=0750
 LogsDirectory=sn360-desktop-agent
 LogsDirectoryMode=0750
 
-# Read-only paths for config.
-ReadOnlyPaths=/etc/sn360-desktop-agent
+# The config directory is intentionally NOT listed in ReadOnlyPaths:
+# enrollment writes client.keys under /etc/sn360-desktop-agent the first
+# time the agent talks to authd, so the directory must be writable.
+# The ReadWritePaths= line below already grants that; listing the same
+# path in ReadOnlyPaths would be overridden by ReadWritePaths but would
+# mislead operators reading this unit into thinking the config dir is
+# locked down.
 
 # Sandboxing. These are deliberately conservative — the agent still
 # needs broad filesystem read access for FIM, rootcheck, and

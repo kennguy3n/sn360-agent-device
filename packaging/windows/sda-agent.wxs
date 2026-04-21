@@ -72,13 +72,18 @@
                         Wait="yes"/>
       </Component>
 
-      <Component Id="ConfigFile" Guid="*">
+      <!--
+        NeverOverwrite="yes" on the component (not just a comment on the
+        File child) is what actually tells the installer to leave an
+        existing config.yaml alone on upgrades. Without it, a major
+        upgrade happily stomps operator-local edits back to the shipped
+        default, which is the bug A6 was filed against.
+      -->
+      <Component Id="ConfigFile" Guid="*" NeverOverwrite="yes">
         <File Id="ConfigYaml"
               Name="config.yaml"
               Source="..\config\config.yaml"
-              KeyPath="yes">
-          <!-- NeverOverwrite preserves operator edits on upgrade. -->
-        </File>
+              KeyPath="yes"/>
       </Component>
     </ComponentGroup>
 

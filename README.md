@@ -144,11 +144,18 @@ For the full configuration reference, see the [Configuration section in `device-
 
 ## Project Status
 
-**Phases 1–3 complete. Phase 4 agent-side tasks (4.1–4.9) complete. Phase 5 platform hardening complete (self-update, privilege separation, tamper protection, installers).** See [`PROGRESS.md`](./PROGRESS.md) for detailed task status, test results, and benchmarks.
+**Phases 1–5 complete.** Phase 5 platform hardening (self-update, privilege separation, tamper protection, installers) plus Phase 5.6 enhanced protocol (opt-in TLS 1.3 / MessagePack / HTTP/2). **Phase 6 (testing & release) is in progress** — CI matrix expanded, benchmark regression gate added, fuzzing harness and `cargo audit` wired up, documentation set written. Tag + binary publication are still pending release infrastructure. See [`PROGRESS.md`](./PROGRESS.md) for detailed task status, test results, and benchmarks.
 
 ## Documentation
 
-- [**device-agent-proposal.md**](./device-agent-proposal.md) — Full architecture & implementation proposal
+- [**docs/user-guide.md**](./docs/user-guide.md) — Per-host install, enrolment, and troubleshooting
+- [**docs/admin-guide.md**](./docs/admin-guide.md) — Fleet deployment, module tuning, upgrades, legacy migration
+- [**docs/architecture.md**](./docs/architecture.md) — Crate map, event flow, PAL design, protocol details
+- [**docs/configuration-reference.md**](./docs/configuration-reference.md) — Full YAML schema reference
+- [**docs/platform-testing.md**](./docs/platform-testing.md) — CI matrix + Fedora/Arch manual procedures
+- [**docs/security-audit.md**](./docs/security-audit.md) — `cargo audit` + `cargo-fuzz` setup
+- [**CHANGELOG.md**](./CHANGELOG.md) — Release notes
+- [**device-agent-proposal.md**](./device-agent-proposal.md) — Original architecture & implementation proposal
 - [**PROGRESS.md**](./PROGRESS.md) — Phase status, test results, known gaps, and next steps
 - [**benchmark-results.md**](./benchmark-results.md) — Performance benchmarks vs. Wazuh 4.9.2
 - [**tests/README.md**](./tests/README.md) — Test harness, Docker setup, and E2E reference
