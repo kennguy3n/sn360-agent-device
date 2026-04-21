@@ -69,8 +69,9 @@ jobs:
         run: cargo install --locked cargo-audit
       - name: Run cargo audit
         # Fail the job on any unpatched advisory against a direct or
-        # transitive dependency. Warnings-only advisories (e.g.
-        # unmaintained crates) surface via RUSTSEC but do not block CI.
+        # transitive dependency. `--deny warnings` also promotes
+        # warnings-only advisories (e.g. unmaintained crates) into
+        # CI failures so they cannot silently accumulate.
         run: cargo audit --deny warnings
 
   build:

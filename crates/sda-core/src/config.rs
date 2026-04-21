@@ -161,8 +161,12 @@ pub struct EnhancedProtocolConfig {
     pub tls_pinned_sha256: Option<String>,
 
     /// Path to a PEM-encoded bundle of trust anchors used when
-    /// `tls == true`. When `None`, the platform trust store is used
-    /// (via `rustls-native-certs`-style discovery in `sda-comms`).
+    /// `tls == true`. When `None`, the Mozilla `webpki-roots`
+    /// bundle compiled into the agent binary is used (this is a
+    /// static copy of the public-web CA list, NOT the host OS
+    /// trust store). Operators running against a private CA MUST
+    /// set this path — custom CAs added to the host trust store
+    /// alone are NOT picked up.
     #[serde(default)]
     pub tls_ca_bundle_path: Option<PathBuf>,
 }

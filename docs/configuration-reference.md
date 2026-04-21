@@ -25,12 +25,11 @@ logging:           # optional — RUST_LOG-style filter override
 server:
   address: "wazuh.example.com"     # hostname or IP of the manager
   port: 1514                        # default: 1514
-  protocol: "tcp"                   # "tcp" or "udp", default: "tcp"
+  protocol: "tcp"                   # "tcp" | "udp" | "http2" (Phase 5.6), default: "tcp"
   keepalive_interval: 600           # seconds, default: 600
   enhanced:                          # Phase 5.6 enhanced protocol (opt-in)
     tls: false                       # enable TLS 1.3 transport
     serialization: "json"             # "json" | "msgpack", default: "json"
-    transport: "tcp"                  # "tcp" | "udp" | "http2", default: "tcp"
     tls_ca_bundle_path: null          # optional path to PEM bundle
     tls_pinned_sha256: null           # optional 64-char hex leaf fingerprint
 ```
@@ -40,8 +39,11 @@ server:
 - `enhanced.serialization = "msgpack"` serialises events with
   `rmp-serde` instead of JSON; 50–70 % smaller on inventory-heavy
   payloads.
-- `enhanced.transport = "http2"` implies `tls: true`; ALPN is
-  negotiated as `h2`.
+- `protocol = "http2"` (at the top-level `server:` scope, NOT inside
+  `enhanced:`) switches to the HTTP/2 transport. It requires
+  `enhanced.tls = true` — HTTP/2 is only speaking over TLS with
+  ALPN `h2` in this agent; a plain-text h2c transport is not
+  supported.
 
 ## `enrollment`
 
