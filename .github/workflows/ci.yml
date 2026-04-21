@@ -178,6 +178,49 @@ jobs:
       - name: Run micro-benchmarks
         run: bash tests/scripts/micro-benchmark.sh
 
+  nightly-fuzz:
+    name: Nightly Fuzz
+    runs-on: ubuntu-latest
+    # cargo-fuzz requires the nightly toolchain; running it per-PR
+    # would swamp the CI budget and produce flaky signals (the
+    # libFuzzer run is bounded by wall-clock, not iterations). The
+    # nightly cron gives each target five minutes of coverage-guided
+    # fuzzing on every calendar day so regressions in
+    # `WazuhMessage::decode`, zlib decompress, msgpack event decode,
+    # or TRDS rule-bundle decode surface within 24 hours.
+    if: github.event.schedule != ''
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        target:
+          - protocol_decode
+          - protocol_decompress
+          - msgpack_event_decode
+          - rule_store_msgpack
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@nightly
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: fuzz
+      - name: Install system dependencies
+        run: sudo apt-get update && sudo apt-get install -y libsystemd-dev libyara-dev
+      - name: Install cargo-fuzz
+        run: cargo install --locked cargo-fuzz
+      - name: Run fuzz target (${{ matrix.target }}) — 5 min budget
+        run: cargo +nightly fuzz run ${{ matrix.target }} -- -max_total_time=300
+      - name: Upload fuzz corpus on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: fuzz-corpus-${{ matrix.target }}
+          path: |
+            fuzz/corpus/${{ matrix.target }}
+            fuzz/artifacts/${{ matrix.target }}
+          if-no-files-found: ignore
+          retention-days: 14
+
   benchmark-regression:
     name: Benchmark Regression Gate
     runs-on: ubuntu-latest

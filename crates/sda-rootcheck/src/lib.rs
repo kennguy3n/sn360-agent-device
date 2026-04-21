@@ -1,12 +1,16 @@
 //! Rootkit detection module for the SN360 Desktop Agent.
 //!
-//! Performs three classes of checks during idle periods:
+//! Performs four classes of checks during idle periods:
 //!
 //! 1. **Signature sweep** — looks for known rootkit file paths
 //!    (see [`signatures`]).
-//! 2. **Hidden-process detection** — compares `/proc` enumeration
-//!    against a `kill(pid, 0)` probe on Linux (see [`hidden_process`]).
-//! 3. **Binary integrity** — tracks SHA-256 drift of critical system
+//! 2. **Content inspection** — reads `/etc/ld.so.preload`,
+//!    `/etc/crontab`, and `/etc/hosts` and flags rootkit / persistence
+//!    indicators inside them (see [`content_checks`]).
+//! 3. **Hidden-process detection** — compares the OS-native process
+//!    enumeration against a per-PID liveness probe on Linux, macOS,
+//!    and Windows (see [`hidden_process`]).
+//! 4. **Binary integrity** — tracks SHA-256 drift of critical system
 //!    binaries against an on-disk baseline (see [`binary_integrity`]).
 //!
 //! All findings are published on the shared event bus as
@@ -14,6 +18,7 @@
 //! events tagged with the originating category.
 
 pub mod binary_integrity;
+pub mod content_checks;
 pub mod hidden_process;
 pub mod signatures;
 
@@ -124,7 +129,8 @@ async fn publish_alert(
     }
 }
 
-/// Run one full rootcheck sweep (all three check categories).
+/// Run one full rootcheck sweep (all four check categories:
+/// signature, content, hidden-process, binary integrity).
 async fn run_sweep(config: &RootcheckConfig, bus: &EventBus) {
     info!("rootcheck sweep starting");
 
@@ -143,7 +149,18 @@ async fn run_sweep(config: &RootcheckConfig, bus: &EventBus) {
         publish_alert(bus, "signature", &title, &hit.path, &description).await;
     }
 
-    // --- 2. Hidden-process check (Linux-only; no-op elsewhere) ---
+    // --- 2. Content-based checks (ld.so.preload, crontab, hosts) ---
+    let content_hits =
+        tokio::task::spawn_blocking(|| content_checks::scan(std::path::Path::new("/")))
+            .await
+            .unwrap_or_default();
+
+    for hit in &content_hits {
+        let title = format!("Suspicious content in {}", hit.path);
+        publish_alert(bus, hit.category, &title, &hit.indicator, &hit.reason).await;
+    }
+
+    // --- 3. Hidden-process check ---
     if config.hidden_process_check {
         let max_pid = config.max_pid;
         let hidden = tokio::task::spawn_blocking(move || hidden_process::scan(max_pid))
@@ -153,7 +170,7 @@ async fn run_sweep(config: &RootcheckConfig, bus: &EventBus) {
         for h in &hidden {
             let subject = h.pid.to_string();
             let description = format!(
-                "PID {} responds to kill(0) but is absent from /proc — possible hidden process",
+                "PID {} responds to liveness probe but is absent from the OS process list — possible hidden process",
                 h.pid
             );
             publish_alert(
@@ -167,7 +184,7 @@ async fn run_sweep(config: &RootcheckConfig, bus: &EventBus) {
         }
     }
 
-    // --- 3. Binary integrity ---
+    // --- 4. Binary integrity ---
     if config.binary_integrity_check {
         run_binary_integrity(config, bus).await;
     }

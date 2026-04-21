@@ -1,0 +1,188 @@
+name: Release
+
+# Triggered when a maintainer pushes a semver-ish tag like
+# `v0.9.0-beta.1` or `v1.0.0`. The workflow builds release binaries
+# and platform installers on ubuntu / macos / windows runners,
+# uploads them as workflow artefacts, and drafts a GitHub Release
+# whose body is the `[Unreleased]` section from `CHANGELOG.md`.
+#
+# The draft is **not** auto-published. A maintainer reviews the
+# draft, signs / notarises the binaries out-of-band per the
+# signing policy in `docs/release-process.md`, and promotes the
+# draft to a published release once the artefacts are good.
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  # ---------------------------------------------------------------
+  # Job 1 — build release binaries + native installers per-OS.
+  # ---------------------------------------------------------------
+  build-release:
+    name: Build (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            artifact_prefix: sda-agent-linux-x86_64
+            binary_name: sda-agent
+            installer_targets: deb rpm
+            installer_artifacts: |
+              target/release/sda-agent
+              packaging/debian/out/*.deb
+              packaging/rpm/out/*.rpm
+          - os: macos-latest
+            artifact_prefix: sda-agent-macos
+            binary_name: sda-agent
+            installer_targets: pkg
+            installer_artifacts: |
+              target/release/sda-agent
+              packaging/macos/out/*.pkg
+          - os: windows-latest
+            artifact_prefix: sda-agent-windows-x86_64
+            binary_name: sda-agent.exe
+            installer_targets: msi
+            installer_artifacts: |
+              target/release/sda-agent.exe
+              packaging/windows/out/*.msi
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Install system dependencies (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libsystemd-dev libyara-dev rpm
+
+      - name: Install packaging deps (macOS)
+        if: runner.os == 'macOS'
+        run: brew install yara
+
+      - name: Build release binary
+        run: make release
+
+      - name: Build native installers
+        shell: bash
+        run: make ${{ matrix.installer_targets }}
+
+      - name: Upload build artefacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact_prefix }}
+          path: ${{ matrix.installer_artifacts }}
+          if-no-files-found: error
+          retention-days: 30
+
+  # ---------------------------------------------------------------
+  # Job 2 — collect every per-OS artefact and draft a GitHub
+  # Release. The draft uses the `[Unreleased]` section from
+  # CHANGELOG.md as its body. A maintainer reviews, signs /
+  # notarises, and publishes manually.
+  # ---------------------------------------------------------------
+  draft-release:
+    name: Draft GitHub Release
+    needs: [build-release]
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download all artefacts
+        uses: actions/download-artifact@v4
+        with:
+          path: release-artifacts
+
+      - name: Flatten artefacts for release upload
+        run: |
+          set -euo pipefail
+          mkdir -p release-upload
+
+          # Rename raw binaries to include the platform suffix so the
+          # Linux and macOS builds (both named `sda-agent`) don't
+          # collide in the flat release directory. `.deb` / `.rpm` /
+          # `.pkg` / `.msi` filenames are already platform-unique so
+          # copying them verbatim is fine.
+          declare -A unix_binaries=(
+            [sda-agent-linux-x86_64]=sda-agent-linux-x86_64
+            [sda-agent-macos]=sda-agent-macos
+          )
+          for src_artifact in "${!unix_binaries[@]}"; do
+            src="release-artifacts/${src_artifact}/target/release/sda-agent"
+            dst="release-upload/${unix_binaries[$src_artifact]}"
+            if [[ -f "$src" ]]; then
+              cp -v "$src" "$dst"
+            else
+              echo "::error ::expected binary not found: $src" >&2
+              exit 1
+            fi
+          done
+
+          # Windows .exe is already platform-unique; keep its suffix.
+          win_src="release-artifacts/sda-agent-windows-x86_64/target/release/sda-agent.exe"
+          if [[ -f "$win_src" ]]; then
+            cp -v "$win_src" "release-upload/sda-agent-windows-x86_64.exe"
+          else
+            echo "::error ::expected binary not found: $win_src" >&2
+            exit 1
+          fi
+
+          # Installer packages have unique filenames by extension /
+          # version; copy them verbatim.
+          find release-artifacts -type f \
+            \( -name '*.deb' -o -name '*.rpm' \
+               -o -name '*.pkg' -o -name '*.msi' \) \
+            -exec cp -v {} release-upload/ \;
+
+          ls -lh release-upload
+
+      - name: Generate per-artefact SHA-256 checksums
+        working-directory: release-upload
+        run: |
+          shopt -s nullglob
+          for f in *; do
+            sha256sum "$f" >> SHA256SUMS
+          done
+          cat SHA256SUMS
+
+      # Pull the `[Unreleased]` section out of CHANGELOG.md so the
+      # draft release has a populated body on creation. Maintainers
+      # can edit the body before publishing.
+      - name: Extract release notes from CHANGELOG.md
+        id: notes
+        run: |
+          awk '
+            /^## \[Unreleased\]/ { capture = 1; next }
+            /^## / && capture    { exit }
+            capture               { print }
+          ' CHANGELOG.md > release-notes.md
+          {
+            echo 'body<<EOF'
+            cat release-notes.md
+            echo 'EOF'
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Create draft GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          draft: true
+          prerelease: ${{ contains(github.ref_name, '-') }}
+          name: ${{ github.ref_name }}
+          tag_name: ${{ github.ref_name }}
+          body: ${{ steps.notes.outputs.body }}
+          files: release-upload/*
+          fail_on_unmatched_files: true
