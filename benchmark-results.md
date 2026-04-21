@@ -132,10 +132,65 @@ OpenSSL under `/var/ossec`.
 
 | Metric | Target | SDA observed | Status |
 |---|---|---|---|
-| Idle RAM | < 15 MB | 5.7 MB | **Met** |
+| Idle RAM | < 15 MB | 4.57 MB (2026-04-21 rerun) / 5.7 MB prior | **Met** |
 | Idle CPU | < 0.1 % | 0.00 % | **Met** |
-| Binary size | < 5 MB | 4.6 MB | **Met** (down from 8.0 MB → 5.5 MB → 4.6 MB) |
+| Binary size | < 5 MB | **6.49 MB** (2026-04-21 rerun) / 4.6 MB prior | **Regressed** (see below) |
 | FIM scan CPU peak | < 3 % | 3 % | **Met** (down from 8 % pre-optimization) |
+
+### Observed regression (2026-04-21 rerun)
+
+A fresh end-to-end rerun of the full pipeline (`make lint` / `make
+test` / `make e2e` / `make security-e2e` / `make benchmark-ci` /
+`bash tests/scripts/benchmark.sh` / `bash tests/scripts/micro-benchmark.sh`
+/ `cargo audit --deny warnings`) on a Ubuntu Linux host observed:
+
+- `target/release/sda-agent` is now **6 803 608 bytes (≈ 6.49 MB)**,
+  compared to the 4.6 MB recorded above. This exceeds the
+  `MAX_BINARY_SIZE_BYTES=5242880` gate in
+  `tests/scripts/benchmark-regression.sh` and causes the nightly
+  `benchmark-regression` CI job to flag the build as a regression.
+- `cargo bloat --release -p sda-agent --crates` points at the
+  Phase 5/6 additions as the primary contributors to the growth:
+  `regex_automata` (≈ 307 KiB `.text`), `rustls` (≈ 270 KiB),
+  `yara_sys` (≈ 229 KiB), `sda_local_detection` (≈ 190 KiB),
+  `ring` (≈ 180 KiB), `reqwest` (≈ 127 KiB), `aho_corasick`
+  (≈ 122 KiB). Enhanced protocol (`rustls` + `ring` + `webpki-roots`),
+  YARA-based LDE rules, and the `sda-updater` HTTP client together
+  account for the bulk of the new weight.
+- `tests/scripts/micro-benchmark.sh` likewise reports a stripped
+  binary size of 6.48 MB for its own rebuild.
+
+The measurement fixtures themselves still pass the idle RSS
+(4.57 MB from `benchmark.sh`, well under the 15 MB budget), idle
+CPU (0.00 %), and FIM peak CPU (0 % when `$FIM_DIR` matches a
+monitored directory) budgets — this is a pure binary-size
+regression, not a runtime regression.
+
+Because `benchmark-regression` is wired to the nightly cron only
+(`if: github.event.schedule != ''` in
+`.github/workflows/ci.yml`), this regression does not block PR
+CI. Addressing it requires an explicit architectural decision —
+candidates include gating YARA / `sda-local-detection` behind a
+default-off Cargo feature, collapsing the duplicate TLS stack
+between `sda-comms` enhanced mode and `sda-updater`, or moving
+the updater out of the main binary — and is left as a follow-up.
+
+### Local-run caveat (`benchmark-regression.sh` on non-CI hosts)
+
+On a developer workstation where `sudo` forks the agent to `uid
+0`, the `kill -0 "$SDA_PID"` liveness check at step 3 of
+`tests/scripts/benchmark-regression.sh` is executed from the
+unprivileged parent shell. Linux returns `EPERM` (not `ESRCH`)
+in this situation, so a healthy root-owned agent is
+indistinguishable from an exited one and the script bails out
+with `FAIL: agent exited before idle measurement could start`
+even though the agent is alive and retrying the server
+connection with exponential backoff. The gate still functions
+correctly on the GitHub-hosted Ubuntu runner (where the actions
+user can signal its own sudo-spawned children). A minor hardening
+option for local runs is to use `sudo kill -0 "$SDA_PID"` or
+`test -d "/proc/$SDA_PID"` — left for a follow-up once the
+binary-size issue above is resolved.
 
 ## Automated regression gate (Phase 6 task 6.3)
 
