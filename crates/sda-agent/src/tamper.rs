@@ -28,10 +28,10 @@ use std::path::Path;
 use std::time::Duration;
 
 use anyhow::{anyhow, Context, Result};
+use sda_core::config::TamperConfig;
 use sha2::{Digest, Sha256};
 use tokio::task::JoinHandle;
 use tracing::{info, warn};
-use sda_core::config::TamperConfig;
 
 /// Run the startup-time tamper checks — self-integrity verification
 /// and file-immutability application. Returns early with `Ok(())`

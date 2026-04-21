@@ -5,7 +5,7 @@
 //! - Windows: `netsh advfirewall`
 //!
 //! Both the macOS pfctl table and the Windows firewall rule name were
-//! previously prefixed with `SDA` / `sda_`. On unblock, the platform helpers
+//! previously prefixed with `WDA` / `wda_`. On unblock, the platform helpers
 //! try the current `SDA` / `sda_` identifier first and fall back to the
 //! legacy name so that rules created by an earlier version of the agent can
 //! still be cleaned up after upgrade.

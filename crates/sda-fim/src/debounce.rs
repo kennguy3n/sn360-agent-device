@@ -8,8 +8,8 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 use std::time::Duration;
 
-use tokio::time::Instant;
 use sda_pal::types::FsEventKind;
+use tokio::time::Instant;
 
 /// Per-path pending event: the latest event kind and when it was last seen.
 #[derive(Debug, Clone)]

@@ -829,11 +829,11 @@ async fn run_baseline_scan_task(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::time::Duration;
-    use tempfile::TempDir;
     use sda_core::config::{FimConfig, FimDirectory, ModulesConfig};
     use sda_core::power::PowerProfile;
     use sda_core::signal::ShutdownController;
+    use std::time::Duration;
+    use tempfile::TempDir;
 
     /// Build a minimal `AgentConfig` that watches `dir`.
     fn test_config(dir: &str) -> sda_core::config::AgentConfig {

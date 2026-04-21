@@ -8,9 +8,9 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 use std::time::Duration;
 
-use tokio::time::Instant;
 use sda_pal::fs_watcher::FsWatcher;
 use sda_pal::types::{FsEvent, FsEventKind};
+use tokio::time::Instant;
 
 /// A debounced filesystem watcher that collapses rapid events per path.
 pub struct DebouncedWatcher {

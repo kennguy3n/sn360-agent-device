@@ -274,9 +274,9 @@ fn simple_glob(text: &str, pattern: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use sda_core::config::FimDirectory;
     use std::fs;
     use tempfile::TempDir;
-    use sda_core::config::FimDirectory;
 
     fn test_directory(path: &str) -> FimDirectory {
         FimDirectory {

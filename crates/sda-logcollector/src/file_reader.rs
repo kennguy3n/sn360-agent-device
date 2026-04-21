@@ -242,10 +242,10 @@ fn same_file(a: &Path, b: &Path) -> bool {
 mod tests {
     use super::*;
     use crate::state::SeekState;
-    use std::io::Write;
-    use tempfile::TempDir;
     use sda_core::signal::ShutdownController;
     use sda_event_bus::EventBus;
+    use std::io::Write;
+    use tempfile::TempDir;
 
     #[tokio::test]
     async fn test_file_reader_detects_new_lines() {

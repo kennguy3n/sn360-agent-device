@@ -5,12 +5,12 @@
 
 use std::time::Duration;
 
-use tempfile::TempDir;
 use sda_core::config::{AgentConfig, FimConfig, FimDirectory, ModulesConfig};
 use sda_core::power::{channel as power_channel, PowerProfile};
 use sda_core::signal::ShutdownController;
 use sda_event_bus::{EventBus, EventKind};
 use sda_fim::FimModule;
+use tempfile::TempDir;
 
 fn test_config(dir: &str, scan_interval: u64) -> AgentConfig {
     AgentConfig {

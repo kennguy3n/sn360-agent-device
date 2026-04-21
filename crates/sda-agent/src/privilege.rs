@@ -49,8 +49,8 @@ pub fn drop_privileges(security: &SecurityConfig) -> Result<()> {
 mod unix {
     use anyhow::{anyhow, Context, Result};
     use nix::unistd::{getuid, setgid, setuid, Gid, Group, Uid, User};
-    use tracing::{info, warn};
     use sda_core::config::SecurityConfig;
+    use tracing::{info, warn};
 
     pub fn drop_privileges(security: &SecurityConfig) -> Result<()> {
         let Some(user_name) = security.run_as_user.as_deref() else {
