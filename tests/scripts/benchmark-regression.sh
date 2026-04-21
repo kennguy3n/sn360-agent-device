@@ -59,17 +59,28 @@ float_gt() {
   awk -v a="$1" -v b="$2" 'BEGIN { exit !(a+0 > b+0) }'
 }
 
+# Portable "is this PID alive?" that works when the target is owned
+# by another user. `kill -0 $pid` returns failure with errno EPERM
+# (not ESRCH) for root-owned children of a sudo-spawned wrapper when
+# called from the unprivileged parent shell — the kernel refuses the
+# signal probe and the shell cannot distinguish that from the
+# process being gone. `ps -p` just reads the procfs entry, which any
+# user can do.
+pid_alive() {
+  [ -n "${1:-}" ] && ps -p "$1" >/dev/null 2>&1
+}
+
 cleanup() {
   # SDA_PID is the real agent child; SUDO_PID is the sudo wrapper
   # that forked it. We kill the agent first (it drives the shutdown
   # path cleanly) and then fall back to the sudo wrapper in case the
   # child somehow survived or never materialised.
-  if [ -n "${SDA_PID:-}" ] && kill -0 "$SDA_PID" 2>/dev/null; then
+  if pid_alive "${SDA_PID:-}"; then
     sudo kill -TERM "$SDA_PID" 2>/dev/null || true
     sleep 1
     sudo kill -KILL "$SDA_PID" 2>/dev/null || true
   fi
-  if [ -n "${SUDO_PID:-}" ] && kill -0 "$SUDO_PID" 2>/dev/null; then
+  if pid_alive "${SUDO_PID:-}"; then
     sudo kill -TERM "$SUDO_PID" 2>/dev/null || true
     sleep 1
     sudo kill -KILL "$SUDO_PID" 2>/dev/null || true
@@ -121,7 +132,7 @@ if [ -z "$SDA_PID" ]; then
 fi
 info "sudo wrapper PID: $SUDO_PID, sda-agent PID: $SDA_PID"
 
-if ! kill -0 "$SDA_PID" 2>/dev/null; then
+if ! pid_alive "$SDA_PID"; then
   fail "agent exited before idle measurement could start"
   tail -40 "$OUTPUT_DIR/agent.log" | tee -a "$REPORT" || true
   exit 1
