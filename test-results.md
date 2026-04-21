@@ -216,3 +216,49 @@ sda-comms additions (MessagePack, TLS, HTTP/2) pass in the same
 - Prerequisites confirmed on this host: Docker 27.4.1 running,
   Compose v2.32.1, Rust 1.95.0, `sudo` available (passwordless), and
   `/usr/bin/pidstat` present.
+
+## PR #60 rerun (2026-04-21)
+
+After feature-gating the legacy SIEM adapter under `legacy-siem` (see
+PR #60), the full suite was re-run on this branch against the same
+local Wazuh 4.9.2 compose environment. All three suites reproduce the
+recorded outcomes with identical counts:
+
+- `cargo test --all` — **431 passing / 0 failed** (per-crate split
+  unchanged from the table above).
+- `cargo test -p sda-agent --no-default-features` — **12 passing / 0
+  failed** (the legacy-siem-gated tests in `sda-agent/src/main.rs` are
+  correctly skipped when the feature is off).
+- `cargo test -p sda-comms --no-default-features` — **17 passing / 0
+  failed** (msgpack + TLS/HTTP2 native-protocol tests; legacy Blowfish
+  / `WazuhMessage` / enrolment / connection tests are correctly skipped
+  when the feature is off).
+- `make e2e` — **14/14** assertions PASS (enrolment, keepalive, FIM
+  syscheck, baseline scan, deletion detection, inventory,
+  file/journald log collection, active response, SCA, Rootcheck,
+  enhanced-inventory running_software/SBOM/browser_extensions). Raw
+  counters from the harness: 2 syscheck alerts, 6 baseline scan
+  alerts, 3 deletion alerts, 1092 inventory events, 1 log-collection
+  alert, 1 journald event, 18 rootcheck marker events.
+- `make security-e2e` — **10/10** attack scenarios PASS
+  (malware file drop, brute-force SSH, sudo abuse, config tampering,
+  ransomware bulk-rename with 208 FIM alerts, `kill_process` AR, IPv4
+  + IPv6 firewall-drop AR, unauthorized package install,
+  system-binary tampering, account-disable AR).
+
+The feature-gating diff is code-organisation-only (no runtime
+behavioural change in the default build), which matches what the
+suites observe.
+
+### Benchmark regression gate on this host
+
+`make benchmark-ci` (see
+[`benchmark-results.md`](./benchmark-results.md) for the full
+methodology) was re-run on this branch **and on `main`** against the
+same local Wazuh 4.9.2 manager on the same host. Binary size passes
+both runs; idle RSS, idle CPU, and FIM peak CPU are over budget on
+both branches with near-identical numbers, so the breach is **not a
+regression from PR #60** but reflects this host's CPU / scheduler
+behaviour vs. the runner the recorded baseline was taken on. Full
+numbers and side-by-side comparison are in
+[`benchmark-results.md`](./benchmark-results.md#pr-60-rerun-2026-04-21).

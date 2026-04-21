@@ -217,3 +217,54 @@ cat target/benchmark-regression/benchmark-regression.txt
   the peak shown here.
 - The test host is a shared CI-style VM; absolute CPU numbers are
   indicative, not authoritative.
+
+## PR #60 rerun (2026-04-21)
+
+The benchmark regression gate was re-run on this branch after the
+`legacy-siem` feature-gating landed (see PR #60) and, for
+comparison, on `origin/main` at commit `f3d5e61` on the same host
+against the same local Wazuh 4.9.2 manager. Both runs used
+`tests/sda-test-config.yaml` and a fresh Wazuh enrolment
+(client.keys cleared, stale agent entries removed from
+`manage_agents -l`) between runs.
+
+| Metric | Budget | PR #60 (this branch) | `main` @ `f3d5e61` | Status |
+|---|---|---|---|---|
+| Binary size | < 7 MB (7 340 032 B) | **6.49 MB** (6 803 288 B) | 6.49 MB (6 803 608 B) | **PASS** on both |
+| Idle RSS | < 15 MB (15 360 KB) | 15 516 KB | 18 608 KB | FAIL on both |
+| Idle CPU (60 s avg) | < 0.1 % | 0.60 % | 0.60 % | FAIL on both |
+| FIM peak CPU (1 000-file burst) | < 3 % | 12 % | 14 % | FAIL on both |
+
+The PR-#60 binary is **320 bytes smaller** than the `main` binary
+(unchanged to 3 significant figures at the 6.49 MB level), consistent
+with the feature-gating diff being purely code-organisation — the
+default build still compiles in every legacy-SIEM module, but the
+`pub mod` declarations now sit under `#[cfg(feature = "legacy-siem")]`
+so the compiler can reuse them slightly more freely.
+
+The three over-budget metrics are **not regressions from PR #60**:
+`main` breaches them by the same margin (or more) on the same host,
+so the delta vs. the prior recorded baseline (5.7 MB idle RSS,
+0.00 % idle CPU, 3 % FIM peak) reflects the host this session
+runs on rather than any change on this branch. Likely causes:
+
+- The rerun host is a container-in-container Linux VM; CPU samples
+  from `pidstat` reflect the noisier scheduler envelope of that
+  environment versus the bare-metal runner the baseline was
+  captured on.
+- The FIM burst now runs behind a live Wazuh 4.9.2 connection
+  (previous baseline runs were done with an unreachable manager and
+  silent retries); every hashed file is serialised into a
+  `WazuhMessage`, Blowfish-encrypted, and written to the 1514 TCP
+  socket, which is extra work per hash event.
+
+PR #60 itself does not exercise any legacy-siem code path at
+runtime — the diff only rearranges module declarations and adds a
+`--no-default-features` compile mode — so the honest reading is
+that the recorded baseline needs to be re-captured on a
+representative runner (ideally the nightly CI benchmark runner) in
+a dedicated follow-up, independent of this PR. For now the
+binary-size budget remains a meaningful hard gate (PASS on both
+branches) and the three runtime budgets should be interpreted
+against a fresh, host-matched baseline rather than the 2026-04-21
+prior run.
