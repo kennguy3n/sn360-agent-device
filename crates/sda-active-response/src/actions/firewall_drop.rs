@@ -150,9 +150,9 @@ async fn platform_unblock_ip(ip: &str, timeout: Duration) -> ActionResult {
 const PFCTL_TABLE: &str = "sda_blocked";
 
 /// Legacy pfctl table name; kept so that `platform_unblock_ip` can still
-/// clean up entries inserted by an older agent build that used `sda_blocked`.
+/// clean up entries inserted by an older agent build that used `wda_blocked`.
 #[cfg(target_os = "macos")]
-const PFCTL_TABLE_LEGACY: &str = "sda_blocked";
+const PFCTL_TABLE_LEGACY: &str = "wda_blocked";
 
 #[cfg(target_os = "macos")]
 async fn platform_block_ip(ip: &str, timeout: Duration) -> ActionResult {
@@ -190,7 +190,7 @@ async fn platform_unblock_ip(ip: &str, timeout: Duration) -> ActionResult {
 
     if result.success {
         // Best-effort cleanup of any stale entry in the legacy table so
-        // upgrades from a sda_blocked-era agent do not leave orphaned blocks.
+        // upgrades from a wda_blocked-era agent do not leave orphaned blocks.
         let _ = executor::execute_command(
             "pfctl",
             &["-t", PFCTL_TABLE_LEGACY, "-T", "delete", addr],
@@ -226,14 +226,14 @@ async fn platform_unblock_ip(ip: &str, timeout: Duration) -> ActionResult {
 // ── Windows ──────────────────────────────────────────────────────────────────
 
 /// Human-readable prefix used for Windows Firewall rule names added by the
-/// active-response module. Pre-rename builds of the agent used `"SDA Block "`.
+/// active-response module. Pre-rename builds of the agent used `"WDA Block "`.
 #[cfg(target_os = "windows")]
 const WINDOWS_RULE_PREFIX: &str = "SDA Block ";
 
 /// Legacy Windows Firewall rule prefix retained so that `platform_unblock_ip`
 /// can still remove rules created by an older build after upgrade.
 #[cfg(target_os = "windows")]
-const WINDOWS_RULE_PREFIX_LEGACY: &str = "SDA Block ";
+const WINDOWS_RULE_PREFIX_LEGACY: &str = "WDA Block ";
 
 #[cfg(target_os = "windows")]
 async fn platform_block_ip(ip: &str, timeout: Duration) -> ActionResult {
