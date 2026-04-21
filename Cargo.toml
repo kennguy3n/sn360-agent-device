@@ -1,19 +1,19 @@
 [workspace]
 members = [
-    "crates/wda-core",
-    "crates/wda-pal",
-    "crates/wda-event-bus",
-    "crates/wda-comms",
-    "crates/wda-fim",
-    "crates/wda-logcollector",
-    "crates/wda-inventory",
-    "crates/wda-sca",
-    "crates/wda-active-response",
-    "crates/wda-rootcheck",
-    "crates/wda-agent",
-    "crates/wda-local-detection",
-    "crates/wda-enhanced-inventory",
-    "crates/wda-updater",
+    "crates/sda-core",
+    "crates/sda-pal",
+    "crates/sda-event-bus",
+    "crates/sda-comms",
+    "crates/sda-fim",
+    "crates/sda-logcollector",
+    "crates/sda-inventory",
+    "crates/sda-sca",
+    "crates/sda-active-response",
+    "crates/sda-rootcheck",
+    "crates/sda-agent",
+    "crates/sda-local-detection",
+    "crates/sda-enhanced-inventory",
+    "crates/sda-updater",
 ]
 resolver = "2"
 
@@ -84,19 +84,19 @@ windows = { version = "0.58", features = [
 ] }
 
 # Internal crates
-wda-core = { path = "crates/wda-core" }
-wda-pal = { path = "crates/wda-pal" }
-wda-event-bus = { path = "crates/wda-event-bus" }
-wda-comms = { path = "crates/wda-comms" }
-wda-fim = { path = "crates/wda-fim" }
-wda-logcollector = { path = "crates/wda-logcollector" }
-wda-inventory = { path = "crates/wda-inventory" }
-wda-sca = { path = "crates/wda-sca" }
-wda-active-response = { path = "crates/wda-active-response" }
-wda-rootcheck = { path = "crates/wda-rootcheck" }
-wda-local-detection = { path = "crates/wda-local-detection" }
-wda-enhanced-inventory = { path = "crates/wda-enhanced-inventory" }
-wda-updater = { path = "crates/wda-updater" }
+sda-core = { path = "crates/sda-core" }
+sda-pal = { path = "crates/sda-pal" }
+sda-event-bus = { path = "crates/sda-event-bus" }
+sda-comms = { path = "crates/sda-comms" }
+sda-fim = { path = "crates/sda-fim" }
+sda-logcollector = { path = "crates/sda-logcollector" }
+sda-inventory = { path = "crates/sda-inventory" }
+sda-sca = { path = "crates/sda-sca" }
+sda-active-response = { path = "crates/sda-active-response" }
+sda-rootcheck = { path = "crates/sda-rootcheck" }
+sda-local-detection = { path = "crates/sda-local-detection" }
+sda-enhanced-inventory = { path = "crates/sda-enhanced-inventory" }
+sda-updater = { path = "crates/sda-updater" }
 
 # Self-update (P3.1)
 reqwest = { version = "0.12", default-features = false, features = ["rustls-tls-native-roots", "stream", "json"] }

@@ -1,16 +1,16 @@
-# Build the wda-agent.msi installer from a pre-built release binary.
+# Build the sda-agent.msi installer from a pre-built release binary.
 #
 # Requires WiX Toolset 3.x (candle.exe and light.exe on PATH). Run on
 # a Windows host where the release binary has already been compiled
-# via `cargo build --release -p wda-agent`.
+# via `cargo build --release -p sda-agent`.
 #
 # Usage:
 #   pwsh packaging\windows\build-msi.ps1
 #
-# Output: dist\wda-agent-<version>.msi
+# Output: dist\sda-agent-<version>.msi
 [CmdletBinding()]
 param(
-    [string]$Binary = "target\x86_64-pc-windows-msvc\release\wda-agent.exe",
+    [string]$Binary = "target\x86_64-pc-windows-msvc\release\sda-agent.exe",
     [string]$OutDir = "dist"
 )
 
@@ -30,9 +30,9 @@ if (-not (Test-Path $Binary)) {
 $outPath = Join-Path $root $OutDir
 New-Item -ItemType Directory -Force -Path $outPath | Out-Null
 
-$wxs     = Join-Path $PSScriptRoot "wda-agent.wxs"
-$wixobj  = Join-Path $outPath     "wda-agent.wixobj"
-$msi     = Join-Path $outPath     "wda-agent-$version.msi"
+$wxs     = Join-Path $PSScriptRoot "sda-agent.wxs"
+$wixobj  = Join-Path $outPath     "sda-agent.wixobj"
+$msi     = Join-Path $outPath     "sda-agent-$version.msi"
 
 & candle.exe -nologo `
     -dVersion="$version" `

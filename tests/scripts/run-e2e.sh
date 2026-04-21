@@ -56,7 +56,7 @@ cleanup() {
   echo ""
 
   echo "--- Agent log (last 50 lines) ---"
-  tail -50 /tmp/wda-agent-e2e.log 2>/dev/null || true
+  tail -50 /tmp/sda-agent-e2e.log 2>/dev/null || true
   echo "--- End agent log ---"
 
   if [ "$EXIT_CODE" -ne 0 ]; then
@@ -67,10 +67,23 @@ cleanup() {
   fi
 
   echo "Cleaning up..."
-  [ -n "$AGENT_PID" ] && kill "$AGENT_PID" 2>/dev/null || true
-  wait "$AGENT_PID" 2>/dev/null || true
-  rm -rf /tmp/wda-e2e-fim /tmp/wda-e2e-logs
-  rm -f /tmp/wda-e2e-rootkit-marker
+  # The agent runs as root via `timeout N sudo ./sda-agent …`, so `$AGENT_PID`
+  # is the unprivileged `timeout` wrapper. An unprivileged SIGTERM to the
+  # wrapper does not propagate down to the root `sda-agent` process and
+  # `wait` would block forever. Issue a privileged pkill against the agent
+  # binary directly, give it a brief grace period to flush, and then reap
+  # the wrapper.
+  if [ -n "$AGENT_PID" ]; then
+    sudo pkill -TERM -f 'target/release/sda-agent' 2>/dev/null || true
+    for _ in 1 2 3 4 5; do
+      pgrep -f 'target/release/sda-agent' >/dev/null 2>&1 || break
+      sleep 1
+    done
+    sudo pkill -KILL -f 'target/release/sda-agent' 2>/dev/null || true
+    wait "$AGENT_PID" 2>/dev/null || true
+  fi
+  rm -rf /tmp/sda-e2e-fim /tmp/sda-e2e-logs
+  rm -f /tmp/sda-e2e-rootkit-marker
   sudo rm -f /etc/sn360-desktop-agent/client.keys
   sudo rm -rf /etc/sn360-desktop-agent/sca
   sudo rm -f /var/lib/sn360-desktop-agent/rootcheck-baseline.json
@@ -80,8 +93,8 @@ trap cleanup EXIT
 
 # ── Step 0: Clean up stale state from previous runs ────────────────
 echo "==> Step 0: Cleaning stale state..."
-rm -rf /tmp/wda-e2e-fim /tmp/wda-e2e-logs
-rm -f /tmp/wda-e2e-rootkit-marker
+rm -rf /tmp/sda-e2e-fim /tmp/sda-e2e-logs
+rm -f /tmp/sda-e2e-rootkit-marker
 sudo rm -f /var/lib/sn360-desktop-agent/fim.db
 sudo rm -f /var/lib/sn360-desktop-agent/rootcheck-baseline.json
 sudo rm -f /etc/sn360-desktop-agent/client.keys
@@ -149,8 +162,8 @@ echo "    Enrollment password configured."
 
 # ── Step 3: Build the agent (skipped if a prebuilt binary is present) ─
 echo "==> Step 3: Building agent..."
-if [ -x "./target/release/wda-agent" ]; then
-  echo "    Found existing ./target/release/wda-agent; skipping cargo build."
+if [ -x "./target/release/sda-agent" ]; then
+  echo "    Found existing ./target/release/sda-agent; skipping cargo build."
 else
   cargo build --release
   echo "    Build complete."
@@ -158,9 +171,9 @@ fi
 
 # ── Step 4: Create test directories and seed module fixtures ────────
 echo "==> Step 4: Creating test directories..."
-mkdir -p /tmp/wda-e2e-fim /tmp/wda-e2e-logs
+mkdir -p /tmp/sda-e2e-fim /tmp/sda-e2e-logs
 # Pre-create log file so the watcher can attach immediately.
-touch /tmp/wda-e2e-logs/test.log
+touch /tmp/sda-e2e-logs/test.log
 
 # Seed an SCA policy that the agent will load on startup. Checks the
 # existence of /etc/hostname — a file that always exists on Linux —
@@ -169,7 +182,7 @@ touch /tmp/wda-e2e-logs/test.log
 sudo mkdir -p /etc/sn360-desktop-agent/sca
 sudo tee /etc/sn360-desktop-agent/sca/e2e-test-policy.yaml >/dev/null <<'SCA_YAML'
 policy:
-  id: wda_e2e_test_policy
+  id: sda_e2e_test_policy
   name: SDA E2E Test Policy
   description: Minimal SCA policy exercised by the base E2E suite
 checks:
@@ -184,7 +197,7 @@ SCA_YAML
 # Plant a file that matches the rootcheck `signature_paths` entry
 # configured in tests/wazuh-test-config.yaml. The rootcheck sweep
 # will detect it and publish a signature hit alert on the `9:` queue.
-touch /tmp/wda-e2e-rootkit-marker
+touch /tmp/sda-e2e-rootkit-marker
 
 echo "    Test directories, SCA policy, and rootkit marker ready."
 
@@ -198,7 +211,7 @@ sudo mkdir -p /etc/sn360-desktop-agent
 # `enhanced_inventory` envelope never lands in archives.json even when
 # the agent successfully delivers it — we use the agent log as the
 # ground-truth oracle in Step 13 below.
-timeout 300 sudo env RUST_LOG=info,wda_enhanced_inventory=debug ./target/release/wda-agent tests/wazuh-test-config.yaml > /tmp/wda-agent-e2e.log 2>&1 &
+timeout 300 sudo env RUST_LOG=info,sda_enhanced_inventory=debug ./target/release/sda-agent tests/wazuh-test-config.yaml > /tmp/sda-agent-e2e.log 2>&1 &
 AGENT_PID=$!
 # Give the agent time to enrol and send first keepalive.
 sleep 20
@@ -243,7 +256,7 @@ fi
 
 # ── Step 8: Trigger FIM event ───────────────────────────────────────
 echo "==> Step 8: Triggering FIM event..."
-touch /tmp/wda-e2e-fim/testfile.txt
+touch /tmp/sda-e2e-fim/testfile.txt
 echo "    Waiting 40s for syscheck alert..."
 sleep 40
 
@@ -262,9 +275,9 @@ fi
 
 # ── Step 8b: Verify baseline scan events ─────────────────────────────
 echo "==> Step 8b: Verifying baseline scan..."
-echo "content1" > /tmp/wda-e2e-fim/scan-test-1.txt
-echo "content2" > /tmp/wda-e2e-fim/scan-test-2.txt
-echo "content3" > /tmp/wda-e2e-fim/scan-test-3.txt
+echo "content1" > /tmp/sda-e2e-fim/scan-test-1.txt
+echo "content2" > /tmp/sda-e2e-fim/scan-test-2.txt
+echo "content3" > /tmp/sda-e2e-fim/scan-test-3.txt
 
 echo "    Waiting for baseline scan cycle..."
 sleep 40
@@ -283,7 +296,7 @@ fi
 
 # ── Step 8c: Verify deletion detection via baseline scan ─────────────
 echo "==> Step 8c: Verifying deletion detection..."
-rm /tmp/wda-e2e-fim/scan-test-2.txt
+rm /tmp/sda-e2e-fim/scan-test-2.txt
 echo "    Waiting for next scan cycle to detect deletion..."
 sleep 40
 
@@ -321,7 +334,7 @@ fi
 # ── Step 9: Trigger log collection event ─────────────────────────────
 echo "==> Step 9: Triggering log collection event..."
 echo 'Apr 18 12:00:00 localhost sshd[9999]: Failed password for root from 10.0.0.1 port 22 ssh2' \
-  >> /tmp/wda-e2e-logs/test.log
+  >> /tmp/sda-e2e-logs/test.log
 echo "    Waiting 15s for log alert..."
 sleep 15
 
@@ -340,12 +353,12 @@ fi
 
 # ── Step 9c: Verify journal log collection ──────────────────────────
 echo "==> Step 9c: Triggering journal log event..."
-logger -t wda-e2e-test "E2E journal test: Failed password for root from 10.0.0.99 port 22 ssh2"
+logger -t sda-e2e-test "E2E journal test: Failed password for root from 10.0.0.99 port 22 ssh2"
 echo "    Waiting 15s for journal log alert..."
 sleep 15
 
 JOURNAL_ALERTS=$(docker compose -f tests/docker-compose.yml exec -T wazuh-manager \
-  cat /var/ossec/logs/archives/archives.json 2>/dev/null | grep -c "wda-e2e-test" || true)
+  cat /var/ossec/logs/archives/archives.json 2>/dev/null | grep -c "sda-e2e-test" || true)
 echo "    Journal log events found in archives: $JOURNAL_ALERTS"
 if [ "$JOURNAL_ALERTS" -gt 0 ]; then
   record PASS "Journal log collection events received by server"
@@ -399,7 +412,7 @@ sleep 10
 
 SCA_ARCHIVES=$(docker compose -f tests/docker-compose.yml exec -T wazuh-manager \
   cat /var/ossec/logs/archives/archives.json 2>/dev/null \
-  | grep -c "wda_e2e_test_policy" || true)
+  | grep -c "sda_e2e_test_policy" || true)
 echo "    SCA events found in archives: $SCA_ARCHIVES"
 if [ "${SCA_ARCHIVES:-0}" -gt 0 ]; then
   record PASS "SCA policy evaluation received by server"
@@ -420,7 +433,7 @@ fi
 
 # ── Step 12: Verify rootcheck signature alert ────────────────────────
 echo "==> Step 12: Verifying rootcheck signature alert..."
-# /tmp/wda-e2e-rootkit-marker was planted in Step 4 and matches the
+# /tmp/sda-e2e-rootkit-marker was planted in Step 4 and matches the
 # `signature_paths` entry in tests/wazuh-test-config.yaml. The agent
 # runs an initial rootcheck sweep on startup and every
 # scan_interval_secs (15s) afterwards, so the hit should already be in
@@ -429,7 +442,7 @@ sleep 10
 
 ROOTCHECK_ARCHIVES=$(docker compose -f tests/docker-compose.yml exec -T wazuh-manager \
   cat /var/ossec/logs/archives/archives.json 2>/dev/null \
-  | grep -c "wda-e2e-rootkit-marker" || true)
+  | grep -c "sda-e2e-rootkit-marker" || true)
 echo "    Rootcheck marker events found in archives: $ROOTCHECK_ARCHIVES"
 if [ "${ROOTCHECK_ARCHIVES:-0}" -gt 0 ]; then
   record PASS "Rootcheck signature alert received by server"
@@ -477,36 +490,36 @@ echo "    Enhanced-inventory events found in archives: $EI_ARCHIVES (manager-sid
 # so a successful log line means the payload was handed to the
 # comms layer for transmission.
 EI_RS_LOG=$(grep -cE 'running-software|category="running_software"|running_software_enabled' \
-  /tmp/wda-agent-e2e.log 2>/dev/null || true)
+  /tmp/sda-agent-e2e.log 2>/dev/null || true)
 echo "    Enhanced-inventory running_software log lines: $EI_RS_LOG"
 if [ "${EI_RS_LOG:-0}" -gt 0 ]; then
   record PASS "Enhanced inventory running-software scanner active (agent log oracle)"
 else
   record FAIL "No enhanced-inventory running-software activity in agent log"
-  tail -80 /tmp/wda-agent-e2e.log 2>/dev/null || true
+  tail -80 /tmp/sda-agent-e2e.log 2>/dev/null || true
 fi
 
 # SBOM oracle: each SBOM tick emits `sbom snapshot components=N`.
 EI_SBOM_LOG=$(grep -cE 'sbom snapshot|category="sbom"|sbom_enabled' \
-  /tmp/wda-agent-e2e.log 2>/dev/null || true)
+  /tmp/sda-agent-e2e.log 2>/dev/null || true)
 echo "    Enhanced-inventory SBOM log lines: $EI_SBOM_LOG"
 if [ "${EI_SBOM_LOG:-0}" -gt 0 ]; then
   record PASS "Enhanced inventory SBOM scanner active (agent log oracle)"
 else
   record FAIL "No enhanced-inventory SBOM activity in agent log"
-  tail -80 /tmp/wda-agent-e2e.log 2>/dev/null || true
+  tail -80 /tmp/sda-agent-e2e.log 2>/dev/null || true
 fi
 
 # Browser-extensions oracle: each tick emits
 # `browser-extensions snapshot count=N`.
 EI_BE_LOG=$(grep -cE 'browser-extensions snapshot|category="browser_extensions"|browser_extensions_enabled' \
-  /tmp/wda-agent-e2e.log 2>/dev/null || true)
+  /tmp/sda-agent-e2e.log 2>/dev/null || true)
 echo "    Enhanced-inventory browser-extensions log lines: $EI_BE_LOG"
 if [ "${EI_BE_LOG:-0}" -gt 0 ]; then
   record PASS "Enhanced inventory browser-extensions scanner active (agent log oracle)"
 else
   record FAIL "No enhanced-inventory browser-extensions activity in agent log"
-  tail -80 /tmp/wda-agent-e2e.log 2>/dev/null || true
+  tail -80 /tmp/sda-agent-e2e.log 2>/dev/null || true
 fi
 
 # ── Step 14: Cleanup handled by trap ─────────────────────────────────

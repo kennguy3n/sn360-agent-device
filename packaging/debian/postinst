@@ -1,14 +1,14 @@
 #!/bin/sh
-# postinst script for wda-agent
+# postinst script for sda-agent
 #
-# Creates the `wda` user/group, ensures runtime directories exist with
+# Creates the `sda` user/group, ensures runtime directories exist with
 # correct ownership, and registers the systemd service. Idempotent so
 # upgrades and reinstalls are safe.
 
 set -e
 
-SDA_USER=wda
-SDA_GROUP=wda
+SDA_USER=sda
+SDA_GROUP=sda
 SDA_HOME=/var/lib/sn360-desktop-agent
 SDA_LOG=/var/log/sn360-desktop-agent
 SDA_CONF=/etc/sn360-desktop-agent
@@ -45,9 +45,9 @@ case "$1" in
 
         if [ -d /run/systemd/system ]; then
             systemctl daemon-reload >/dev/null 2>&1 || true
-            systemctl enable wda-agent.service >/dev/null 2>&1 || true
+            systemctl enable sda-agent.service >/dev/null 2>&1 || true
             if [ -z "${DPKG_ROOT:-}" ]; then
-                systemctl start wda-agent.service >/dev/null 2>&1 || true
+                systemctl start sda-agent.service >/dev/null 2>&1 || true
             fi
         fi
         ;;

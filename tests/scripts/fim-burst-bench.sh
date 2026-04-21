@@ -15,7 +15,7 @@ REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 cd "$REPO_ROOT"
 
 FILE_COUNT=${FILE_COUNT:-1000}
-WATCH_DIR=${WATCH_DIR:-/tmp/wda-bench-fim}
+WATCH_DIR=${WATCH_DIR:-/tmp/sda-bench-fim}
 
 if ! command -v pidstat &>/dev/null; then
   echo "ERROR: pidstat is required (apt install sysstat)" >&2
@@ -23,7 +23,7 @@ if ! command -v pidstat &>/dev/null; then
 fi
 
 echo "==> Building burst_watcher example (release)..."
-cargo build --release --example burst_watcher -p wda-fim 2>&1 | tail -3
+cargo build --release --example burst_watcher -p sda-fim 2>&1 | tail -3
 
 BIN="$REPO_ROOT/target/release/examples/burst_watcher"
 if [[ ! -x "$BIN" ]]; then
@@ -35,7 +35,7 @@ rm -rf "$WATCH_DIR"
 mkdir -p "$WATCH_DIR"
 
 echo "==> Starting burst_watcher on $WATCH_DIR..."
-"$BIN" "$WATCH_DIR" &>/tmp/wda-burst-watcher.log &
+"$BIN" "$WATCH_DIR" &>/tmp/sda-burst-watcher.log &
 BENCH_PID=$!
 
 cleanup() {
@@ -49,7 +49,7 @@ sleep 2
 
 if ! kill -0 "$BENCH_PID" 2>/dev/null; then
   echo "ERROR: burst_watcher exited early" >&2
-  cat /tmp/wda-burst-watcher.log
+  cat /tmp/sda-burst-watcher.log
   exit 1
 fi
 

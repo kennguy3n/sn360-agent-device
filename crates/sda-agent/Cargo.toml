@@ -1,0 +1,39 @@
+[package]
+name = "sda-agent"
+description = "Binary entry point for SN360 Desktop Agent"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[[bin]]
+name = "sda-agent"
+path = "src/main.rs"
+
+[dependencies]
+sda-core = { workspace = true }
+sda-comms = { workspace = true }
+sda-event-bus = { workspace = true }
+sda-pal = { workspace = true }
+sda-fim = { workspace = true }
+sda-logcollector = { workspace = true, features = ["linux-journal"] }
+sda-inventory = { workspace = true }
+sda-sca = { workspace = true }
+sda-active-response = { workspace = true }
+sda-rootcheck = { workspace = true }
+sda-local-detection = { workspace = true }
+sda-enhanced-inventory = { workspace = true }
+sda-updater = { workspace = true }
+tokio = { workspace = true, features = ["rt-multi-thread"] }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+anyhow = { workspace = true }
+serde_json = { workspace = true }
+gethostname = { workspace = true }
+sha2 = { workspace = true }
+
+[target.'cfg(unix)'.dependencies]
+nix = { workspace = true }
+libc = "0.2"
+
+[dev-dependencies]
+tempfile = "3"

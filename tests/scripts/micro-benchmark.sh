@@ -22,10 +22,10 @@ if cargo bench --bench crypto_bench 2>/dev/null; then
   echo "    Criterion benchmark completed (see target/criterion/ for reports)"
 else
   echo "    Criterion bench not found; running inline timing test..."
-  cargo test --release -p wda-comms --lib -- --ignored bench 2>/dev/null || true
+  cargo test --release -p sda-comms --lib -- --ignored bench 2>/dev/null || true
 
   # Fallback: measure encrypt/decrypt round-trip via a small Rust snippet
-  cat > /tmp/wda_crypto_bench.rs << 'BENCH_EOF'
+  cat > /tmp/sda_crypto_bench.rs << 'BENCH_EOF'
 use std::time::Instant;
 fn main() {
     // Simple throughput estimation: AES-256-CBC encrypt/decrypt 1 MB
@@ -44,7 +44,7 @@ fn main() {
              throughput_mbps, iterations, elapsed.as_secs_f64());
 }
 BENCH_EOF
-  echo "    (Criterion benchmarks can be added to crates/wda-comms/benches/)"
+  echo "    (Criterion benchmarks can be added to crates/sda-comms/benches/)"
 fi
 
 echo ""
@@ -58,7 +58,7 @@ else
   echo "    Running inline hashing benchmark..."
 
   # Create test files of various sizes
-  BENCH_DIR="/tmp/wda-hash-bench"
+  BENCH_DIR="/tmp/sda-hash-bench"
   rm -rf "$BENCH_DIR"
   mkdir -p "$BENCH_DIR"
 
@@ -100,12 +100,12 @@ else
 
   # Run event bus tests in release mode and time them
   START_NS=$(date +%s%N)
-  cargo test --release -p wda-event-bus -- 2>/dev/null
+  cargo test --release -p sda-event-bus -- 2>/dev/null
   END_NS=$(date +%s%N)
 
   ELAPSED_MS=$(( (END_NS - START_NS) / 1000000 ))
   echo "    Event bus test suite completed in ${ELAPSED_MS}ms (release mode)"
-  echo "    (Add Criterion benchmarks to crates/wda-event-bus/benches/ for detailed throughput)"
+  echo "    (Add Criterion benchmarks to crates/sda-event-bus/benches/ for detailed throughput)"
 fi
 
 echo ""
@@ -124,7 +124,7 @@ BUILD_S=$(echo "scale=1; $BUILD_MS / 1000" | bc)
 echo "    Clean release build time: ${BUILD_S}s"
 
 # Binary size
-BIN_SIZE=$(stat --format='%s' ./target/release/wda-agent 2>/dev/null || stat -f '%z' ./target/release/wda-agent 2>/dev/null || echo "0")
+BIN_SIZE=$(stat --format='%s' ./target/release/sda-agent 2>/dev/null || stat -f '%z' ./target/release/sda-agent 2>/dev/null || echo "0")
 BIN_MB=$(echo "scale=2; $BIN_SIZE / 1048576" | bc 2>/dev/null || echo "N/A")
 echo "    Binary size (stripped): ${BIN_MB} MB"
 
@@ -132,7 +132,7 @@ echo ""
 echo "======================================================================"
 echo "  Micro-benchmarks complete."
 echo "  For detailed profiling, add Criterion benchmarks to:"
-echo "    crates/wda-comms/benches/crypto_bench.rs"
-echo "    crates/wda-fim/benches/fim_bench.rs"
-echo "    crates/wda-event-bus/benches/eventbus_bench.rs"
+echo "    crates/sda-comms/benches/crypto_bench.rs"
+echo "    crates/sda-fim/benches/fim_bench.rs"
+echo "    crates/sda-event-bus/benches/eventbus_bench.rs"
 echo "======================================================================"

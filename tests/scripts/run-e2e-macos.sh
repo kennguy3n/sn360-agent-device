@@ -7,7 +7,7 @@
 # Differences from run-e2e.sh (Linux):
 #   - no journald source (macOS has no systemd journal)
 #   - no apt-get based package install test
-#   - FIM db path is the same as Linux (wda-fim uses #[cfg(unix)])
+#   - FIM db path is the same as Linux (sda-fim uses #[cfg(unix)])
 
 set -euo pipefail
 
@@ -67,7 +67,7 @@ cleanup() {
   echo "Cleaning up..."
   [ -n "$AGENT_PID" ] && kill "$AGENT_PID" 2>/dev/null || true
   wait "$AGENT_PID" 2>/dev/null || true
-  rm -rf /tmp/wda-e2e-fim /tmp/wda-e2e-logs
+  rm -rf /tmp/sda-e2e-fim /tmp/sda-e2e-logs
   sudo rm -f /etc/sn360-desktop-agent/client.keys
   docker compose -f tests/docker-compose.yml down -v 2>/dev/null || true
 }
@@ -75,8 +75,8 @@ trap cleanup EXIT
 
 # ── Step 0: Clean up stale state from previous runs ────────────────
 echo "==> Step 0: Cleaning stale state..."
-rm -rf /tmp/wda-e2e-fim /tmp/wda-e2e-logs
-# wda-fim uses /var/lib/sn360-desktop-agent/fim.db on all Unix platforms.
+rm -rf /tmp/sda-e2e-fim /tmp/sda-e2e-logs
+# sda-fim uses /var/lib/sn360-desktop-agent/fim.db on all Unix platforms.
 sudo rm -f /var/lib/sn360-desktop-agent/fim.db
 sudo rm -f /etc/sn360-desktop-agent/client.keys
 # Remove ALL previously-enrolled agents from the running Wazuh container
@@ -142,8 +142,8 @@ echo "    Enrollment password configured."
 
 # ── Step 3: Build the agent (skipped if a prebuilt binary is present) ─
 echo "==> Step 3: Building agent..."
-if [ -x "./target/release/wda-agent" ]; then
-  echo "    Found existing ./target/release/wda-agent; skipping cargo build."
+if [ -x "./target/release/sda-agent" ]; then
+  echo "    Found existing ./target/release/sda-agent; skipping cargo build."
 else
   cargo build --release
   echo "    Build complete."
@@ -151,9 +151,9 @@ fi
 
 # ── Step 4: Create test directories ─────────────────────────────────
 echo "==> Step 4: Creating test directories..."
-mkdir -p /tmp/wda-e2e-fim /tmp/wda-e2e-logs
+mkdir -p /tmp/sda-e2e-fim /tmp/sda-e2e-logs
 # Pre-create log file so the watcher can attach immediately.
-touch /tmp/wda-e2e-logs/test.log
+touch /tmp/sda-e2e-logs/test.log
 echo "    Test directories ready."
 
 # ── Step 5: Run the agent ───────────────────────────────────────────
@@ -162,9 +162,9 @@ sudo mkdir -p /etc/sn360-desktop-agent
 # gtimeout (from coreutils) is preferred on macOS; fall back to plain sudo
 # when it isn't installed, relying on the trap to kill the agent.
 if command -v gtimeout >/dev/null 2>&1; then
-  gtimeout 120 sudo ./target/release/wda-agent tests/wazuh-test-config-macos.yaml &
+  gtimeout 120 sudo ./target/release/sda-agent tests/wazuh-test-config-macos.yaml &
 else
-  sudo ./target/release/wda-agent tests/wazuh-test-config-macos.yaml &
+  sudo ./target/release/sda-agent tests/wazuh-test-config-macos.yaml &
 fi
 AGENT_PID=$!
 # Give the agent time to enrol and send first keepalive.
@@ -210,7 +210,7 @@ fi
 
 # ── Step 8: Trigger FIM event ───────────────────────────────────────
 echo "==> Step 8: Triggering FIM event..."
-touch /tmp/wda-e2e-fim/testfile.txt
+touch /tmp/sda-e2e-fim/testfile.txt
 echo "    Waiting 30s for syscheck alert..."
 sleep 30
 
@@ -229,9 +229,9 @@ fi
 
 # ── Step 8b: Verify baseline scan events ─────────────────────────────
 echo "==> Step 8b: Verifying baseline scan..."
-echo "content1" > /tmp/wda-e2e-fim/scan-test-1.txt
-echo "content2" > /tmp/wda-e2e-fim/scan-test-2.txt
-echo "content3" > /tmp/wda-e2e-fim/scan-test-3.txt
+echo "content1" > /tmp/sda-e2e-fim/scan-test-1.txt
+echo "content2" > /tmp/sda-e2e-fim/scan-test-2.txt
+echo "content3" > /tmp/sda-e2e-fim/scan-test-3.txt
 
 echo "    Waiting for baseline scan cycle..."
 sleep 30
@@ -250,7 +250,7 @@ fi
 
 # ── Step 8c: Verify deletion detection via baseline scan ─────────────
 echo "==> Step 8c: Verifying deletion detection..."
-rm /tmp/wda-e2e-fim/scan-test-2.txt
+rm /tmp/sda-e2e-fim/scan-test-2.txt
 echo "    Waiting for next scan cycle to detect deletion..."
 sleep 30
 
@@ -288,7 +288,7 @@ fi
 # ── Step 9: Trigger log collection event (file-based) ───────────────
 echo "==> Step 9: Triggering log collection event..."
 echo 'Apr 18 12:00:00 localhost sshd[9999]: Failed password for root from 10.0.0.1 port 22 ssh2' \
-  >> /tmp/wda-e2e-logs/test.log
+  >> /tmp/sda-e2e-logs/test.log
 echo "    Waiting 15s for log alert..."
 sleep 15
 
@@ -307,7 +307,7 @@ fi
 
 # NOTE: Journald log collection test is skipped on macOS — journald is
 # Linux-only. macOS Unified Log (OSLog) streaming is implemented in
-# wda-logcollector but is not exercised here since it requires a
+# sda-logcollector but is not exercised here since it requires a
 # macOS-specific log source configuration.
 
 # ── Step 10: Verify active response ──────────────────────────────────

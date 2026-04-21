@@ -8,7 +8,7 @@
 # Differences from run-e2e.sh (Linux):
 #   - no journald source (Windows has no systemd journal)
 #   - no apt-get based package install test
-#   - paths are Windows-style (C:\wda-e2e-*)
+#   - paths are Windows-style (C:\sda-e2e-*)
 #   - agent keys live under %PROGRAMDATA%\sn360-desktop-agent\
 #     (note: current enrollment code still defaults to
 #      C:\Program Files\SN360DesktopAgent\client.keys; this script
@@ -45,8 +45,8 @@ $script:ExitCode = 0
 # Built at runtime to avoid pre-commit secret scanners.
 $E2eEnrollPass = 'Test' + 'Pass' + 'word123'
 
-$FimDir   = 'C:\wda-e2e-fim'
-$LogDir   = 'C:\wda-e2e-logs'
+$FimDir   = 'C:\sda-e2e-fim'
+$LogDir   = 'C:\sda-e2e-logs'
 $LogFile  = Join-Path $LogDir 'test.log'
 $KeysDir1 = Join-Path $env:PROGRAMDATA 'sn360-desktop-agent'
 $KeysFile1 = Join-Path $KeysDir1 'client.keys'
@@ -167,7 +167,7 @@ sed -i 's|<logall>no</logall>|<logall>yes</logall>|;s|<logall_json>no</logall_js
 
     # ── Step 3: Build the agent (skipped if a prebuilt binary is present) ─
     Write-Host '==> Step 3: Building agent...'
-    $PrebuiltAgent = Join-Path $RepoRoot 'target\release\wda-agent.exe'
+    $PrebuiltAgent = Join-Path $RepoRoot 'target\release\sda-agent.exe'
     if (Test-Path $PrebuiltAgent) {
         Write-Host "    Found existing $PrebuiltAgent; skipping cargo build."
     } else {
@@ -189,7 +189,7 @@ sed -i 's|<logall>no</logall>|<logall>yes</logall>|;s|<logall_json>no</logall_js
 
     # ── Step 5: Run the agent ───────────────────────────────────────────
     Write-Host '==> Step 5: Starting agent...'
-    $AgentExe = Join-Path $RepoRoot 'target\release\wda-agent.exe'
+    $AgentExe = Join-Path $RepoRoot 'target\release\sda-agent.exe'
     if (-not (Test-Path $AgentExe)) {
         Record -Status FAIL -Description "Agent binary not found at $AgentExe"
         exit 1
@@ -291,7 +291,7 @@ sed -i 's|<logall>no</logall>|<logall>yes</logall>|;s|<logall_json>no</logall_js
     }
 
     # NOTE: journald log collection test is skipped on Windows — journald is
-    # Linux-only. Windows EventLog support exists in wda-logcollector but is
+    # Linux-only. Windows EventLog support exists in sda-logcollector but is
     # not exercised here since EventLog ingestion lives in a separate path.
 
     # ── Step 10: Verify active response ──────────────────────────────────

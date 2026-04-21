@@ -1,18 +1,18 @@
 #!/usr/bin/env bash
-# Build a .pkg installer for wda-agent on macOS.
+# Build a .pkg installer for sda-agent on macOS.
 #
 # Requires `pkgbuild` and `productbuild` (ship with Xcode Command Line
 # Tools). Code-signing is out of scope for this script — sign the
 # resulting .pkg with `productsign` in a downstream release job.
 #
 # Usage:
-#   BIN=target/release/wda-agent packaging/macos/build-pkg.sh
+#   BIN=target/release/sda-agent packaging/macos/build-pkg.sh
 #
-# Output: dist/wda-agent-<version>.pkg
+# Output: dist/sda-agent-<version>.pkg
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
-BIN="${BIN:-$ROOT/target/release/wda-agent}"
+BIN="${BIN:-$ROOT/target/release/sda-agent}"
 VERSION="${VERSION:-$(grep -E '^version' "$ROOT/Cargo.toml" | head -n1 | cut -d'"' -f2)}"
 OUT_DIR="${OUT_DIR:-$ROOT/dist}"
 IDENT="com.sn360.desktop-agent"
@@ -36,7 +36,7 @@ ROOTFS="$WORK/root"
 install -d -m 0755 "$ROOTFS/usr/local/bin"
 install -d -m 0755 "$ROOTFS/etc/sn360-desktop-agent/sca"
 install -d -m 0755 "$ROOTFS/Library/LaunchDaemons"
-install -m 0755 "$BIN" "$ROOTFS/usr/local/bin/wda-agent"
+install -m 0755 "$BIN" "$ROOTFS/usr/local/bin/sda-agent"
 install -m 0644 "$ROOT/packaging/config/config.yaml" \
     "$ROOTFS/etc/sn360-desktop-agent/config.yaml"
 install -m 0644 "$ROOT/packaging/macos/com.sn360.desktop-agent.plist" \
@@ -48,8 +48,8 @@ install -d -m 0755 "$SCRIPTS_DIR"
 install -m 0755 "$ROOT/packaging/macos/scripts/preinstall"  "$SCRIPTS_DIR/preinstall"
 install -m 0755 "$ROOT/packaging/macos/scripts/postinstall" "$SCRIPTS_DIR/postinstall"
 
-COMPONENT="$WORK/wda-agent-component.pkg"
-FINAL="$OUT_DIR/wda-agent-$VERSION.pkg"
+COMPONENT="$WORK/sda-agent-component.pkg"
+FINAL="$OUT_DIR/sda-agent-$VERSION.pkg"
 
 pkgbuild \
     --root "$ROOTFS" \

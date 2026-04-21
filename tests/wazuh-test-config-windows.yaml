@@ -13,14 +13,14 @@ modules:
     enabled: true
     scan_interval: 20
     directories:
-      - path: "C:\\wda-e2e-fim"
+      - path: "C:\\sda-e2e-fim"
         realtime: true
         check_sha256: true
   logcollector:
     enabled: true
     sources:
       - source_type: "file"
-        path: "C:\\wda-e2e-logs\\test.log"
+        path: "C:\\sda-e2e-logs\\test.log"
         format: "syslog"
   inventory:
     enabled: true
