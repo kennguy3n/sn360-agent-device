@@ -61,10 +61,19 @@ float_gt() {
 }
 
 cleanup() {
+  # SDA_PID is the real agent child; SUDO_PID is the sudo wrapper
+  # that forked it. We kill the agent first (it drives the shutdown
+  # path cleanly) and then fall back to the sudo wrapper in case the
+  # child somehow survived or never materialised.
   if [ -n "${SDA_PID:-}" ] && kill -0 "$SDA_PID" 2>/dev/null; then
     sudo kill -TERM "$SDA_PID" 2>/dev/null || true
     sleep 1
     sudo kill -KILL "$SDA_PID" 2>/dev/null || true
+  fi
+  if [ -n "${SUDO_PID:-}" ] && kill -0 "$SUDO_PID" 2>/dev/null; then
+    sudo kill -TERM "$SUDO_PID" 2>/dev/null || true
+    sleep 1
+    sudo kill -KILL "$SUDO_PID" 2>/dev/null || true
   fi
   rm -rf "$FIM_DIR" 2>/dev/null || true
 }
@@ -92,11 +101,28 @@ fi
 # ── 3. Start agent & measure idle ─────────────────────────────────────
 info "Starting agent for idle measurement (${IDLE_MEASURE_SECS}s)..."
 sudo mkdir -p /etc/sn360-desktop-agent
+# `sudo ... &` puts the sudo wrapper in the background; `$!` is the
+# wrapper's PID, NOT the sda-agent child it execs. If we use that PID
+# for ps/pidstat we silently measure an idle sudo process (~3 MB RSS,
+# 0 % CPU) and the regression gate passes regardless of the agent's
+# real resource use. Resolve the actual agent child via pgrep after
+# giving the wrapper enough time to exec.
 sudo "$SDA_BIN" "$SDA_CONFIG" >"$OUTPUT_DIR/agent.log" 2>&1 &
-SDA_PID=$!
+SUDO_PID=$!
 # Give tokio time to spin up all modules and for enrollment backoff to
 # reach steady state.
 sleep 15
+
+# Find the real agent PID. Match the absolute binary path to avoid
+# matching any other sda-agent instance on the runner, and explicitly
+# drop the sudo wrapper PID from the results.
+SDA_PID=$(pgrep -f "^${SDA_BIN}( |$)" 2>/dev/null | grep -v "^${SUDO_PID}$" | head -1 || true)
+if [ -z "$SDA_PID" ]; then
+  fail "could not resolve sda-agent child PID (sudo wrapper was $SUDO_PID)"
+  tail -40 "$OUTPUT_DIR/agent.log" | tee -a "$REPORT" || true
+  exit 1
+fi
+info "sudo wrapper PID: $SUDO_PID, sda-agent PID: $SDA_PID"
 
 if ! kill -0 "$SDA_PID" 2>/dev/null; then
   fail "agent exited before idle measurement could start"
