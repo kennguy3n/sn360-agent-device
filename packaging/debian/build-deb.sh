@@ -40,6 +40,7 @@ install -m 0644 "$ROOT/packaging/systemd/wda-agent.service" \
 sed -E "s/^Version: .*/Version: $VERSION/; s/^Architecture: .*/Architecture: $ARCH/" \
     "$ROOT/packaging/debian/control" > "$STAGE/DEBIAN/control"
 install -m 0644 "$ROOT/packaging/debian/conffiles" "$STAGE/DEBIAN/conffiles"
+install -m 0755 "$ROOT/packaging/debian/preinst"  "$STAGE/DEBIAN/preinst"
 install -m 0755 "$ROOT/packaging/debian/postinst" "$STAGE/DEBIAN/postinst"
 install -m 0755 "$ROOT/packaging/debian/prerm"    "$STAGE/DEBIAN/prerm"
 install -m 0755 "$ROOT/packaging/debian/postrm"   "$STAGE/DEBIAN/postrm"

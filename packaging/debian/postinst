@@ -13,26 +13,6 @@ SDA_HOME=/var/lib/sn360-desktop-agent
 SDA_LOG=/var/log/sn360-desktop-agent
 SDA_CONF=/etc/sn360-desktop-agent
 
-# Legacy install paths used by pre-rename builds; migrated on first
-# `configure` so operators upgrading from an older wazuh-desktop-agent
-# package keep their configuration and state.
-LEGACY_HOME=/var/lib/wazuh-desktop-agent
-LEGACY_LOG=/var/log/wazuh-desktop-agent
-LEGACY_CONF=/etc/wazuh-desktop-agent
-
-migrate_legacy_dir() {
-    src="$1"
-    dst="$2"
-    # Only migrate when the legacy directory exists, the new one does not
-    # already contain anything, and we're not running in a dpkg chroot
-    # scenario where both paths would point at the same location.
-    if [ -d "$src" ] && [ ! -e "$dst" ]; then
-        mkdir -p "$(dirname "$dst")"
-        mv "$src" "$dst"
-        echo "migrated $src -> $dst" >&2
-    fi
-}
-
 case "$1" in
     configure)
         if ! getent group "$SDA_GROUP" >/dev/null; then
@@ -45,9 +25,9 @@ case "$1" in
                     "$SDA_USER"
         fi
 
-        migrate_legacy_dir "$LEGACY_CONF" "$SDA_CONF"
-        migrate_legacy_dir "$LEGACY_HOME" "$SDA_HOME"
-        migrate_legacy_dir "$LEGACY_LOG"  "$SDA_LOG"
+        # Legacy wazuh-desktop-agent -> sn360-desktop-agent migration runs in
+        # the preinst script, before dpkg extracts the payload and creates
+        # the new directories. See packaging/debian/preinst.
 
         mkdir -p "$SDA_HOME" "$SDA_LOG" "$SDA_CONF" "$SDA_CONF/sca"
         chown -R "$SDA_USER:$SDA_GROUP" "$SDA_HOME" "$SDA_LOG"

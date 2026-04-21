@@ -55,12 +55,12 @@ getent group wda >/dev/null || groupadd -r wda
 getent passwd wda >/dev/null || \
     useradd -r -g wda -d %{_sharedstatedir}/sn360-desktop-agent \
             -s /sbin/nologin -c "SN360 Desktop Agent" wda
-exit 0
 
-%post
 # Migrate legacy wazuh-desktop-agent install paths from pre-rename builds
-# so operators upgrading keep their configuration and state. Only runs when
-# the legacy directory exists and the new one is absent.
+# so operators upgrading keep their configuration and state. Must run
+# before rpm extracts the payload, otherwise the new directories (which
+# are shipped in %files) already exist and the -e check below always
+# short-circuits to skip.
 for legacy_new in \
     "%{_sysconfdir}/wazuh-desktop-agent:%{_sysconfdir}/sn360-desktop-agent" \
     "%{_sharedstatedir}/wazuh-desktop-agent:%{_sharedstatedir}/sn360-desktop-agent" \
@@ -74,7 +74,9 @@ do
         echo "migrated $src -> $dst" >&2
     fi
 done
+exit 0
 
+%post
 %systemd_post wda-agent.service
 
 %preun
