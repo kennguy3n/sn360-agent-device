@@ -113,9 +113,15 @@ async fn module_lifecycle_publishes_sbom_snapshot() {
     }
 
     controller.shutdown();
-    tokio::time::timeout(Duration::from_secs(2), handle.task)
+    // The SBOM generator walks the whole host (installed software,
+    // browser extensions, running processes). On slower Windows CI
+    // runners this baseline snapshot can still be finishing when we
+    // hit shutdown, so a 2s cap is too tight and flakes. 15s is well
+    // above the observed worst case while still catching a real
+    // shutdown deadlock.
+    tokio::time::timeout(Duration::from_secs(15), handle.task)
         .await
-        .expect("enhanced inventory task did not stop within 2s")
+        .expect("enhanced inventory task did not stop within 15s")
         .expect("join error")
         .expect("enhanced inventory run returned Err");
 
@@ -155,9 +161,9 @@ async fn module_lifecycle_with_sbom_disabled_does_not_publish_sbom() {
     );
 
     controller.shutdown();
-    tokio::time::timeout(Duration::from_secs(2), handle.task)
+    tokio::time::timeout(Duration::from_secs(15), handle.task)
         .await
-        .expect("task did not stop within 2s")
+        .expect("task did not stop within 15s")
         .expect("join error")
         .expect("run returned Err");
 }

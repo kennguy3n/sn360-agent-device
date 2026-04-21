@@ -1,0 +1,33 @@
+# cargo-audit configuration.
+#
+# The CI workflow runs `cargo audit --deny warnings`, which surfaces
+# both security vulnerabilities (RUSTSEC-YYYY-NNNN with kind=vulnerability)
+# and informational advisories (unmaintained / unsound / notice). We want
+# strict failure on anything new, but we carry a small ignore list for
+# warnings-only advisories that come from transitive dependencies we do
+# not directly control. Each entry MUST carry a justification and,
+# ideally, a tracking link.
+#
+# Do NOT add ignores for `vulnerability`-kind advisories. Those are
+# real CVEs and must be fixed by bumping (or vendoring) the dependency.
+
+[advisories]
+ignore = [
+    # `instant` is unmaintained. It is pulled in transitively via
+    # `notify-types` -> `notify` (our filesystem watcher). The upstream
+    # `notify` crate is already migrating off `instant` in its 8.x line
+    # but the stable 7.x release still depends on it. No code path in
+    # SDA uses `instant` directly; it is only used internally by
+    # `notify` for debouncing timestamps.
+    # https://rustsec.org/advisories/RUSTSEC-2024-0384
+    "RUSTSEC-2024-0384",
+
+    # `rustls-pemfile` 2.x has been folded into `rustls-pki-types` and
+    # is technically unmaintained as a separate crate. We pull it in
+    # via the TLS CA-bundle loader in `sda-comms` (see
+    # `crates/sda-comms/src/transport/tls.rs`). The code it provides
+    # is a thin PEM parser with no known vulnerabilities; migration to
+    # `rustls-pki-types::pem` is tracked for a follow-up bump.
+    # https://rustsec.org/advisories/RUSTSEC-2025-0134
+    "RUSTSEC-2025-0134",
+]
