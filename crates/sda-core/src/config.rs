@@ -109,11 +109,10 @@ pub struct ServerConfig {
     #[serde(default = "default_server_port")]
     pub port: u16,
 
-    /// Transport protocol. Legacy values `"tcp"` and `"udp"` speak the
-    /// Wazuh-compatible AES/Blowfish-over-TCP/UDP protocol. `"http2"`
-    /// speaks the enhanced HTTP/2 protocol (Phase 5.6 / § 8.2 in the
-    /// proposal) and only works against SDA-aware servers. Defaults to
-    /// `"tcp"` for backward compatibility.
+    /// Transport protocol. `"tcp"` (the default) and `"udp"` use the
+    /// stream / datagram transports on the standard agent port.
+    /// `"http2"` selects the SN360 native HTTP/2 transport, which is
+    /// only supported against the SN360 Agent Gateway.
     #[serde(default = "default_protocol")]
     pub protocol: String,
 
@@ -121,35 +120,37 @@ pub struct ServerConfig {
     #[serde(default = "default_keepalive")]
     pub keepalive_interval: u64,
 
-    /// Enhanced-protocol toggles (Phase 5.6). All fields are off by
-    /// default so an unmodified config keeps speaking the legacy
-    /// Wazuh protocol.
+    /// Optional SN360 native protocol toggles (TLS 1.3 + MessagePack +
+    /// HTTP/2). All fields default **off** so an unmodified config
+    /// keeps the stable agent protocol behavior; operators running
+    /// against an SN360 Agent Gateway can flip them on.
     #[serde(default)]
     pub enhanced: EnhancedProtocolConfig,
 }
 
-/// Enhanced-protocol options (Phase 5.6).
+/// Optional SN360 native protocol options.
 ///
-/// These knobs enable opt-in TLS 1.3, MessagePack event serialization,
-/// and HTTP/2 transport. None of them are on by default — Wazuh 4.x
-/// servers don't understand any of them, so turning them on requires
-/// an SDA-aware server endpoint.
+/// These knobs opt the agent into the SN360 native protocol: TLS 1.3,
+/// MessagePack event serialization, and HTTP/2 transport against the
+/// SN360 Agent Gateway. All of them default **off** — turning them on
+/// requires an SN360-aware server endpoint.
 ///
 /// The actual transport / serializer implementations live in
 /// `sda-comms` (see `transport::tls`, `transport::http2`) and
 /// `sda-comms::msgpack` respectively.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct EnhancedProtocolConfig {
-    /// Wrap the legacy TCP transport in TLS 1.3 (via `rustls`). Has
-    /// no effect when `protocol == "udp"` (TLS requires a stream
+    /// Wrap the stream transport in TLS 1.3 (via `rustls`). Has no
+    /// effect when `protocol == "udp"` (TLS requires a stream
     /// transport) or when `protocol == "http2"` (HTTP/2 already
-    /// negotiates TLS via ALPN).
+    /// negotiates TLS via ALPN). Defaults to `false`.
     #[serde(default)]
     pub tls: bool,
 
-    /// Event serialization format. `"json"` (the default) preserves
-    /// Wazuh compatibility; `"msgpack"` produces significantly
-    /// smaller frames and is only understood by SDA-aware servers.
+    /// Event serialization format. `"json"` (the default) is the
+    /// standard agent event encoding; `"msgpack"` produces
+    /// significantly smaller frames and is only understood by
+    /// SN360-aware server endpoints.
     #[serde(default = "default_enhanced_serialization")]
     pub serialization: String,
 

@@ -3,7 +3,7 @@
 Canonical reference for every field understood by
 `AgentConfig` in [`crates/sda-core/src/config.rs`](../crates/sda-core/src/config.rs).
 Defaults shown here are what the agent uses when the field is
-absent from `config.yaml`; see `tests/wazuh-test-config.yaml` for
+absent from `config.yaml`; see `tests/sda-test-config.yaml` for
 an end-to-end working example.
 
 ---
@@ -11,55 +11,63 @@ an end-to-end working example.
 ## Top-level shape
 
 ```yaml
-server:            # required — connection to the Wazuh / SN360 manager
+server:            # required — connection to the SN360 Control Plane
 enrollment:        # required if auto-enrolling
 modules:           # optional — per-module toggles, defaults enable all
 updater:           # optional — self-update configuration
 resource_limits:   # optional — per-host budget overrides
 logging:           # optional — RUST_LOG-style filter override
+legacy_adapter:    # optional — only relevant when built with the `legacy-siem` Cargo feature
 ```
 
 ## `server`
 
 ```yaml
 server:
-  address: "wazuh.example.com"     # hostname or IP of the manager
+  address: "sn360.example.com"     # hostname or IP of the manager / Agent Gateway
   port: 1514                        # default: 1514
-  protocol: "tcp"                   # "tcp" | "udp" | "http2" (Phase 5.6), default: "tcp"
+  protocol: "tcp"                   # "tcp" (default) | "udp" | "http2" (SN360 native)
   keepalive_interval: 600           # seconds, default: 600
-  enhanced:                          # Phase 5.6 enhanced protocol (opt-in)
-    tls: false                       # enable TLS 1.3 transport
-    serialization: "json"             # "json" | "msgpack", default: "json"
-    tls_ca_bundle_path: null          # optional path to PEM bundle
-    tls_pinned_sha256: null           # optional 64-char hex leaf fingerprint
+  enhanced:                         # SN360 native protocol knobs (all default off)
+    tls: false                       # opt in to TLS 1.3 transport, default: false
+    serialization: "json"            # "json" (default) | "msgpack"
+    tls_ca_bundle_path: null         # optional path to PEM bundle
+    tls_pinned_sha256: null          # optional 64-char hex leaf fingerprint
 ```
 
-- `enhanced.tls = true` switches the comms layer onto `rustls`
-  with TLS 1.3 enforced (`rustls::version::TLS13`).
+- `enhanced.tls = true` opts into `rustls` with TLS 1.3 enforced
+  (`rustls::version::TLS13`). Keep it off to preserve the stable
+  agent stream protocol against existing SIEM managers.
 - `enhanced.serialization = "msgpack"` serialises events with
   `rmp-serde` instead of JSON; 50–70 % smaller on inventory-heavy
-  payloads.
-- `protocol = "http2"` (at the top-level `server:` scope, NOT inside
-  `enhanced:`) switches to the HTTP/2 transport. It requires
-  `enhanced.tls = true` — HTTP/2 is only speaking over TLS with
-  ALPN `h2` in this agent; a plain-text h2c transport is not
-  supported.
+  payloads. Requires an SN360-aware server endpoint — leave it at
+  `"json"` for legacy SIEM managers.
+- `protocol = "http2"` switches to the SN360 native HTTP/2
+  transport. It requires `enhanced.tls = true` — HTTP/2 is only
+  spoken over TLS with ALPN `h2`; plain-text h2c is not supported.
+  `"tcp"` (default) and `"udp"` are the standard stream /
+  datagram transports used against existing SIEM managers.
 
 ## `enrollment`
 
 ```yaml
 enrollment:
-  server: "wazuh.example.com"     # manager authd host; defaults to server.address
+  server: "sn360.example.com"     # manager enrolment host; defaults to server.address
   port: 1515                        # default: 1515
   password_file: "/etc/sn360-desktop-agent/enrollment.password"
   auto_enroll: true                 # default: true
   agent_name: null                  # defaults to hostname
-  agent_groups: []                   # Wazuh agent group tags
+  agent_groups: []                  # agent group tags
 ```
 
-Enrolment writes `client.keys` into the same directory as
-`config.yaml`. The systemd unit's `ReadWritePaths=` must include
-this directory or enrolment will fail with `EACCES`.
+Enrolment talks to the manager's enrolment daemon on port 1515
+and writes `client.keys` into the same directory as `config.yaml`.
+The systemd unit's `ReadWritePaths=` must include this directory
+or enrolment will fail with `EACCES`. When the SN360 native
+protocol is selected (`server.protocol = "http2"` +
+`enhanced.tls = true`), enrolment uses mTLS against the SN360
+Agent Gateway and the native identity is persisted alongside the
+config.
 
 ## `modules`
 
@@ -198,6 +206,35 @@ and overrides `RUST_LOG` if both are set.
 
 ---
 
+## `legacy_adapter`
+
+The legacy SIEM protocol adapter is **optional** and compiled in
+only when `sda-comms` is built with the `legacy-siem` Cargo
+feature. When that feature is off, this stanza is ignored with a
+warning. When it is on, use this block to pin a deployment to the
+legacy path while migrating onto the SN360 native protocol:
+
+```yaml
+legacy_adapter:
+  enabled: false                    # default: false
+  manager_address: "siem.example.com"
+  manager_port: 1514                # legacy TCP/UDP port
+  transport: "tcp"                  # "tcp" | "udp"
+  enrollment_port: 1515             # authd-compatible enrolment port
+```
+
+Switching `legacy_adapter.enabled: true` implies
+`server.enhanced.tls = false`, `server.enhanced.serialization =
+"json"`, and `server.protocol = "tcp"` for that deployment’s
+session — the adapter cannot negotiate the SN360 native protocol
+knobs. See
+[`proprietary-licensing-rationale.md`](./proprietary-licensing-rationale.md)
+for the clean-room interoperability statement and the
+[revised phase plan](./revised-phase-plan.md) for the deprecation
+timeline.
+
+---
+
 ## Migration notes
 
 - `server.protocol` replaces the legacy `server.transport` field.
@@ -205,6 +242,8 @@ and overrides `RUST_LOG` if both are set.
   (`/etc/wazuh-desktop-agent/`) are read at startup and a warning
   is logged; move them to `/etc/sn360-desktop-agent/` before the
   next major release.
-- The Phase 5.6 `server.enhanced` stanza is additive — omit it
-  entirely to stay on the default legacy protocol (fully Wazuh
-  4.x compatible).
+- The `server.enhanced` stanza is additive — omit it entirely to
+  keep the stable stream protocol against an existing SIEM
+  manager. Explicitly set its fields to `true` / `"msgpack"` and
+  switch `server.protocol` to `"http2"` to opt into the SN360
+  native protocol against an SN360 Agent Gateway.

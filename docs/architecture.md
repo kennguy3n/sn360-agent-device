@@ -16,7 +16,7 @@ the shape of the code as shipped today.
 | `sda-core`                     | Config loading/validation (`AgentConfig`) and shutdown coordination.           |
 | `sda-pal`                      | Platform Abstraction Layer: filesystem watcher, power monitor, system info.   |
 | `sda-event-bus`                | Bounded async channels with priority queues and back-pressure.                 |
-| `sda-comms`                    | Wazuh legacy transport (TCP/UDP + Blowfish/AES), enrolment, Phase 5.6 TLS 1.3 / HTTP/2 / MessagePack. |
+| `sda-comms`                    | Communication layer. SN360 native protocol (TLS 1.3 + HTTP/2 + MessagePack, default) and optional legacy SIEM protocol adapter (TCP/UDP + Blowfish/AES, behind the `legacy-siem` Cargo feature). |
 | `sda-fim`                      | File integrity monitoring: real-time watcher, idle-aware baseline scan, SQLite state. |
 | `sda-logcollector`             | Log collection: file tailers, journald (Linux), EvtSubscribe (Windows), OSLog (macOS). |
 | `sda-inventory`                | Classic syscollector-compatible inventory.                                     |
@@ -43,7 +43,7 @@ foundation layer with minimal coupling to each other.
   |   +-----------+      |                                      |
   |   | Inventory |------+       +----------+    +--------+    |
   |   +-----------+      |====>  | Router   |==> | Comms  |=====>  Manager
-  |   | LogColl   |------+       | (main.rs)|    | (1514) |    |  (Wazuh / SN360)
+  |   | LogColl   |------+       | (main.rs)|    | Comms  |    |  (SN360 Control Plane)
   |   +-----------+      |       +----------+    +--------+    |
   |   | LDE       |------+                                      |
   |   +-----------+      |                                      |
@@ -58,14 +58,18 @@ foundation layer with minimal coupling to each other.
 
 Every module publishes `EventKind` variants to the bus. The
 router in `sda-agent::main::map_event_to_message` maps each
-`EventKind` to a `MessageType` (and therefore a Wazuh queue
-prefix) before handing it off to `sda-comms`.
+`EventKind` to a `MessageType` before handing it off to
+`sda-comms`. On the SN360 native protocol path each `MessageType`
+maps to a native event category; on the legacy adapter path each
+`MessageType` is additionally prefixed with a legacy queue prefix
+to match the publicly documented SIEM manager wire protocol.
 
-Queue prefixes are enforced in
+Legacy SIEM queue prefixes are enforced in
 [`crates/sda-comms/src/protocol.rs`
-`WazuhMessage::encode_body`](../crates/sda-comms/src/protocol.rs):
+`WazuhMessage::encode_body`](../crates/sda-comms/src/protocol.rs)
+and apply **only when the `legacy-siem` feature is active**:
 
-| MessageType     | Prefix              |
+| MessageType     | Legacy prefix       |
 |-----------------|---------------------|
 | `Log`           | `1:`                |
 | `Syscheck`      | `8:syscheck:`       |
@@ -77,25 +81,33 @@ Queue prefixes are enforced in
 | control frames  | none (passthrough)  |
 
 Adding a new `MessageType` without an explicit arm here causes the
-Wazuh manager to silently drop the frame, so the protocol tests in
-`protocol.rs` exhaustively assert the prefixes.
+legacy SIEM manager to silently drop the frame, so the protocol
+tests in `protocol.rs` exhaustively assert the prefixes.
 
 ## 3. Communication layers
 
-### 3.1 Legacy (default)
+### 3.1 Stable stream protocol (default)
+
+The default comms path is UDP or TCP on port 1514 against an
+existing SIEM manager. This path is always compiled in and stays
+on when the `legacy-siem` Cargo feature is enabled (see
+[`proprietary-licensing-rationale.md`](./proprietary-licensing-rationale.md)
+for the clean-room interoperability statement):
 
 - UDP or TCP on port 1514.
 - Payloads encrypted with Blowfish (and AES, depending on server
-  negotiation). A single `WazuhCipher` is shared for the lifetime
-  of a session so per-agent `(global, local)` counters in
-  `remoted`'s `ReadSecMSG` stay monotonic.
-- Enrolment uses `authd` on 1515 with password authentication and
-  persists to `client.keys`.
+  negotiation). A single cipher is shared for the lifetime of a
+  session so per-agent `(global, local)` counters in the manager's
+  `remoted` stay monotonic.
+- Enrolment uses the publicly documented `authd`-compatible
+  endpoint on 1515 with password authentication and persists the
+  issued agent identity to `client.keys`.
 
-### 3.2 Enhanced (Phase 5.6, opt-in)
+### 3.2 SN360 Native Protocol (opt-in)
 
-Three orthogonal, individually toggleable options under
-`server.enhanced`:
+Three orthogonal knobs under `server.enhanced`, all default
+**off** today. Flip any of them on to move a deployment onto the
+SN360 native protocol against an SN360 Agent Gateway:
 
 | Option             | Crate surface                                   | Default |
 |--------------------|-------------------------------------------------|---------|
@@ -103,9 +115,12 @@ Three orthogonal, individually toggleable options under
 | MessagePack events | `sda_comms::msgpack::MessagePackSerializer`     | off     |
 | HTTP/2 transport   | `sda_comms::transport::http2` (requires TLS)    | off     |
 
-ALPN identifiers: `b"sda/1.0"` for enhanced TCP, `b"h2"` for
-HTTP/2. Certificate pinning is SHA-256 leaf-fingerprint based and
-configured via `server.enhanced.tls_pinned_sha256`.
+ALPN identifiers: `b"h2"` for HTTP/2, `b"sda/1.0"` for native
+TCP-over-TLS. Certificate pinning is SHA-256 leaf-fingerprint
+based and configured via `server.enhanced.tls_pinned_sha256`.
+Native enrolment is mTLS against the SN360 Agent Gateway. The
+[revised phase plan](./revised-phase-plan.md) tracks the work to
+promote the native path to default-on in a future phase.
 
 ## 4. Platform Abstraction Layer
 
@@ -131,8 +146,8 @@ proposal. Hard budgets (idle RSS < 15 MB, idle CPU < 0.1 %, binary
 | Layer            | Command                  | Coverage                                                 |
 |------------------|--------------------------|----------------------------------------------------------|
 | Unit             | `cargo test --all`       | 400+ tests across all crates                             |
-| Base E2E         | `make e2e`               | 14 assertions vs Wazuh 4.9.2                             |
-| Compat E2E       | `make e2e-compat`        | 14 assertions vs Wazuh 4.7.5                             |
+| Base E2E         | `make e2e`               | 14 assertions vs a reference SIEM manager (v4.9.2)       |
+| Compat E2E       | `make e2e-compat`        | 14 assertions vs a reference SIEM manager (v4.7.5)       |
 | Security E2E     | `make security-e2e`      | 10 attack scenarios (malware drop, brute force, etc.)    |
 | Benchmark gate   | `make benchmark-ci`      | idle RSS / CPU / binary size / FIM burst hard thresholds |
 | Fuzzing          | `cargo +nightly fuzz run` | Protocol, MessagePack, rule-store parsers                |

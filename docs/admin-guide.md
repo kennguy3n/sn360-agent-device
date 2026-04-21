@@ -1,8 +1,9 @@
 # SDA Administrator Guide
 
 Audience: SREs, security engineers, and packaging owners who
-deploy SDA to fleets of devices and integrate it with existing
-Wazuh or SN360 control planes.
+deploy SDA to fleets of devices and integrate it with the SN360
+Control Plane (or, when the optional legacy adapter is enabled,
+an existing legacy SIEM manager).
 
 For per-host install instructions see the
 [user guide](./user-guide.md); for module-level YAML see the
@@ -12,17 +13,25 @@ For per-host install instructions see the
 
 ## 1. Deployment topology
 
-SDA is a single static binary that speaks the Wazuh 4.x agent
-protocol on port 1514 (TCP or UDP) and enrols via `authd` on port
-1515. It is compatible with:
+SDA is a single static binary with two supported back ends:
 
-- Existing Wazuh 4.7.x – 4.9.x managers (validated in CI via
-  `make e2e` against `wazuh-manager:4.9.2` and `make e2e-compat`
-  against `wazuh-manager:4.7.5`).
-- SN360 Agent Gateway (mTLS entrypoint, not yet shipped — see
-  Phase 4.10 in `PROGRESS.md`).
-- Future Wazuh 5.x managers via the Phase 5.6 enhanced protocol
-  (TLS 1.3 + MessagePack + HTTP/2, opt-in).
+- **Existing SIEM manager (default today).** The binary speaks a
+  publicly documented legacy agent wire protocol on TCP/UDP port
+  1514 with enrolment on port 1515. Interoperability with
+  reference manager versions 4.7.x – 4.9.x is validated in CI via
+  `make e2e` (v4.9.2) and `make e2e-compat` (v4.7.5). See
+  [`proprietary-licensing-rationale.md`](./proprietary-licensing-rationale.md)
+  for the clean-room interoperability statement.
+- **SN360 Control Plane / Agent Gateway (opt-in).** mTLS
+  entrypoint terminating the SN360 native protocol (TLS 1.3 +
+  HTTP/2 + MessagePack). Enabled by flipping
+  `server.enhanced.{tls, serialization}` on and setting
+  `server.protocol: http2` in the deployment’s `config.yaml`.
+
+The SIEM adapter back end can be compiled out of a given build by
+dropping the `legacy-siem` Cargo feature; see the
+[revised phase plan](./revised-phase-plan.md) for the timeline on
+promoting the SN360 native protocol to default-on.
 
 ## 2. Packaging
 
@@ -93,8 +102,10 @@ often touched during rollout:
    ```sh
    sudo systemctl start sda-agent
    ```
-5. Tail the log for 5 minutes and confirm a keepalive lands on the
-   manager (`/var/ossec/logs/ossec.log` or `archives.json`).
+5. Tail the log for 5 minutes and confirm a keepalive lands on
+   the manager’s event log (for the SN360 Control Plane, the
+   Agent Gateway access log; for a legacy SIEM manager, its
+   manager event log / `archives.json`).
 
 ### 4.2 Self-update (Phase 5.3)
 
@@ -108,11 +119,28 @@ Rollback: the updater writes a `.sda-backup` sibling file to the
 current binary before swapping. Restore by stopping the service,
 renaming `sda-agent.sda-backup` → `sda-agent`, and restarting.
 
-## 5. Legacy path migration
+## 5. Migrating off the legacy SIEM adapter
+
+The legacy SIEM protocol adapter is the shipped default today and
+will be superseded by the SN360 native protocol. Once the SN360
+Control Plane is available for a fleet, move agents onto the
+SN360 native protocol:
+
+1. Stand up the SN360 Agent Gateway reachable from the fleet.
+2. Update the agent config so `server.address` points at the
+   Agent Gateway, set `server.protocol: http2`, and flip
+   `server.enhanced.tls: true` and
+   `server.enhanced.serialization: msgpack`.
+3. Roll out the updated config; agents reconnect via mTLS through
+   the native protocol and obtain fresh native enrolment material
+   from the Gateway.
+4. Disable the legacy adapter in the build by producing an SDA
+   release **without** the `legacy-siem` Cargo feature; the
+   legacy transport code then compiles out entirely.
 
 Earlier internal builds shipped under the `wda-*` prefix. Crate
-names, binary names, and install paths have since been renamed to
-`sda-*`. When upgrading from a pre-0.9 build:
+names, binary names, and install paths have since been renamed
+to `sda-*`. When upgrading from a pre-0.9 build:
 
 1. Stop and disable the old service
    (`wda-agent.service` → `sda-agent.service`).
@@ -147,5 +175,8 @@ remove; the new unit does not conflict with it.
 - All parsers have `cargo fuzz` targets (see
   [`security-audit.md`](./security-audit.md)).
 - Dependencies are gated through `cargo audit` in CI.
-- TLS 1.3 + certificate pinning available via the Phase 5.6
-  enhanced protocol (`server.enhanced.tls: true`).
+- TLS 1.3 + certificate pinning are available via the SN360
+  native protocol (`server.enhanced.tls: true`,
+  `server.enhanced.serialization: msgpack`,
+  `server.protocol: http2`) — opt-in today, default-on in a
+  future release tracked in the revised phase plan.

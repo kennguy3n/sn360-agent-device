@@ -66,12 +66,13 @@ at `C:\Program Files\SN360DesktopAgent\config.yaml`.
 
 ## 3. Enrolment
 
-SDA enrols against a Wazuh manager's `authd` daemon on port 1515.
-On Linux/macOS:
+SDA enrols against the SN360 Control Plane (or a compatible SIEM
+manager via the legacy adapter) over the enrolment daemon on
+port 1515. On Linux/macOS:
 
 ```sh
 sudo /usr/local/bin/sda-agent --enroll \
-  --server wazuh.example.com \
+  --server sn360.example.com \
   --password "$(cat /etc/sn360-desktop-agent/enrollment.password)"
 ```
 
@@ -79,7 +80,7 @@ On Windows (PowerShell, Administrator):
 
 ```powershell
 & 'C:\Program Files\SN360DesktopAgent\sda-agent.exe' --enroll `
-  --server wazuh.example.com `
+  --server sn360.example.com `
   --password (Get-Content 'C:\Program Files\SN360DesktopAgent\enrollment.password')
 ```
 
@@ -95,12 +96,12 @@ and enables the FIM and log-collection modules:
 
 ```yaml
 server:
-  address: wazuh.example.com
+  address: sn360.example.com
   port: 1514
-  protocol: tcp
+  protocol: tcp     # "tcp" (default) | "udp" | "http2" (SN360 native)
 
 enrollment:
-  server: wazuh.example.com
+  server: sn360.example.com
   port: 1515
 
 modules:
@@ -130,16 +131,24 @@ Restart-Service SDAAgent            # Windows (PowerShell)
 
 ### Agent fails to enrol
 
-Symptom: `systemctl status sda-agent` shows repeated `authd
-connection refused` or `invalid enrollment password`.
+Symptom: `systemctl status sda-agent` shows repeated
+`connection refused`, `TLS handshake failed`, or
+`invalid enrollment password`.
 
-- Check `authd` is listening on the manager: `ss -tlnp | grep 1515`.
-- Confirm enrolment password matches the manager-side
-  `/var/ossec/etc/authd.pass`.
+- For the SN360 native protocol, confirm the Agent Gateway is
+  reachable from the endpoint (`openssl s_client -alpn h2
+  -connect sn360.example.com:443`) and that the endpoint trusts
+  the Gateway’s certificate chain (or the configured
+  `server.enhanced.tls_pinned_sha256`).
+- When using the legacy adapter, check that the `authd`-
+  compatible enrolment daemon is listening on the manager
+  (`ss -tlnp | grep 1515`) and that the enrolment password
+  matches the manager-side value
+  (e.g. `/var/ossec/etc/authd.pass` on reference managers).
 - Make sure the config directory is writable: enrolment writes
   `client.keys` to `/etc/sn360-desktop-agent/` (Linux) or
-  `C:\Program Files\SN360DesktopAgent\` (Windows). The systemd unit
-  intentionally allows write access here — see
+  `C:\Program Files\SN360DesktopAgent\` (Windows). The systemd
+  unit intentionally allows write access here — see
   `packaging/systemd/sda-agent.service`.
 
 ### FIM events not reaching the manager

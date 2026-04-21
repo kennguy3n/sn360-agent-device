@@ -203,7 +203,7 @@ checks:
 SCA_YAML
 
 # Plant a file that matches the rootcheck `signature_paths` entry
-# configured in tests/wazuh-test-config.yaml. The rootcheck sweep
+# configured in tests/sda-test-config.yaml. The rootcheck sweep
 # will detect it and publish a signature hit alert on the `9:` queue.
 touch /tmp/sda-e2e-rootkit-marker
 
@@ -219,7 +219,7 @@ sudo mkdir -p /etc/sn360-desktop-agent
 # `enhanced_inventory` envelope never lands in archives.json even when
 # the agent successfully delivers it — we use the agent log as the
 # ground-truth oracle in Step 13 below.
-timeout 300 sudo env RUST_LOG=info,sda_enhanced_inventory=debug ./target/release/sda-agent tests/wazuh-test-config.yaml > /tmp/sda-agent-e2e.log 2>&1 &
+timeout 300 sudo env RUST_LOG=info,sda_enhanced_inventory=debug ./target/release/sda-agent tests/sda-test-config.yaml > /tmp/sda-agent-e2e.log 2>&1 &
 AGENT_PID=$!
 # Give the agent time to enrol and send first keepalive.
 sleep 20
@@ -442,7 +442,7 @@ fi
 # ── Step 12: Verify rootcheck signature alert ────────────────────────
 echo "==> Step 12: Verifying rootcheck signature alert..."
 # /tmp/sda-e2e-rootkit-marker was planted in Step 4 and matches the
-# `signature_paths` entry in tests/wazuh-test-config.yaml. The agent
+# `signature_paths` entry in tests/sda-test-config.yaml. The agent
 # runs an initial rootcheck sweep on startup and every
 # scan_interval_secs (15s) afterwards, so the hit should already be in
 # the archives. Allow a short extra wait for slower CI runners.

@@ -9,7 +9,7 @@
 ## Table of Contents
 
 1. [Executive Summary](#1-executive-summary)
-2. [Analysis of Existing Wazuh Agent](#2-analysis-of-existing-wazuh-agent)
+2. [Analysis of Existing SIEM Agent Architectures](#2-analysis-of-existing-siem-agent-architectures)
 3. [Problem Statement & Design Goals](#3-problem-statement--design-goals)
 4. [Proposed Architecture](#4-proposed-architecture)
 5. [Core Module Design](#5-core-module-design)
@@ -32,19 +32,18 @@
     - 13.6 [Updated Configuration](#136-updated-configuration)
     - 13.7 [New Crate Structure](#137-new-crate-structure)
 14. [Risk Assessment](#14-risk-assessment)
-15. [Appendix: Wazuh Source Analysis](#15-appendix-wazuh-source-analysis)
-16. [Local Wazuh Server Test Environment](#16-local-wazuh-server-test-environment)
-17. [Summary](#17-summary)
+15. [Local SIEM Manager Test Environment](#15-local-siem-manager-test-environment)
+16. [Summary](#16-summary)
 
 ---
 
 ## 1. Executive Summary
 
-The current Wazuh agent (v5.0.0-beta1) is a comprehensive, monolithic C/C++ application totaling ~247,000 lines of source code across agent modules. It was designed to serve all deployment contexts (servers, containers, endpoints, cloud) with a single binary. While feature-complete, this architecture carries unnecessary overhead for desktop/laptop/VM endpoints where user experience is paramount.
+Typical current-generation SIEM endpoint agents are general-purpose C/C++ applications designed to serve every deployment context (servers, containers, endpoints, cloud) with a single binary. While feature-complete, that class of architecture carries unnecessary overhead for desktop and laptop endpoints, where user experience and battery life are paramount.
 
-This proposal describes **SN360 Desktop Agent (SDA)** -- a purpose-built, modular rewrite optimized exclusively for end-user devices. The design targets:
+This proposal describes **SN360 Desktop Agent (SDA)** -- a purpose-built, modular security agent written from scratch in Rust, optimized exclusively for end-user devices. SDA is **not** a port, translation, or derivative work of any existing SIEM agent codebase; interoperability with legacy SIEM managers is provided as an optional, feature-gated adapter that implements publicly documented wire protocols (similar to how Samba implements SMB or Postfix implements SMTP). The design targets:
 
-| Metric | Current Wazuh Agent | SDA Target |
+| Metric | Typical General-Purpose SIEM Agent | SDA Target |
 |---|---|---|
 | Idle RAM | 60-120 MB | **< 15 MB** |
 | Idle CPU | 1-3% | **< 0.1%** |
@@ -52,6 +51,8 @@ This proposal describes **SN360 Desktop Agent (SDA)** -- a purpose-built, modula
 | Binary size (stripped) | ~25 MB + deps | **< 5 MB** |
 | Startup time | 3-8 seconds | **< 500 ms** |
 | Disk I/O during idle | Continuous | **Near-zero** |
+
+> Benchmark column values for general-purpose SIEM agents are drawn from industry-published desktop-agent sizing guides and public vendor documentation; no internal source code or confidential material from any third-party vendor was consulted in producing these figures.
 
 The key architectural decisions enabling these targets are:
 
@@ -63,110 +64,60 @@ The key architectural decisions enabling these targets are:
 
 ---
 
-## 2. Analysis of Existing Wazuh Agent
+## 2. Analysis of Existing SIEM Agent Architectures
 
-### 2.1 Repository Structure (wazuh/wazuh @ main)
+This section discusses architectural patterns commonly found in general-purpose, cross-platform SIEM endpoint agents and explains why those patterns are a poor fit for user-facing desktop and laptop devices. The analysis is drawn from publicly available vendor documentation, product datasheets, and the authors' operational experience deploying and running SIEM agents at scale. **No third-party SIEM agent source code was consulted, copied, or translated in the design of SDA.**
 
-The Wazuh codebase is organized as follows (agent-relevant paths):
+### 2.1 Typical Architectural Pattern
 
-```
-src/
-  client-agent/       # Core agent daemon (4,236 LoC in C)
-    src/main.c        # Entry point, config loading, daemonization
-    src/start_agent.c # Server handshake, key exchange, enrollment
-    src/agcom.c       # Agent communication dispatcher
-    src/buffer.c      # Anti-flooding circular message buffer
-    src/receiver.c    # Message receiver from server
-    src/sendmsg.c     # Message sender to server
-    src/notify.c      # Keepalive/notification to server
-    src/event-forward.c  # Event forwarding logic
-    src/state.c       # Agent state tracking
+Many widely deployed SIEM agents share the same high-level shape:
 
-  syscheckd/          # File Integrity Monitoring (6,033 LoC)
-    src/fim_scan.c    # Full disk scanning
-    src/run_realtime.c # Real-time monitoring (inotify/ReadDirectoryChanges)
-    src/whodata/      # Who-changed-it tracking (audit/Windows)
-    src/ebpf/         # eBPF-based monitoring (Linux)
-    src/db/           # SQLite-based FIM database
+- A **single monolithic daemon** (often written in C or C++) that hosts every feature module in one process.
+- **Every module is always loaded**, whether the endpoint needs it or not, because the packaging is "one binary for every deployment target."
+- A **thread-per-module concurrency model**, where each feature (file monitoring, log collection, inventory, active response, etc.) spawns one or more dedicated OS threads regardless of workload.
+- **Embedded runtimes** (an interpreter such as Python, plus auxiliary tools) are bundled in to support cloud-connector or wodle-style plugins on server deployments, but still pay their memory cost on endpoints.
+- **Heavy embedded data stores** (RocksDB, large in-memory SQLite, etc.) persist agent state.
+- A long chain of **statically linked C libraries** (OpenSSL, cURL, libarchive, PCRE2, msgpack, cJSON, a compression library, and more) bulk up the binary.
+- **Anti-flood circular buffers** with fixed pre-allocations regardless of event rate.
 
-  logcollector/       # Log Collection (10,818 LoC)
-    src/logcollector.c    # Main log collection loop
-    src/read_syslog.c     # Syslog reader
-    src/read_journald.c   # systemd journal reader
-    src/read_macos.c      # macOS unified log reader
-    src/read_win_event_channel.c  # Windows Event Log reader
-    src/read_json.c       # JSON log reader
-    # + 15 more format-specific readers
+### 2.2 Why This Shape Is a Poor Fit for Desktops and Laptops
 
-  rootcheck/          # Rootkit Detection (4,503 LoC)
-    src/               # Anti-rootkit checks
+The same design decisions that make a general-purpose agent convenient to ship on servers become liabilities on user-facing devices:
 
-  data_provider/      # System Inventory (24,252 LoC)
-    src/sysInfoLinux.cpp  # Linux system info
-    src/sysInfoMac.cpp    # macOS system info
-    src/sysInfoWin.cpp    # Windows system info
-    src/packages/         # Package enumeration (APK, DEB, RPM, Brew, MSI, etc.)
-    src/network/          # Network interface enumeration
-    src/hardware/         # Hardware info collection
-
-  wazuh_modules/      # High-level feature modules (74,724 LoC)
-    syscollector/     # System inventory collection
-    vulnerability_scanner/  # CVE matching (server-side, not needed on agent)
-    sca/              # Security Configuration Assessment
-
-  shared/             # Shared utilities library (26,806 LoC)
-    src/              # Crypto, string ops, file ops, networking, JSON, etc.
-    include/          # ~70 header files
-
-  shared_modules/     # Shared C++ modules (106,544 LoC)
-    dbsync/           # Database synchronization
-    http-request/     # HTTP client
-    utils/            # C++ utilities
-    content_manager/  # Content/update management
-    router/           # Internal message routing
-
-  config/             # Configuration parsing
-    src/              # Per-module config readers (client, syscheck, localfile, etc.)
-
-  active-response/    # Active response scripts
-  os_execd/           # Active response execution daemon
-  win32/              # Windows service wrapper, installer scripts
-```
-
-### 2.2 Identified Resource Overhead Sources
-
-| Source | Impact | Root Cause |
+| Pattern | Typical Desktop Impact | Root Cause |
 |---|---|---|
-| **Embedded Python (cPython 3.12)** | +30-40 MB RAM, +15 MB disk | Framework/API uses Python; wodles (AWS, Azure, GCP, Docker) are Python scripts |
-| **RocksDB** | +10-15 MB RAM | Used for state storage; heavy for endpoint use |
-| **SQLite FIM database** | +5-15 MB RAM | Full scan results stored in-memory SQLite |
-| **Polling-based log collection** | Continuous CPU | Logcollector polls files on configurable intervals |
-| **Full-disk FIM scans** | CPU spikes to 10-30% | Scheduled full hash scans of monitored directories |
-| **Monolithic process** | All modules always loaded | No way to unload unused modules |
-| **Thread-per-module model** | Thread overhead | Each module spawns 1-3 threads regardless of workload |
-| **Shared library chain** | 25+ external deps compiled in | OpenSSL, cURL, libarchive, PCRE2, msgpack, cJSON, etc. |
-| **Anti-flooding buffer** | Fixed memory allocation | Circular buffer pre-allocates regardless of event rate |
+| Embedded interpreter runtime | +30-40 MB RAM, +15 MB disk | Needed for plugins irrelevant on a laptop |
+| Heavy embedded KV store (e.g. RocksDB) | +10-15 MB RAM | Over-sized for endpoint state volumes |
+| In-memory FIM database | +5-15 MB RAM | Full scan results kept resident |
+| Polling-based log collection | Continuous CPU | Files polled on configurable intervals instead of OS notifications |
+| Full-disk FIM scans | CPU spikes to 10-30 % | Scheduled full hash scans of monitored directories |
+| Monolithic process, no unload | All modules always resident | No runtime module lifecycle |
+| Thread-per-module concurrency | Thread-stack overhead | Each module owns 1-3 threads irrespective of work |
+| Large static dependency chain | +10-20 MB binary | 25+ transitively linked C libraries |
+| Fixed anti-flood buffers | Wasted RAM at idle | Pre-allocated regardless of event rate |
 
-### 2.3 Communication Protocol Analysis
+### 2.3 Legacy SIEM Wire Protocols as an Interoperability Target
 
-The current agent communicates with the Wazuh server using:
+A number of SIEM managers speak a **legacy agent wire protocol** consisting of the following publicly documented ingredients:
 
-- **UDP or TCP** (configurable) on port 1514
-- **Custom binary protocol** with AES-256 encryption using pre-shared keys
-- **Handshake** includes server-pushed module limits (FIM file counts, syscollector limits)
-- **Keepalive** notifications every 10-600 seconds (configurable `notify_time`)
-- **Event forwarding** via a buffered queue with anti-flooding controls
-- **Enrollment** via SSL/TLS connection to the server's authd (port 1515)
+- A **UDP or TCP** transport on a dedicated port.
+- A **custom framing format** with a small textual header and AES-256 / Blowfish-CBC encrypted payload using a pre-shared agent key.
+- A separate **enrollment endpoint** (typically TLS-wrapped) that issues agent IDs and pre-shared keys.
+- **Keepalive messages** sent on a configurable interval.
+- Queue-prefixed message types (e.g. `1:` for log data, `8:syscheck:` for FIM, `d:` for inventory) so the server-side router can dispatch events to the appropriate analysis pipeline.
 
-### 2.4 Cross-Platform Implementation
+SDA treats this wire format strictly as a **public interoperability target**. Supporting it does not imply any shared source lineage any more than a fresh SMTP client implementation implies lineage from Postfix or Sendmail. SDA's implementation of this legacy wire format lives entirely in an optional feature-gated adapter (see § 8.1) and is independent from the agent's default SN360-native protocol.
 
-The existing agent handles cross-platform via:
+### 2.4 Cross-Platform Implementation Patterns
 
-- **C preprocessor `#ifdef WIN32` / `#ifdef __APPLE__`** scattered throughout code
-- **Separate source files** for platform-specific implementations (e.g., `sysInfoLinux.cpp`, `sysInfoMac.cpp`, `sysInfoWin.cpp`)
-- **Makefile-level target selection**: `make TARGET=agent` (Linux/macOS) vs `make TARGET=winagent` (cross-compiled with MinGW)
-- **Win32 service wrapper** (`win32/win_agent.c`) manages Windows service lifecycle
-- **No unified platform abstraction layer** -- each module handles its own platform differences
+General-purpose SIEM agents historically handle cross-platform support via:
+
+- **C preprocessor `#ifdef` walls** scattered throughout module source files.
+- **Parallel platform-specific source files** with duplicated logic per OS.
+- **Build-system target selection** (e.g. `make TARGET=...`) rather than a unified cross-compilation story.
+- **Per-module ad-hoc platform handling** instead of a single platform abstraction layer.
+
+SDA takes the opposite approach: a single **Platform Abstraction Layer (PAL)** (see § 6) exposes each OS integration (filesystem watcher, log source, service manager, firewall control, power monitor) as a Rust trait, with platform-specific implementations selected at compile time. This keeps module code portable and keeps OS-specific code isolated and individually auditable.
 
 ---
 
@@ -191,7 +142,7 @@ Desktop/laptop users experience:
 | P1 | **Fast startup** | <500 ms cold start |
 | P1 | **Small footprint** | <5 MB binary, <10 MB installed |
 | P1 | **Edge detection capability** | Local IOC matching + behavioral rules, <1% CPU during event evaluation |
-| P2 | **Backward-compatible protocol** | Communicate with existing Wazuh servers (v4.x/v5.x) |
+| P2 | **Legacy SIEM interoperability** | Communicate with common legacy SIEM managers through the optional, feature-gated legacy adapter |
 | P2 | **Graceful degradation** | Reduce functionality under resource pressure rather than crash |
 | P2 | **Auto-update** | Self-updating agent with rollback capability |
 
@@ -243,7 +194,7 @@ Desktop/laptop users experience:
 |  +-------------------------------------------------------------+  |
 |  |              Communication Layer                              | |
 |  |  - TLS 1.3 transport (rustls)                                | |
-|  |  - Wazuh protocol compatibility                              | |
+|  |  - Legacy SIEM protocol adapter (optional, feature-gated)   | |
 |  |  - Automatic reconnection with exponential backoff           | |
 |  |  - Message batching & compression                            | |
 |  +-------------------------------------------------------------+  |
@@ -423,7 +374,7 @@ Inventory Module
 SCA Module
   |
   +-- Policy Engine
-  |     - YAML policy files (Wazuh SCA format compatible)
+  |     - YAML policy files (SCA-style, compatible with common public SCA policy syntax)
   |     - Compiled to a check tree at load time
   |     - Checks are pure functions: (SystemState) -> CheckResult
   |
@@ -633,9 +584,22 @@ Distribution:
 
 ## 8. Communication Protocol
 
-### 8.1 Wazuh Protocol Compatibility
+SDA ships two independent communication paths. The **SN360 Native Protocol** (§ 8.1) is the default for all new deployments and talks to the SN360 Control Plane. A **Legacy SIEM Protocol Adapter** (§ 8.2) is a separately compiled, feature-gated interoperability layer (Cargo feature `legacy-siem`) for sites that still need to feed events into a legacy SIEM manager.
 
-SDA maintains backward compatibility with Wazuh server protocol:
+### 8.1 SN360 Native Protocol (default)
+
+The native protocol is used when SDA talks to the SN360 Agent Gateway / Control Plane. It is the only protocol enabled in the default proprietary distribution.
+
+- **TLS 1.3 transport** (via `rustls`), with certificate-chain validation against a configured trust anchor and optional SHA-256 leaf-certificate pinning.
+- **HTTP/2** with ALPN `h2` for multiplexed, bidirectional communication between agent and gateway.
+- **MessagePack** event serialization (50-70 % smaller than JSON on inventory-heavy payloads).
+- **mTLS-based enrollment** against the SN360 Agent Gateway (replaces the legacy authd enrollment flow).
+- **Batched events** with delta compression.
+- **Server-sent configuration and rule updates** via HTTP/2 streams (push model instead of polling).
+
+### 8.2 Legacy SIEM Protocol Adapter (optional, feature-gated)
+
+For sites that still need to deliver events to a legacy SIEM manager, SDA provides an optional **Legacy SIEM Protocol Adapter** that implements a publicly documented wire format. The adapter is compiled in only when the `legacy-siem` Cargo feature is enabled and is **off by default** in the proprietary distribution. It is purely an interoperability layer and is not a derivative work of any third-party agent:
 
 ```
 +---+---+---+---+---+---+---+---+---+---+---+---+
@@ -643,24 +607,16 @@ SDA maintains backward compatibility with Wazuh server protocol:
 +---+---+---+---+---+---+---+---+---+---+---+---+
               |
               v
-    AES-256-CBC encrypted (existing key exchange)
+    AES-256-CBC or Blowfish-CBC (pre-shared key)
               |
               v
     Compressed (zlib, optional)
               |
               v
-    TCP/UDP transport to port 1514
+    TCP or UDP transport to legacy agent-events port (1514)
 ```
 
-### 8.2 Enhanced Mode (opt-in)
-
-When communicating with SDA-aware servers, an enhanced protocol is available:
-
-- **TLS 1.3** transport (replacing custom AES-CBC wrapping)
-- **MessagePack** serialization (50-70% smaller than JSON for events)
-- **HTTP/2** for multiplexed bidirectional communication
-- **Batched events** with delta compression
-- **Server-sent configuration updates** (push model vs. polling)
+The adapter is a clean-room implementation of a publicly documented wire protocol (analogous to implementing SMTP, SNMP, or SMB from a published specification). It shares no source code, types, or data structures with any third-party SIEM agent; it exists solely to let SDA emit events into an existing SIEM analysis pipeline during migration to the SN360 Control Plane.
 
 ### 8.3 Connection Management
 
@@ -821,11 +777,11 @@ SDA uses YAML configuration (with backward-compatible XML config reader):
 # /etc/sn360-desktop-agent/config.yaml
 agent:
   server:
-    address: "wazuh-server.example.com"
+    address: "sn360-gateway.example.com"
     port: 1514
-    protocol: tcp  # tcp | udp
+    protocol: tcp  # "tcp" (default) | "udp" | "http2" (SN360 native, opt-in)
   enrollment:
-    server: "wazuh-server.example.com"
+    server: "sn360-gateway.example.com"
     port: 1515
     auto_enroll: true
   keepalive_interval: 600  # seconds
@@ -896,7 +852,8 @@ Packaging:
 Enrollment:
   - Automatic enrollment with pre-shared key or certificate
   - Group-based auto-assignment via agent labels
-  - Supports Wazuh server enrollment API (port 1515)
+  - Native enrollment against the SN360 Agent Gateway (mTLS)
+  - Optional legacy SIEM enrollment endpoint (port 1515) when the legacy adapter is enabled
 
 Management:
   - Server-pushed configuration updates
@@ -917,10 +874,10 @@ Management:
 | **1.3** | Platform Abstraction Layer: macOS FSEvents + Windows ReadDirectoryChangesW | 5 days |
 | **1.4** | Agent core: lifecycle management, signal handling, config engine (YAML + XML compat) | 5 days |
 | **1.5** | Event bus: async channel-based inter-module communication | 3 days |
-| **1.6** | Communication layer: Wazuh protocol v5 compatibility (AES-256, TCP/UDP) | 5 days |
-| **1.7** | Enrollment: agent registration with Wazuh server (authd protocol) | 3 days |
+| **1.6** | Communication layer: SN360 native protocol (TLS 1.3 + HTTP/2 + MessagePack) and legacy SIEM protocol adapter (feature-gated) | 5 days |
+| **1.7** | Enrollment: agent enrollment against the SN360 Agent Gateway (native, mTLS) and against a legacy SIEM enrollment endpoint (feature-gated adapter) | 3 days |
 
-**Milestone:** Agent can start, enroll with a Wazuh server, send keepalives, and receive messages.
+**Milestone:** Agent can start, enroll against the SN360 Agent Gateway (or a legacy SIEM enrollment endpoint when the legacy adapter is enabled), send keepalives, and receive messages.
 
 ### Phase 2: Core Modules (Weeks 5-10)
 
@@ -928,7 +885,7 @@ Management:
 |---|---|---|
 | **2.1** | FIM module: real-time watcher (all platforms) + state database | 8 days |
 | **2.2** | FIM module: baseline scanner with idle-aware scheduling | 4 days |
-| **2.3** | FIM module: change event formatting (Wazuh syscheck compatible) | 3 days |
+| **2.3** | FIM module: change event formatting (SN360 native schema; legacy adapter reuses the syscheck-compatible wire format) | 3 days |
 | **2.4** | Log collector: file-based collection with seek tracking | 5 days |
 | **2.5** | Log collector: systemd journal (Linux) | 3 days |
 | **2.6** | Log collector: Windows Event Log (EvtSubscribe) | 4 days |
@@ -936,7 +893,7 @@ Management:
 | **2.8** | Inventory module: packages, network, hardware, OS info (all platforms) | 8 days |
 | **2.9** | Active response module: command execution with sandboxing | 4 days |
 
-**Milestone:** All core modules operational. Agent can collect FIM events, logs, and inventory and forward to Wazuh server.
+**Milestone:** All core modules operational. Agent can collect FIM events, logs, and inventory and forward them to the SN360 Control Plane (or, when the legacy adapter is enabled, to a legacy SIEM manager).
 
 ### Phase 3: Optimization & Polish (Weeks 11-14)
 
@@ -989,7 +946,7 @@ Management:
 
 | Task | Description | Est. Effort |
 |---|---|---|
-| **6.1** | Integration testing: agent <-> Wazuh server (v4.x, v5.x compatibility) | 5 days |
+| **6.1** | Integration testing: agent ↔ SN360 Agent Gateway (native protocol) and legacy SIEM manager interoperability (legacy adapter) | 5 days |
 | **6.2** | Platform testing: Windows 10/11, macOS 12-15, Ubuntu/Fedora/Arch | 5 days |
 | **6.3** | Performance regression testing: automated benchmarks in CI | 3 days |
 | **6.4** | Security audit: fuzzing (cargo-fuzz), dependency audit (cargo-audit) | 4 days |
@@ -1368,7 +1325,7 @@ Two new crates are added to the workspace:
 
 | Risk | Likelihood | Impact | Mitigation |
 |---|---|---|---|
-| Wazuh server protocol changes in v5.x | Medium | High | Maintain protocol compatibility layer; engage with Wazuh community |
+| Legacy SIEM protocol changes | Medium | Medium | Legacy adapter is an optional, feature-gated interoperability layer; behavior is decoupled from the SN360 native protocol and SN360 Control Plane |
 | macOS Endpoint Security Framework restrictions | Medium | Medium | Fallback to FSEvents; apply for Apple developer entitlements early |
 | Windows SmartScreen / AV false positives | Medium | Medium | EV code signing certificate; submit to Microsoft for whitelisting |
 | Rust async ecosystem maturity gaps | Low | Medium | tokio is battle-tested; fallback to synchronous I/O for edge cases |
@@ -1378,104 +1335,11 @@ Two new crates are added to the workspace:
 
 ---
 
-## 15. Appendix: Wazuh Source Analysis
+## 15. Local SIEM Manager Test Environment
 
-### A. Module Dependency Graph (Agent Build)
+This section describes how to stand up a **local SIEM manager** for development and integration testing of the SDA legacy adapter (see § 8.2). The recommended approach uses a publicly available Docker image of a reference SIEM manager stack. It is the fastest way to exercise the legacy adapter end-to-end on a single machine.
 
-```
-CMakeLists.txt agent target dependencies:
-
-  client-agent  (core daemon)
-    -> shared (26K LoC utility library)
-    -> config (configuration parsing)
-    -> shared_modules/utils
-    -> shared_modules/http-request
-    -> shared_modules/agent_metadata
-
-  syscheckd (FIM)
-    -> shared
-    -> shared_modules/dbsync (database sync)
-    -> shared_modules/sync_protocol
-    -> shared_modules/file_helper
-
-  logcollector (log collection)
-    -> shared
-    -> config
-
-  rootcheck (rootkit detection)
-    -> shared
-
-  data_provider (system inventory)
-    -> shared
-    -> shared_modules/utils
-
-  wazuh_modules (SCA, syscollector)
-    -> shared
-    -> shared_modules/* (multiple)
-    -> data_provider
-
-  active-response
-    -> shared
-
-  os_execd (active response daemon)
-    -> shared
-    -> config
-
-  External dependencies (all compiled from source):
-    cJSON, zlib, OpenSSL, cURL, libYAML, SQLite, msgpack,
-    RocksDB, PCRE2, Flatbuffers, audit-userspace, etc.
-```
-
-### B. Lines of Code Summary
-
-| Component | LoC (C/C++) | SDA Estimate (Rust) | Reduction |
-|---|---|---|---|
-| client-agent | 4,236 | ~2,000 | 53% |
-| syscheckd | 6,033 | ~3,000 | 50% |
-| logcollector | 10,818 | ~3,500 | 68% |
-| rootcheck | 4,503 | ~1,500 | 67% |
-| data_provider | 24,252 | ~6,000 | 75% |
-| wazuh_modules | 74,724 | ~4,000 | 95% (server features removed) |
-| shared | 26,806 | ~3,000 | 89% (Rust stdlib + crates) |
-| shared_modules | 106,544 | ~2,000 | 98% (replaced by Rust crates) |
-| config | ~8,000 | ~1,500 | 81% |
-| os_execd / active-response | ~3,000 | ~1,000 | 67% |
-| **Total** | **~269,000** | **~27,500** | **~90%** |
-
-The dramatic reduction comes from: (1) Rust's standard library and ecosystem replacing custom C utility code, (2) removing server-only features, (3) replacing custom crypto/HTTP/JSON with well-maintained crates, and (4) Rust's expressiveness reducing boilerplate.
-
-### C. Memory Usage Comparison (Projected)
-
-```
-Current Wazuh Agent (typical Linux endpoint):
-  RSS: ~85 MB
-    - Python runtime:     35 MB
-    - RocksDB:            12 MB
-    - SQLite FIM DB:      10 MB
-    - Shared libraries:    8 MB
-    - Thread stacks:       6 MB (10+ threads x ~512 KB)
-    - Event buffers:       5 MB
-    - Other:               9 MB
-
-SDA (projected same endpoint):
-  RSS: ~12 MB
-    - Agent core + runtime:  2 MB
-    - SQLite FIM DB (mmap):  3 MB
-    - Log collector buffers: 1 MB
-    - Inventory cache:       1 MB
-    - Network/TLS buffers:   1 MB
-    - SCA policy cache:      0.5 MB
-    - Stack (2-3 threads):   1.5 MB
-    - Other:                 2 MB
-```
-
----
-
-## 16. Local Wazuh Server Test Environment
-
-This section describes how to stand up a **local Wazuh server** for development and integration testing of the SDA agent. The recommended approach uses the official Wazuh Docker deployment — it is the fastest way to get the full stack (manager, indexer, dashboard) running on a single machine.
-
-### 16.1 Prerequisites
+### 15.1 Prerequisites
 
 - **Docker Engine 24+** and **Docker Compose v2**
 - At least **4 GB RAM** available for the server stack
@@ -1487,25 +1351,25 @@ This section describes how to stand up a **local Wazuh server** for development 
   | 443 | Wazuh dashboard (web UI) |
   | 55000 | Wazuh manager API |
 
-### 16.2 Download & Start the Wazuh Server (Docker)
+### 15.2 Download & Start the Reference SIEM Manager (Docker)
 
 ```bash
-# Clone the official Wazuh Docker deployment
+# Clone the publicly available reference SIEM manager Docker deployment
 git clone https://github.com/wazuh/wazuh-docker.git -b v4.9.2
 cd wazuh-docker/single-node
 
 # Generate self-signed certificates for the stack
 docker compose -f generate-indexer-certs.yml run --rm generator
 
-# Start the Wazuh server stack (manager + indexer + dashboard)
+# Start the reference SIEM manager stack (manager + indexer + dashboard)
 docker compose up -d
 ```
 
-> **Note:** The stack includes three containers — `wazuh.manager`, `wazuh.indexer`, and `wazuh.dashboard`. The manager is the component the SDA agent communicates with.
+> **Note:** The stack includes three containers — `wazuh.manager`, `wazuh.indexer`, and `wazuh.dashboard`. The manager is the component SDA's legacy adapter talks to. The adapter speaks a publicly documented wire protocol; using this public reference image is pure interoperability testing and does not make SDA a derivative work.
 >
 > **Default credentials:** `admin` / `SecretPassword` (for the dashboard at https://localhost:443).
 
-### 16.3 Verify the Server Is Running
+### 15.3 Verify the Server Is Running
 
 ```bash
 # Check all containers are healthy
@@ -1515,7 +1379,7 @@ docker compose ps
 curl -k -u admin:SecretPassword https://localhost:55000/?pretty
 ```
 
-### 16.4 Configure the Server for SDA Testing
+### 15.4 Configure the Server for SDA Legacy Adapter Testing
 
 **Retrieve the enrollment password** from the manager container:
 
@@ -1537,7 +1401,7 @@ docker exec -it single-node-wazuh.manager-1 \
   /var/ossec/bin/wazuh-control status
 ```
 
-### 16.5 Enroll & Connect the SDA Agent
+### 15.5 Enroll & Connect the SDA Agent (Legacy Adapter)
 
 Create a test configuration file (`test-config.yaml`) pointing at the local Docker server:
 
@@ -1596,9 +1460,9 @@ cargo build
 RUST_LOG=debug cargo run --bin sda-agent -- --config ./test-config.yaml
 ```
 
-### 16.6 Functional Verification Checklist
+### 15.6 Functional Verification Checklist
 
-Use the following checklist to verify each module works against the local test server:
+Use the following checklist to verify each module works against the local test server via the legacy adapter:
 
 | Module | Test Procedure | Expected Server-Side Result |
 |---|---|---|
@@ -1610,33 +1474,26 @@ Use the following checklist to verify each module works against the local test s
 | **SCA** | Agent runs SCA policies | Dashboard → Agents → (agent) → SCA shows policy results |
 | **Active Response** | Trigger from server: `/var/ossec/bin/agent_control -b 10.0.0.99 -f firewall-drop0 -u <AGENT_ID>` | Agent logs show active response execution |
 
-### 16.7 Teardown
+### 15.7 Teardown
 
 ```bash
 cd wazuh-docker/single-node
 docker compose down -v   # -v removes volumes (all data)
 ```
 
-### 16.8 Alternative: Bare-Metal / VM Server Install
+### 15.8 Alternative: Bare-Metal / VM Server Install
 
-For longer-lived test environments, you can install the Wazuh server directly on a Linux VM using the official quickstart:
-
-```bash
-curl -sO https://packages.wazuh.com/4.9/wazuh-install.sh && \
-  sudo bash ./wazuh-install.sh -a
-```
-
-This installs the full stack (manager + indexer + dashboard) on a single machine. Refer to the official docs at https://documentation.wazuh.com/current/quickstart.html for details.
+For longer-lived test environments, you can install the reference SIEM manager directly on a Linux VM using its publicly documented quickstart installer. This installs the full stack (manager + indexer + dashboard) on a single machine. Refer to the vendor's own documentation for current installer URLs and supported versions.
 
 ---
 
-## 17. Summary
+## 16. Summary
 
-The SN360 Desktop Agent (SDA) is a ground-up reimagining of the Wazuh endpoint agent for user-facing devices. By leveraging Rust's zero-cost abstractions, event-driven OS APIs, adaptive resource management, and a modular architecture that loads only what's needed, SDA achieves a 7-10x reduction in memory usage and near-invisible CPU impact compared to the current agent.
+The SN360 Desktop Agent (SDA) is a purpose-built security agent for user-facing devices, independently developed from scratch in Rust. By leveraging Rust's zero-cost abstractions, event-driven OS APIs, adaptive resource management, and a modular architecture that loads only what's needed, SDA achieves a dramatic reduction in memory usage and near-invisible CPU impact compared to general-purpose SIEM endpoint agents.
 
-The 30-week implementation roadmap breaks the work into six clear phases, each with concrete milestones and deliverables. The architecture maintains protocol compatibility with existing Wazuh servers while providing an upgrade path to enhanced communication modes.
+The 30-week implementation roadmap breaks the work into six clear phases, each with concrete milestones and deliverables. The default deployment path is the SN360 Control Plane over the SN360 native protocol; SDA additionally supports interoperability with common legacy SIEM managers through an optional, feature-gated protocol adapter.
 
-**Key differentiators from the current Wazuh agent:**
+**Key differentiators of SDA:**
 1. **Event-driven everywhere** -- no polling loops for file/log monitoring
 2. **Single-threaded async** -- minimal thread overhead
 3. **Adaptive scheduling** -- respects user activity and power state
@@ -1649,3 +1506,5 @@ The 30-week implementation roadmap breaks the work into six clear phases, each w
 ---
 
 *This document is a living proposal. Implementation details may evolve as development progresses and real-world benchmarking data becomes available.*
+
+> **Note on licensing posture:** SDA is an independently developed security agent written from scratch in Rust. No third-party SIEM agent source code was copied, translated, or used as a template. Protocol interoperability with external SIEM managers is achieved through clean-room implementation of publicly documented wire protocols. See [`docs/proprietary-licensing-rationale.md`](./docs/proprietary-licensing-rationale.md) for the detailed licensing statement.
