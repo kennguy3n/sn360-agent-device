@@ -24,51 +24,50 @@ legacy_adapter:    # optional — only relevant when built with the `legacy-siem
 
 ```yaml
 server:
-  address: "sn360.example.com"     # hostname or IP of the SN360 Agent Gateway
-  port: 443                         # default: 1514 (override for native HTTP/2)
-  protocol: "http2"                 # "http2" (default) | "tcp" | "udp" (legacy adapter only)
+  address: "sn360.example.com"     # hostname or IP of the manager / Agent Gateway
+  port: 1514                        # default: 1514
+  protocol: "tcp"                   # "tcp" (default) | "udp" | "http2" (SN360 native)
   keepalive_interval: 600           # seconds, default: 600
-  enhanced:                         # SN360 native protocol knobs (all default on)
-    tls: true                        # TLS 1.3 transport, default: true
-    serialization: "msgpack"         # "msgpack" (default) | "json"
+  enhanced:                         # SN360 native protocol knobs (all default off)
+    tls: false                       # opt in to TLS 1.3 transport, default: false
+    serialization: "json"            # "json" (default) | "msgpack"
     tls_ca_bundle_path: null         # optional path to PEM bundle
     tls_pinned_sha256: null          # optional 64-char hex leaf fingerprint
 ```
 
-- `enhanced.tls = true` is the default and switches the comms
-  layer onto `rustls` with TLS 1.3 enforced
-  (`rustls::version::TLS13`). Flip this off only when the optional
-  legacy SIEM adapter is compiled in and you need to talk to a
-  legacy manager that does not offer TLS on port 1514.
-- `enhanced.serialization = "msgpack"` is the default and encodes
-  events with `rmp-serde`; 50–70 % smaller on inventory-heavy
-  payloads. Use `"json"` only when talking to a legacy SIEM
-  manager through the adapter.
-- `protocol = "http2"` is the default and switches to the native
-  HTTP/2 transport. It requires `enhanced.tls = true` — HTTP/2 is
-  only spoken over TLS with ALPN `h2`; plain-text h2c is not
-  supported. `"tcp"` and `"udp"` are accepted only for the legacy
-  SIEM adapter path.
+- `enhanced.tls = true` opts into `rustls` with TLS 1.3 enforced
+  (`rustls::version::TLS13`). Keep it off to preserve the stable
+  agent stream protocol against existing SIEM managers.
+- `enhanced.serialization = "msgpack"` serialises events with
+  `rmp-serde` instead of JSON; 50–70 % smaller on inventory-heavy
+  payloads. Requires an SN360-aware server endpoint — leave it at
+  `"json"` for legacy SIEM managers.
+- `protocol = "http2"` switches to the SN360 native HTTP/2
+  transport. It requires `enhanced.tls = true` — HTTP/2 is only
+  spoken over TLS with ALPN `h2`; plain-text h2c is not supported.
+  `"tcp"` (default) and `"udp"` are the standard stream /
+  datagram transports used against existing SIEM managers.
 
 ## `enrollment`
 
 ```yaml
 enrollment:
-  server: "sn360.example.com"     # SN360 Agent Gateway; defaults to server.address
-  port: 1515                        # default: 1515 (legacy adapter only)
+  server: "sn360.example.com"     # manager enrolment host; defaults to server.address
+  port: 1515                        # default: 1515
   password_file: "/etc/sn360-desktop-agent/enrollment.password"
   auto_enroll: true                 # default: true
   agent_name: null                  # defaults to hostname
   agent_groups: []                  # agent group tags
 ```
 
-On the SN360 native protocol, enrolment is mTLS against the Agent
-Gateway and the issued native identity is persisted alongside the
-config. On the legacy SIEM adapter path, enrolment talks to the
-legacy `authd`-compatible daemon on port 1515 and writes
-`client.keys` into the same directory as `config.yaml`. Either
-way, the systemd unit's `ReadWritePaths=` must include this
-directory or enrolment will fail with `EACCES`.
+Enrolment talks to the manager's enrolment daemon on port 1515
+and writes `client.keys` into the same directory as `config.yaml`.
+The systemd unit's `ReadWritePaths=` must include this directory
+or enrolment will fail with `EACCES`. When the SN360 native
+protocol is selected (`server.protocol = "http2"` +
+`enhanced.tls = true`), enrolment uses mTLS against the SN360
+Agent Gateway and the native identity is persisted alongside the
+config.
 
 ## `modules`
 
@@ -213,7 +212,7 @@ The legacy SIEM protocol adapter is **optional** and compiled in
 only when `sda-comms` is built with the `legacy-siem` Cargo
 feature. When that feature is off, this stanza is ignored with a
 warning. When it is on, use this block to pin a deployment to the
-legacy path while migrating off a legacy SIEM manager:
+legacy path while migrating onto the SN360 native protocol:
 
 ```yaml
 legacy_adapter:
@@ -243,7 +242,8 @@ timeline.
   (`/etc/wazuh-desktop-agent/`) are read at startup and a warning
   is logged; move them to `/etc/sn360-desktop-agent/` before the
   next major release.
-- The `server.enhanced` stanza is now the **default** path — omit
-  it to keep the SN360 native protocol. Explicitly set its fields
-  to `false` / `"json"` / `"tcp"` only when routing a specific
-  deployment through the optional legacy SIEM adapter.
+- The `server.enhanced` stanza is additive — omit it entirely to
+  keep the stable stream protocol against an existing SIEM
+  manager. Explicitly set its fields to `true` / `"msgpack"` and
+  switch `server.protocol` to `"http2"` to opt into the SN360
+  native protocol against an SN360 Agent Gateway.

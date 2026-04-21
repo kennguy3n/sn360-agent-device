@@ -13,25 +13,25 @@ For per-host install instructions see the
 
 ## 1. Deployment topology
 
-SDA is a single static binary. The **default** deployment target
-is the SN360 Control Plane via the SN360 native protocol
-(TLS 1.3 + HTTP/2 + MessagePack, with mTLS enrolment against the
-SN360 Agent Gateway). An **optional**, feature-gated legacy SIEM
-protocol adapter (Cargo feature `legacy-siem`) lets the same
-binary feed events into an existing legacy SIEM manager while
-customers migrate to the SN360 Control Plane.
+SDA is a single static binary with two supported back ends:
 
-Supported back ends:
-
-- **SN360 Control Plane / Agent Gateway (default).** mTLS
-  entrypoint terminating the native protocol.
-- **Legacy SIEM manager (optional, feature-gated).** Speaks a
+- **Existing SIEM manager (default today).** The binary speaks a
   publicly documented legacy agent wire protocol on TCP/UDP port
   1514 with enrolment on port 1515. Interoperability with
   reference manager versions 4.7.x – 4.9.x is validated in CI via
   `make e2e` (v4.9.2) and `make e2e-compat` (v4.7.5). See
   [`proprietary-licensing-rationale.md`](./proprietary-licensing-rationale.md)
   for the clean-room interoperability statement.
+- **SN360 Control Plane / Agent Gateway (opt-in).** mTLS
+  entrypoint terminating the SN360 native protocol (TLS 1.3 +
+  HTTP/2 + MessagePack). Enabled by flipping
+  `server.enhanced.{tls, serialization}` on and setting
+  `server.protocol: http2` in the deployment’s `config.yaml`.
+
+The SIEM adapter back end can be compiled out of a given build by
+dropping the `legacy-siem` Cargo feature; see the
+[revised phase plan](./revised-phase-plan.md) for the timeline on
+promoting the SN360 native protocol to default-on.
 
 ## 2. Packaging
 
@@ -121,15 +121,16 @@ renaming `sda-agent.sda-backup` → `sda-agent`, and restarting.
 
 ## 5. Migrating off the legacy SIEM adapter
 
-The legacy SIEM protocol adapter is provided for **migration
-only** and is off by default. Once the SN360 Control Plane is
-available for a fleet, customers should move agents off the
-legacy adapter and onto the SN360 native protocol:
+The legacy SIEM protocol adapter is the shipped default today and
+will be superseded by the SN360 native protocol. Once the SN360
+Control Plane is available for a fleet, move agents onto the
+SN360 native protocol:
 
 1. Stand up the SN360 Agent Gateway reachable from the fleet.
 2. Update the agent config so `server.address` points at the
-   Agent Gateway and `server.enhanced.{tls, serialization,
-   transport}` use the defaults (`true`, `msgpack`, `http2`).
+   Agent Gateway, set `server.protocol: http2`, and flip
+   `server.enhanced.tls: true` and
+   `server.enhanced.serialization: msgpack`.
 3. Roll out the updated config; agents reconnect via mTLS through
    the native protocol and obtain fresh native enrolment material
    from the Gateway.
@@ -174,7 +175,8 @@ remove; the new unit does not conflict with it.
 - All parsers have `cargo fuzz` targets (see
   [`security-audit.md`](./security-audit.md)).
 - Dependencies are gated through `cargo audit` in CI.
-- TLS 1.3 + certificate pinning are the **default** for the SN360
+- TLS 1.3 + certificate pinning are available via the SN360
   native protocol (`server.enhanced.tls: true`,
   `server.enhanced.serialization: msgpack`,
-  `server.enhanced.transport: http2`).
+  `server.protocol: http2`) — opt-in today, default-on in a
+  future release tracked in the revised phase plan.

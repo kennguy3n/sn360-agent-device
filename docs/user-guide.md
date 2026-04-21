@@ -66,12 +66,9 @@ at `C:\Program Files\SN360DesktopAgent\config.yaml`.
 
 ## 3. Enrolment
 
-SDA enrols against the SN360 Control Plane (SN360 Agent Gateway)
-via mTLS by default. When the optional legacy adapter is enabled,
-it can also enrol against a legacy SIEM manager’s
-`authd`-compatible daemon on port 1515.
-
-On Linux/macOS:
+SDA enrols against the SN360 Control Plane (or a compatible SIEM
+manager via the legacy adapter) over the enrolment daemon on
+port 1515. On Linux/macOS:
 
 ```sh
 sudo /usr/local/bin/sda-agent --enroll \
@@ -100,8 +97,8 @@ and enables the FIM and log-collection modules:
 ```yaml
 server:
   address: sn360.example.com
-  port: 443
-  protocol: http2   # native SN360 protocol; use tcp|udp only with the legacy adapter
+  port: 1514
+  protocol: tcp     # "tcp" (default) | "udp" | "http2" (SN360 native)
 
 enrollment:
   server: sn360.example.com

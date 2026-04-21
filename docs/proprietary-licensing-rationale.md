@@ -65,22 +65,27 @@ No third-party agent or manager source code was consulted in the
 process. The resulting adapter is an **interoperability layer**,
 not a derivative work of any existing agent codebase.
 
-## 3. Protocol architecture — native default, legacy adapter optional
+## 3. Protocol architecture — native opt-in, legacy adapter default
 
-SDA speaks two protocols:
+SDA speaks two protocols. Both are implemented in the
+`sda-comms` crate under `crates/sda-comms`, and the protocol used
+for a given deployment is selected per-config:
 
-- **SN360 native protocol (default).** TLS 1.3 + HTTP/2 +
-  MessagePack, with mTLS enrolment against the SN360 Agent
-  Gateway. This is the only communication path enabled in the
-  default proprietary distribution. All fields under
-  `server.enhanced` in `AgentConfig` default **on**.
-- **Legacy SIEM protocol adapter (optional, feature-gated).**
-  Compiled in only when the `legacy-siem` Cargo feature is
-  enabled on the `sda-comms` crate. Implements a publicly
-  documented agent wire protocol (TCP/UDP + Blowfish/AES,
-  `authd`-compatible enrolment on port 1515) purely so customers
-  can run SDA against an existing SIEM manager while migrating to
-  the SN360 Control Plane.
+- **SN360 native protocol (opt-in today, default on the roadmap).**
+  TLS 1.3 + HTTP/2 + MessagePack, with mTLS enrolment against the
+  SN360 Agent Gateway. Enabled by setting `server.protocol:
+  http2` and flipping `server.enhanced.tls` and
+  `server.enhanced.serialization: msgpack` on in `AgentConfig`.
+  The [revised phase plan](./revised-phase-plan.md) tracks
+  promoting this path to default-on once the SN360 Agent Gateway
+  is generally available.
+- **Legacy SIEM protocol adapter (default today, feature-gated).**
+  Compiled in when the `legacy-siem` Cargo feature is enabled on
+  the `sda-comms` crate (which is the shipped default). Implements
+  a publicly documented agent wire protocol (TCP/UDP +
+  Blowfish/AES, `authd`-compatible enrolment on port 1515) so the
+  same binary can feed events into an existing SIEM manager while
+  customers migrate to the SN360 Control Plane.
 
 A proprietary-only build of SDA that does not need legacy
 interoperability can compile out the legacy adapter entirely:

@@ -778,8 +778,8 @@ SDA uses YAML configuration (with backward-compatible XML config reader):
 agent:
   server:
     address: "sn360-gateway.example.com"
-    port: 443
-    protocol: http2  # http2 (native, default) | tcp | udp (legacy adapter)
+    port: 1514
+    protocol: tcp  # "tcp" (default) | "udp" | "http2" (SN360 native, opt-in)
   enrollment:
     server: "sn360-gateway.example.com"
     port: 1515

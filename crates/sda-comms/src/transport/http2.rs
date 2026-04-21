@@ -67,10 +67,7 @@ mod tests {
 
     #[test]
     fn build_fails_when_tls_disabled() {
-        let cfg = EnhancedProtocolConfig {
-            tls: false,
-            ..Default::default()
-        };
+        let cfg = EnhancedProtocolConfig::default();
         let err = build_client_config(&cfg).unwrap_err();
         assert!(err.to_string().contains("requires enhanced.tls = true"));
     }
@@ -119,10 +116,7 @@ mod tests {
             port: 443,
             protocol: "http2".into(),
             keepalive_interval: 600,
-            enhanced: EnhancedProtocolConfig {
-                tls: false,
-                ..Default::default()
-            },
+            enhanced: EnhancedProtocolConfig::default(),
         };
         let err = validate_server_config(&server).unwrap_err();
         assert!(err.contains("requires server.enhanced.tls = true"));

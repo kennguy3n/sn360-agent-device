@@ -109,13 +109,10 @@ pub struct ServerConfig {
     #[serde(default = "default_server_port")]
     pub port: u16,
 
-    /// Transport protocol. `"http2"` (the default) speaks the SN360
-    /// native protocol (TLS 1.3 + ALPN `h2`) against the SN360 Agent
-    /// Gateway. `"tcp"` and `"udp"` are legacy values used only by
-    /// the optional legacy SIEM protocol adapter (behind the
-    /// `legacy-siem` Cargo feature) to talk to an existing SIEM
-    /// manager over the publicly documented AES/Blowfish wire
-    /// protocol.
+    /// Transport protocol. `"tcp"` (the default) and `"udp"` use the
+    /// stream / datagram transports on the standard agent port.
+    /// `"http2"` selects the SN360 native HTTP/2 transport, which is
+    /// only supported against the SN360 Agent Gateway.
     #[serde(default = "default_protocol")]
     pub protocol: String,
 
@@ -123,40 +120,37 @@ pub struct ServerConfig {
     #[serde(default = "default_keepalive")]
     pub keepalive_interval: u64,
 
-    /// SN360 native protocol toggles (TLS 1.3 + MessagePack + HTTP/2).
-    /// All fields default **on** in the proprietary distribution;
-    /// operators running the optional legacy SIEM adapter against a
-    /// legacy manager can flip them off in that deployment's config.
+    /// Optional SN360 native protocol toggles (TLS 1.3 + MessagePack +
+    /// HTTP/2). All fields default **off** so an unmodified config
+    /// keeps the stable agent protocol behavior; operators running
+    /// against an SN360 Agent Gateway can flip them on.
     #[serde(default)]
     pub enhanced: EnhancedProtocolConfig,
 }
 
-/// SN360 native protocol options.
+/// Optional SN360 native protocol options.
 ///
-/// These knobs are the default communication path for SDA: TLS 1.3,
+/// These knobs opt the agent into the SN360 native protocol: TLS 1.3,
 /// MessagePack event serialization, and HTTP/2 transport against the
-/// SN360 Agent Gateway. All of them default **on** so an unmodified
-/// config speaks the native protocol out of the box. Operators who
-/// have opted into the legacy SIEM adapter (Cargo feature
-/// `legacy-siem`) and want a specific deployment to fall back to the
-/// legacy AES/Blowfish-over-TCP/UDP path can flip these fields off.
+/// SN360 Agent Gateway. All of them default **off** — turning them on
+/// requires an SN360-aware server endpoint.
 ///
 /// The actual transport / serializer implementations live in
 /// `sda-comms` (see `transport::tls`, `transport::http2`) and
 /// `sda-comms::msgpack` respectively.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct EnhancedProtocolConfig {
-    /// Terminate TLS 1.3 against the Agent Gateway (via `rustls`).
-    /// Has no effect when `protocol == "udp"` (TLS requires a stream
+    /// Wrap the stream transport in TLS 1.3 (via `rustls`). Has no
+    /// effect when `protocol == "udp"` (TLS requires a stream
     /// transport) or when `protocol == "http2"` (HTTP/2 already
-    /// negotiates TLS via ALPN). Defaults to `true`.
-    #[serde(default = "default_true")]
+    /// negotiates TLS via ALPN). Defaults to `false`.
+    #[serde(default)]
     pub tls: bool,
 
-    /// Event serialization format. `"msgpack"` (the default)
-    /// produces significantly smaller frames and is used by the SN360
-    /// native protocol. `"json"` is retained for the legacy SIEM
-    /// adapter so legacy managers can decode agent events.
+    /// Event serialization format. `"json"` (the default) is the
+    /// standard agent event encoding; `"msgpack"` produces
+    /// significantly smaller frames and is only understood by
+    /// SN360-aware server endpoints.
     #[serde(default = "default_enhanced_serialization")]
     pub serialization: String,
 
@@ -181,7 +175,7 @@ pub struct EnhancedProtocolConfig {
 impl Default for EnhancedProtocolConfig {
     fn default() -> Self {
         Self {
-            tls: true,
+            tls: false,
             serialization: default_enhanced_serialization(),
             tls_pinned_sha256: None,
             tls_ca_bundle_path: None,
@@ -653,10 +647,10 @@ fn default_server_port() -> u16 {
     1514
 }
 fn default_protocol() -> String {
-    "http2".to_string()
+    "tcp".to_string()
 }
 fn default_enhanced_serialization() -> String {
-    "msgpack".to_string()
+    "json".to_string()
 }
 fn default_keepalive() -> u64 {
     600

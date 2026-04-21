@@ -86,40 +86,41 @@ tests in `protocol.rs` exhaustively assert the prefixes.
 
 ## 3. Communication layers
 
-### 3.1 SN360 Native Protocol (default)
+### 3.1 Stable stream protocol (default)
 
-The native protocol is the only path enabled in the default
-proprietary distribution. Three orthogonal knobs live under
-`server.enhanced`; all three default **on** in a native
-deployment:
-
-| Option             | Crate surface                                   | Default |
-|--------------------|-------------------------------------------------|---------|
-| TLS 1.3            | `sda_comms::transport::tls` (`rustls`)          | on      |
-| MessagePack events | `sda_comms::msgpack::MessagePackSerializer`     | on      |
-| HTTP/2 transport   | `sda_comms::transport::http2` (requires TLS)    | on      |
-
-ALPN identifiers: `b"h2"` for HTTP/2, `b"sda/1.0"` for native
-TCP-over-TLS. Certificate pinning is SHA-256 leaf-fingerprint
-based and configured via `server.enhanced.tls_pinned_sha256`.
-Native enrolment is mTLS against the SN360 Agent Gateway.
-
-### 3.2 Legacy SIEM Adapter (optional)
-
-Compiled in only when the `legacy-siem` Cargo feature is enabled.
-Implements a publicly documented SIEM agent wire protocol for
-interoperability with existing legacy SIEM managers (see
+The default comms path is UDP or TCP on port 1514 against an
+existing SIEM manager. This path is always compiled in and stays
+on when the `legacy-siem` Cargo feature is enabled (see
 [`proprietary-licensing-rationale.md`](./proprietary-licensing-rationale.md)
-for the clean-room statement):
+for the clean-room interoperability statement):
 
 - UDP or TCP on port 1514.
 - Payloads encrypted with Blowfish (and AES, depending on server
   negotiation). A single cipher is shared for the lifetime of a
   session so per-agent `(global, local)` counters in the manager's
   `remoted` stay monotonic.
-- Enrolment uses the legacy `authd`-compatible endpoint on 1515
-  with password authentication and persists the issued agent
-  identity to `client.keys`.
+- Enrolment uses the publicly documented `authd`-compatible
+  endpoint on 1515 with password authentication and persists the
+  issued agent identity to `client.keys`.
+
+### 3.2 SN360 Native Protocol (opt-in)
+
+Three orthogonal knobs under `server.enhanced`, all default
+**off** today. Flip any of them on to move a deployment onto the
+SN360 native protocol against an SN360 Agent Gateway:
+
+| Option             | Crate surface                                   | Default |
+|--------------------|-------------------------------------------------|---------|
+| TLS 1.3            | `sda_comms::transport::tls` (`rustls`)          | off     |
+| MessagePack events | `sda_comms::msgpack::MessagePackSerializer`     | off     |
+| HTTP/2 transport   | `sda_comms::transport::http2` (requires TLS)    | off     |
+
+ALPN identifiers: `b"h2"` for HTTP/2, `b"sda/1.0"` for native
+TCP-over-TLS. Certificate pinning is SHA-256 leaf-fingerprint
+based and configured via `server.enhanced.tls_pinned_sha256`.
+Native enrolment is mTLS against the SN360 Agent Gateway. The
+[revised phase plan](./revised-phase-plan.md) tracks the work to
+promote the native path to default-on in a future phase.
 
 ## 4. Platform Abstraction Layer
 
