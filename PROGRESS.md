@@ -18,7 +18,7 @@ has landed. Phase 5 platform hardening is also complete: self-update
 (PR #49), privilege separation + tamper protection (PR #50), and
 installer / packaging (PR #48). All four proposal benchmark targets
 (idle RSS 5.7 MB, idle CPU 0.00 %, shipped binary 4.6 MB, FIM scan
-peak 3 %) are met. `cargo test --all` shows **361 passing / 0
+peak 3 %) are met. `cargo test --all` shows **391 passing / 0
 failed**, the base E2E harness passes **14/14** assertions against a
 local Wazuh 4.9.2 manager, and the security E2E suite passes
 **10/10** attack-scenario checks. Remaining work is the server-side
@@ -89,24 +89,25 @@ microservices that live outside this repository.
 
 Command: `cargo test --all`
 
-**Result: 361 passing / 0 failed.**
+**Result: 391 passing / 0 failed.**
 
 | Crate | Passed |
 |---|---|
 | `wda-active-response` | 29 |
-| `wda-agent` | 18 |
+| `wda-agent` | 29 |
 | `wda-comms` | 31 |
 | `wda-core` | 2 |
-| `wda-enhanced-inventory` | 57 |
+| `wda-enhanced-inventory` | 56 |
 | `wda-event-bus` | 4 |
-| `wda-fim` | 68 |
+| `wda-fim` | 69 |
 | `wda-inventory` | 32 |
 | `wda-local-detection` | 56 |
 | `wda-logcollector` | 34 |
 | `wda-pal` | 5 |
 | `wda-rootcheck` | 20 |
 | `wda-sca` | 5 |
-| **Total** | **361** |
+| `wda-updater` | 19 |
+| **Total** | **391** |
 
 Reproduce locally with `make test`. CI regenerates the result on every
 push across `ubuntu-latest`, `macos-latest`, and `windows-latest`.
