@@ -58,6 +58,23 @@ getent passwd wda >/dev/null || \
 exit 0
 
 %post
+# Migrate legacy wazuh-desktop-agent install paths from pre-rename builds
+# so operators upgrading keep their configuration and state. Only runs when
+# the legacy directory exists and the new one is absent.
+for legacy_new in \
+    "%{_sysconfdir}/wazuh-desktop-agent:%{_sysconfdir}/sn360-desktop-agent" \
+    "%{_sharedstatedir}/wazuh-desktop-agent:%{_sharedstatedir}/sn360-desktop-agent" \
+    "%{_localstatedir}/log/wazuh-desktop-agent:%{_localstatedir}/log/sn360-desktop-agent"
+do
+    src="${legacy_new%%:*}"
+    dst="${legacy_new##*:}"
+    if [ -d "$src" ] && [ ! -e "$dst" ]; then
+        mkdir -p "$(dirname "$dst")"
+        mv "$src" "$dst"
+        echo "migrated $src -> $dst" >&2
+    fi
+done
+
 %systemd_post wda-agent.service
 
 %preun

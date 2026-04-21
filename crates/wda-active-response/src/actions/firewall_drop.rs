@@ -1,8 +1,14 @@
 //! Firewall drop action — blocks an IP via platform-native firewall commands.
 //!
 //! - Linux: `iptables` (IPv4) / `ip6tables` (IPv6)
-//! - macOS: `pfctl` with the `wda_blocked` table
+//! - macOS: `pfctl` with the `sda_blocked` table
 //! - Windows: `netsh advfirewall`
+//!
+//! Both the macOS pfctl table and the Windows firewall rule name were
+//! previously prefixed with `WDA` / `wda_`. On unblock, the platform helpers
+//! try the current `SDA` / `sda_` identifier first and fall back to the
+//! legacy name so that rules created by an earlier version of the agent can
+//! still be cleaned up after upgrade.
 
 use std::net::IpAddr;
 use std::time::Duration;
@@ -139,12 +145,21 @@ async fn platform_unblock_ip(ip: &str, timeout: Duration) -> ActionResult {
 
 // ── macOS ────────────────────────────────────────────────────────────────────
 
+/// pfctl table name used by the active-response module on macOS.
+#[cfg(target_os = "macos")]
+const PFCTL_TABLE: &str = "sda_blocked";
+
+/// Legacy pfctl table name; kept so that `platform_unblock_ip` can still
+/// clean up entries inserted by an older agent build that used `wda_blocked`.
+#[cfg(target_os = "macos")]
+const PFCTL_TABLE_LEGACY: &str = "wda_blocked";
+
 #[cfg(target_os = "macos")]
 async fn platform_block_ip(ip: &str, timeout: Duration) -> ActionResult {
     let addr = strip_zone_id(ip);
     let result = executor::execute_command(
         "pfctl",
-        &["-t", "wda_blocked", "-T", "add", addr],
+        &["-t", PFCTL_TABLE, "-T", "add", addr],
         timeout,
         false,
     )
@@ -167,14 +182,38 @@ async fn platform_unblock_ip(ip: &str, timeout: Duration) -> ActionResult {
     let addr = strip_zone_id(ip);
     let result = executor::execute_command(
         "pfctl",
-        &["-t", "wda_blocked", "-T", "delete", addr],
+        &["-t", PFCTL_TABLE, "-T", "delete", addr],
         timeout,
         false,
     )
     .await;
 
     if result.success {
-        ActionResult::ok(format!("unblocked IP {}", ip))
+        // Best-effort cleanup of any stale entry in the legacy table so
+        // upgrades from a wda_blocked-era agent do not leave orphaned blocks.
+        let _ = executor::execute_command(
+            "pfctl",
+            &["-t", PFCTL_TABLE_LEGACY, "-T", "delete", addr],
+            timeout,
+            false,
+        )
+        .await;
+        return ActionResult::ok(format!("unblocked IP {}", ip));
+    }
+
+    // Current-table delete failed (typically because the entry is not there).
+    // Fall back to the legacy table before reporting failure.
+    let legacy = executor::execute_command(
+        "pfctl",
+        &["-t", PFCTL_TABLE_LEGACY, "-T", "delete", addr],
+        timeout,
+        false,
+    )
+    .await;
+
+    if legacy.success {
+        debug!(ip, "IP unblocked via legacy pfctl table");
+        ActionResult::ok(format!("unblocked IP {} (legacy table)", ip))
     } else {
         ActionResult::err(format!(
             "failed to unblock IP {}: {}",
@@ -186,10 +225,20 @@ async fn platform_unblock_ip(ip: &str, timeout: Duration) -> ActionResult {
 
 // ── Windows ──────────────────────────────────────────────────────────────────
 
+/// Human-readable prefix used for Windows Firewall rule names added by the
+/// active-response module. Pre-rename builds of the agent used `"WDA Block "`.
+#[cfg(target_os = "windows")]
+const WINDOWS_RULE_PREFIX: &str = "SDA Block ";
+
+/// Legacy Windows Firewall rule prefix retained so that `platform_unblock_ip`
+/// can still remove rules created by an older build after upgrade.
+#[cfg(target_os = "windows")]
+const WINDOWS_RULE_PREFIX_LEGACY: &str = "WDA Block ";
+
 #[cfg(target_os = "windows")]
 async fn platform_block_ip(ip: &str, timeout: Duration) -> ActionResult {
     let addr = strip_zone_id(ip);
-    let rule_name = format!("SDA Block {}", addr);
+    let rule_name = format!("{}{}", WINDOWS_RULE_PREFIX, addr);
     let result = executor::execute_command(
         "netsh",
         &[
@@ -222,7 +271,9 @@ async fn platform_block_ip(ip: &str, timeout: Duration) -> ActionResult {
 #[cfg(target_os = "windows")]
 async fn platform_unblock_ip(ip: &str, timeout: Duration) -> ActionResult {
     let addr = strip_zone_id(ip);
-    let rule_name = format!("SDA Block {}", addr);
+    let rule_name = format!("{}{}", WINDOWS_RULE_PREFIX, addr);
+    let legacy_rule_name = format!("{}{}", WINDOWS_RULE_PREFIX_LEGACY, addr);
+
     let result = executor::execute_command(
         "netsh",
         &[
@@ -237,7 +288,25 @@ async fn platform_unblock_ip(ip: &str, timeout: Duration) -> ActionResult {
     )
     .await;
 
-    if result.success {
+    // Always attempt the legacy-name cleanup too so that rules created by
+    // pre-rename builds are not orphaned on upgrade. `netsh ... delete rule`
+    // with a name that does not exist simply reports "No rules match the
+    // specified criteria" and exits non-zero; that outcome is fine here.
+    let legacy = executor::execute_command(
+        "netsh",
+        &[
+            "advfirewall",
+            "firewall",
+            "delete",
+            "rule",
+            &format!("name={}", legacy_rule_name),
+        ],
+        timeout,
+        false,
+    )
+    .await;
+
+    if result.success || legacy.success {
         ActionResult::ok(format!("unblocked IP {}", ip))
     } else {
         ActionResult::err(format!(
