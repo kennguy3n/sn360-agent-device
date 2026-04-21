@@ -43,9 +43,22 @@ cleanup() {
   echo ""
 
   echo "Cleaning up..."
-  [ -n "$AGENT_PID" ] && kill "$AGENT_PID" 2>/dev/null || true
-  wait "$AGENT_PID" 2>/dev/null || true
-  rm -rf /tmp/wda-e2e-fim /tmp/wda-e2e-logs /tmp/wda-e2e-security
+  # The agent runs as root via `timeout N sudo ./sda-agent …`, so `$AGENT_PID`
+  # is the unprivileged `timeout` wrapper. An unprivileged SIGTERM to the
+  # wrapper does not propagate down to the root `sda-agent` process and
+  # `wait` would block forever. Issue a privileged pkill against the agent
+  # binary directly, give it a brief grace period to flush, and then reap
+  # the wrapper.
+  if [ -n "$AGENT_PID" ]; then
+    sudo pkill -TERM -f 'target/release/sda-agent' 2>/dev/null || true
+    for _ in 1 2 3 4 5; do
+      pgrep -f 'target/release/sda-agent' >/dev/null 2>&1 || break
+      sleep 1
+    done
+    sudo pkill -KILL -f 'target/release/sda-agent' 2>/dev/null || true
+    wait "$AGENT_PID" 2>/dev/null || true
+  fi
+  rm -rf /tmp/sda-e2e-fim /tmp/sda-e2e-logs /tmp/sda-e2e-security
   sudo rm -f /etc/sn360-desktop-agent/client.keys
   docker compose -f tests/docker-compose.yml down -v 2>/dev/null || true
 }
@@ -53,7 +66,7 @@ trap cleanup EXIT
 
 # ── Setup: Start manager, build agent, enroll ─────────────────────────
 echo "==> Setup: Cleaning stale state..."
-rm -rf /tmp/wda-e2e-fim /tmp/wda-e2e-logs /tmp/wda-e2e-security
+rm -rf /tmp/sda-e2e-fim /tmp/sda-e2e-logs /tmp/sda-e2e-security
 sudo rm -f /var/lib/sn360-desktop-agent/fim.db
 sudo rm -f /etc/sn360-desktop-agent/client.keys
 for STALE_ID in $(docker compose -f tests/docker-compose.yml exec -T wazuh-manager \
@@ -108,12 +121,12 @@ echo "==> Setup: Building agent..."
 cargo build --release
 
 echo "==> Setup: Creating test directories..."
-mkdir -p /tmp/wda-e2e-fim /tmp/wda-e2e-logs /tmp/wda-e2e-security
-touch /tmp/wda-e2e-logs/test.log
+mkdir -p /tmp/sda-e2e-fim /tmp/sda-e2e-logs /tmp/sda-e2e-security
+touch /tmp/sda-e2e-logs/test.log
 
 echo "==> Setup: Starting agent..."
 sudo mkdir -p /etc/sn360-desktop-agent
-timeout 300 sudo ./target/release/wda-agent tests/wazuh-test-config.yaml &
+timeout 300 sudo ./target/release/sda-agent tests/wazuh-test-config.yaml &
 AGENT_PID=$!
 sleep 15
 echo "    Agent started (PID $AGENT_PID)."
@@ -121,7 +134,7 @@ echo "    Agent started (PID $AGENT_PID)."
 # ── Test 1: Malware file drop ─────────────────────────────────────────
 echo "==> Test 1: Malware file drop..."
 echo "X5O!P%@AP[4\PZX54(P^)7CC)7}\$EICAR-STANDARD-ANTIVIRUS-TEST-FILE!\$H+H*" \
-  > /tmp/wda-e2e-fim/malware.exe
+  > /tmp/sda-e2e-fim/malware.exe
 sleep 20
 
 MALWARE_ALERTS=$(docker compose -f tests/docker-compose.yml exec -T wazuh-manager \
@@ -143,7 +156,7 @@ fi
 echo "==> Test 2: Brute-force SSH simulation..."
 for i in $(seq 1 10); do
   echo "$(date '+%b %d %H:%M:%S') localhost sshd[${RANDOM}]: Failed password for root from 192.168.1.${i} port 22 ssh2" \
-    >> /tmp/wda-e2e-logs/test.log
+    >> /tmp/sda-e2e-logs/test.log
 done
 sleep 20
 
@@ -159,7 +172,7 @@ fi
 echo "==> Test 3: Privilege escalation simulation..."
 for i in $(seq 1 5); do
   echo "$(date '+%b %d %H:%M:%S') localhost sudo: testuser : user NOT in sudoers ; TTY=pts/${i} ; PWD=/home/testuser ; USER=root ; COMMAND=/bin/bash" \
-    >> /tmp/wda-e2e-logs/test.log
+    >> /tmp/sda-e2e-logs/test.log
 done
 sleep 20
 
@@ -179,9 +192,9 @@ fi
 
 # ── Test 4: Config file tampering ─────────────────────────────────────
 echo "==> Test 4: Config file tampering..."
-echo "# initial content" > /tmp/wda-e2e-fim/config.ini
+echo "# initial content" > /tmp/sda-e2e-fim/config.ini
 sleep 10
-echo "# tampered content" >> /tmp/wda-e2e-fim/config.ini
+echo "# tampered content" >> /tmp/sda-e2e-fim/config.ini
 sleep 20
 
 CONFIG_ALERTS=$(docker compose -f tests/docker-compose.yml exec -T wazuh-manager \
@@ -200,15 +213,15 @@ fi
 
 # ── Test 5: Ransomware simulation ─────────────────────────────────────
 echo "==> Test 5: Ransomware simulation (bulk rename to .encrypted)..."
-mkdir -p /tmp/wda-e2e-fim/ransomware-test
+mkdir -p /tmp/sda-e2e-fim/ransomware-test
 for i in $(seq 1 100); do
-  echo "important data $i" > "/tmp/wda-e2e-fim/ransomware-test/document_${i}.txt"
+  echo "important data $i" > "/tmp/sda-e2e-fim/ransomware-test/document_${i}.txt"
 done
 sleep 15
 
 for i in $(seq 1 100); do
-  mv "/tmp/wda-e2e-fim/ransomware-test/document_${i}.txt" \
-     "/tmp/wda-e2e-fim/ransomware-test/document_${i}.txt.encrypted"
+  mv "/tmp/sda-e2e-fim/ransomware-test/document_${i}.txt" \
+     "/tmp/sda-e2e-fim/ransomware-test/document_${i}.txt.encrypted"
 done
 sleep 30
 
@@ -296,14 +309,14 @@ sudo apt-get remove -y cowsay 2>/dev/null || true
 # ── Test 9: System binary tampering ───────────────────────────────────
 echo "==> Test 9: System binary tampering simulation..."
 # Use our own test dir to simulate /usr/bin tampering
-mkdir -p /tmp/wda-e2e-fim/usr-bin-sim
-echo '#!/bin/sh' > /tmp/wda-e2e-fim/usr-bin-sim/fake-binary
-chmod +x /tmp/wda-e2e-fim/usr-bin-sim/fake-binary
+mkdir -p /tmp/sda-e2e-fim/usr-bin-sim
+echo '#!/bin/sh' > /tmp/sda-e2e-fim/usr-bin-sim/fake-binary
+chmod +x /tmp/sda-e2e-fim/usr-bin-sim/fake-binary
 sleep 10
 
 # Tamper with the binary
-echo '#!/bin/sh' > /tmp/wda-e2e-fim/usr-bin-sim/fake-binary
-echo 'echo "tampered"' >> /tmp/wda-e2e-fim/usr-bin-sim/fake-binary
+echo '#!/bin/sh' > /tmp/sda-e2e-fim/usr-bin-sim/fake-binary
+echo 'echo "tampered"' >> /tmp/sda-e2e-fim/usr-bin-sim/fake-binary
 sleep 20
 
 BINARY_ALERTS=$(docker compose -f tests/docker-compose.yml exec -T wazuh-manager \
@@ -327,19 +340,19 @@ if [ -n "$AGENT_ID" ]; then
   # Create a test user with a real password so we can distinguish the
   # locked-by-AR state (`!` prefix on the shadow hash) from the
   # unlocked-but-no-password default.
-  sudo useradd -m wda-e2e-testuser 2>/dev/null || true
-  echo 'wda-e2e-testuser:wda-e2e-testpass' | sudo chpasswd 2>/dev/null || true
+  sudo useradd -m sda-e2e-testuser 2>/dev/null || true
+  echo 'sda-e2e-testuser:sda-e2e-testpass' | sudo chpasswd 2>/dev/null || true
 
   AR_DISPATCH_OUT=$(docker compose -f tests/docker-compose.yml exec -T wazuh-manager \
-    /var/ossec/bin/agent_control -b "wda-e2e-testuser" -f disable-account0 -u "$AGENT_ID" 2>&1 || true)
+    /var/ossec/bin/agent_control -b "sda-e2e-testuser" -f disable-account0 -u "$AGENT_ID" 2>&1 || true)
   sleep 10
 
   # macOS platform_disable_account rewrites the shell to /usr/bin/false.
-  USER_SHELL=$(getent passwd wda-e2e-testuser 2>/dev/null | cut -d: -f7 || true)
+  USER_SHELL=$(getent passwd sda-e2e-testuser 2>/dev/null | cut -d: -f7 || true)
   # Linux platform_disable_account runs `passwd -l` which locks the
   # account; `passwd -S` reports 'L' and the shadow hash is prefixed
   # with '!' in that case.
-  LOCK_STATUS=$(sudo passwd -S wda-e2e-testuser 2>/dev/null | awk '{print $2}' || true)
+  LOCK_STATUS=$(sudo passwd -S sda-e2e-testuser 2>/dev/null | awk '{print $2}' || true)
   # Server-side confirmation that the AR is configured and was
   # dispatched.  `agent_control -f` only prints this line when the AR
   # name resolves in `/var/ossec/etc/shared/ar.conf`.
@@ -360,7 +373,7 @@ if [ -n "$AGENT_ID" ]; then
   fi
 
   # Cleanup test user
-  sudo userdel -r wda-e2e-testuser 2>/dev/null || true
+  sudo userdel -r sda-e2e-testuser 2>/dev/null || true
 else
   record FAIL "Could not determine agent ID for account disable test"
 fi

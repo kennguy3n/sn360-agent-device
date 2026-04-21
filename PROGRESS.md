@@ -29,7 +29,7 @@ in other repositories).
 
 | # | Task | Status |
 |---|------|--------|
-| 1.1 | Workspace + crate skeleton (`wda-core`, `wda-comms`, `wda-event-bus`, `wda-pal`, modules) | Done |
+| 1.1 | Workspace + crate skeleton (`sda-core`, `sda-comms`, `sda-event-bus`, `sda-pal`, modules) | Done |
 | 1.2 | Structured YAML config loading (`AgentConfig`) on all OSes | Done |
 | 1.3 | Enrollment against `authd` on 1515 with password auth, key persistence | Done |
 | 1.4 | Connection manager with TCP + UDP transports and Blowfish crypto | Done |
@@ -93,20 +93,20 @@ Command: `cargo test --all`
 
 | Crate | Passed |
 |---|---|
-| `wda-active-response` | 29 |
-| `wda-agent` | 29 |
-| `wda-comms` | 31 |
-| `wda-core` | 2 |
-| `wda-enhanced-inventory` | 56 |
-| `wda-event-bus` | 4 |
-| `wda-fim` | 69 |
-| `wda-inventory` | 32 |
-| `wda-local-detection` | 56 |
-| `wda-logcollector` | 34 |
-| `wda-pal` | 5 |
-| `wda-rootcheck` | 20 |
-| `wda-sca` | 5 |
-| `wda-updater` | 19 |
+| `sda-active-response` | 29 |
+| `sda-agent` | 29 |
+| `sda-comms` | 31 |
+| `sda-core` | 2 |
+| `sda-enhanced-inventory` | 56 |
+| `sda-event-bus` | 4 |
+| `sda-fim` | 69 |
+| `sda-inventory` | 32 |
+| `sda-local-detection` | 56 |
+| `sda-logcollector` | 34 |
+| `sda-pal` | 5 |
+| `sda-rootcheck` | 20 |
+| `sda-sca` | 5 |
+| `sda-updater` | 19 |
 | **Total** | **391** |
 
 Reproduce locally with `make test`. CI regenerates the result on every

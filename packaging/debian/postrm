@@ -1,15 +1,15 @@
 #!/bin/sh
-# postrm script for wda-agent.
+# postrm script for sda-agent.
 #
 # On `remove`, disables the systemd unit but preserves state and
 # configuration so a future reinstall picks up where we left off.
 # On `purge`, also deletes the state directory, log directory,
-# configuration directory, and the unprivileged `wda` user/group.
+# configuration directory, and the unprivileged `sda` user/group.
 
 set -e
 
-SDA_USER=wda
-SDA_GROUP=wda
+SDA_USER=sda
+SDA_GROUP=sda
 SDA_HOME=/var/lib/sn360-desktop-agent
 SDA_LOG=/var/log/sn360-desktop-agent
 SDA_CONF=/etc/sn360-desktop-agent

@@ -1,5 +1,5 @@
 #!/bin/bash
-# macOS preinstall script for wda-agent.
+# macOS preinstall script for sda-agent.
 #
 # Runs before `pkgbuild` expands the package payload into the target
 # volume. We use this window to:

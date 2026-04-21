@@ -13,9 +13,9 @@ cd "$REPO_ROOT"
 # ── Configuration ─────────────────────────────────────────────────────
 MEASURE_DURATION=60          # seconds to measure idle metrics
 FIM_FILE_COUNT=1000          # files to create for FIM scan benchmark
-FIM_DIR="/tmp/wda-benchmark-fim"
+FIM_DIR="/tmp/sda-benchmark-fim"
 WAZUH_AGENT_BIN="/var/ossec/bin/wazuh-agentd"
-SDA_BIN="./target/release/wda-agent"
+SDA_BIN="./target/release/sda-agent"
 SDA_CONFIG="tests/wazuh-test-config.yaml"
 
 # ── Helper functions ──────────────────────────────────────────────────
@@ -210,11 +210,11 @@ echo ""
 # Calculate improvements where possible
 calc_improvement() {
   local wazuh="$1"
-  local wda="$2"
-  if [ "$wazuh" = "N/A" ] || [ "$wda" = "N/A" ] || [ "$wda" = "0" ]; then
+  local sda="$2"
+  if [ "$wazuh" = "N/A" ] || [ "$sda" = "N/A" ] || [ "$sda" = "0" ]; then
     echo "N/A"
   else
-    echo "scale=1; $wazuh / $wda" | bc 2>/dev/null || echo "N/A"
+    echo "scale=1; $wazuh / $sda" | bc 2>/dev/null || echo "N/A"
   fi
 }
 

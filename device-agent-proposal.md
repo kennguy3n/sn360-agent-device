@@ -1350,8 +1350,8 @@ modules:
 
 Two new crates are added to the workspace:
 
-- **`wda-local-detection`** — Local Detection Engine: rule store, pattern matching, behavioral evaluation, response dispatch, YARA integration (feature-gated).
-- **`wda-enhanced-inventory`** — Enhanced Software Inventory: running software monitor, browser extension inventory, SBOM generator.
+- **`sda-local-detection`** — Local Detection Engine: rule store, pattern matching, behavioral evaluation, response dispatch, YARA integration (feature-gated).
+- **`sda-enhanced-inventory`** — Enhanced Software Inventory: running software monitor, browser extension inventory, SBOM generator.
 
 **New workspace dependencies:**
 
@@ -1558,7 +1558,7 @@ modules:
   fim:
     enabled: true
     directories:
-      - path: /tmp/wda-test-fim
+      - path: /tmp/sda-test-fim
         recursive: true
         realtime: true
     scan_interval: 60
@@ -1566,7 +1566,7 @@ modules:
     enabled: true
     sources:
       - type: file
-        path: /tmp/wda-test-logs/test.log
+        path: /tmp/sda-test-logs/test.log
         format: syslog
   sca:
     enabled: true
@@ -1593,7 +1593,7 @@ Build and run the agent against the local server:
 cargo build
 
 # Run with the test config
-RUST_LOG=debug cargo run --bin wda-agent -- --config ./test-config.yaml
+RUST_LOG=debug cargo run --bin sda-agent -- --config ./test-config.yaml
 ```
 
 ### 16.6 Functional Verification Checklist
@@ -1604,8 +1604,8 @@ Use the following checklist to verify each module works against the local test s
 |---|---|---|
 | **Enrollment** | Start the agent; it should auto-enroll | Agent appears in `docker exec single-node-wazuh.manager-1 /var/ossec/bin/manage_agents -l` |
 | **Keepalive** | Agent stays running | Agent shows as "Active" in the Wazuh dashboard (Agents page) |
-| **FIM** | `mkdir -p /tmp/wda-test-fim && echo "test" > /tmp/wda-test-fim/hello.txt` | FIM alert in Dashboard → Security Events with rule.groups containing "syscheck" |
-| **Log Collection** | `mkdir -p /tmp/wda-test-logs && echo "Apr 17 12:00:00 localhost sshd[1234]: Failed password for root" >> /tmp/wda-test-logs/test.log` | Log event visible in Dashboard → Security Events |
+| **FIM** | `mkdir -p /tmp/sda-test-fim && echo "test" > /tmp/sda-test-fim/hello.txt` | FIM alert in Dashboard → Security Events with rule.groups containing "syscheck" |
+| **Log Collection** | `mkdir -p /tmp/sda-test-logs && echo "Apr 17 12:00:00 localhost sshd[1234]: Failed password for root" >> /tmp/sda-test-logs/test.log` | Log event visible in Dashboard → Security Events |
 | **Inventory** | Agent sends inventory on startup | Dashboard → Agents → (agent) → Inventory shows packages, network, OS info |
 | **SCA** | Agent runs SCA policies | Dashboard → Agents → (agent) → SCA shows policy results |
 | **Active Response** | Trigger from server: `/var/ossec/bin/agent_control -b 10.0.0.99 -f firewall-drop0 -u <AGENT_ID>` | Agent logs show active response execution |

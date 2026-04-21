@@ -17,59 +17,59 @@ Per-crate breakdown (unit + integration test binaries):
 
 | Crate | Passed | Failed |
 |---|---|---|
-| `wda-active-response` (unit) | 29 | 0 |
-| `wda-agent` (unit) | 29 | 0 |
-| `wda-comms` (unit) | 31 | 0 |
-| `wda-core` (unit) | 2 | 0 |
-| `wda-enhanced-inventory` (unit) | 50 | 0 |
-| `wda-enhanced-inventory` (integration: `browser_extensions_integration`) | 3 | 0 |
-| `wda-enhanced-inventory` (integration: `sbom_integration`) | 3 | 0 |
-| `wda-event-bus` (unit) | 4 | 0 |
-| `wda-fim` (unit) | 57 | 0 |
-| `wda-fim` (integration: `baseline_scan_integration`) | 1 | 0 |
-| `wda-fim` (integration: `burst_workload`) | 2 | 0 |
-| `wda-fim` (integration: `fim_integration`) | 5 | 0 |
-| `wda-fim` (integration: `integration`) | 4 | 0 |
-| `wda-inventory` (unit) | 32 | 0 |
-| `wda-local-detection` (unit) | 56 | 0 |
-| `wda-logcollector` (unit) | 34 | 0 |
-| `wda-pal` (unit) | 5 | 0 |
-| `wda-rootcheck` (unit) | 20 | 0 |
-| `wda-sca` (unit) | 5 | 0 |
-| `wda-updater` (unit) | 16 | 0 |
-| `wda-updater` (integration: `checker_http`) | 3 | 0 |
+| `sda-active-response` (unit) | 29 | 0 |
+| `sda-agent` (unit) | 29 | 0 |
+| `sda-comms` (unit) | 31 | 0 |
+| `sda-core` (unit) | 2 | 0 |
+| `sda-enhanced-inventory` (unit) | 50 | 0 |
+| `sda-enhanced-inventory` (integration: `browser_extensions_integration`) | 3 | 0 |
+| `sda-enhanced-inventory` (integration: `sbom_integration`) | 3 | 0 |
+| `sda-event-bus` (unit) | 4 | 0 |
+| `sda-fim` (unit) | 57 | 0 |
+| `sda-fim` (integration: `baseline_scan_integration`) | 1 | 0 |
+| `sda-fim` (integration: `burst_workload`) | 2 | 0 |
+| `sda-fim` (integration: `fim_integration`) | 5 | 0 |
+| `sda-fim` (integration: `integration`) | 4 | 0 |
+| `sda-inventory` (unit) | 32 | 0 |
+| `sda-local-detection` (unit) | 56 | 0 |
+| `sda-logcollector` (unit) | 34 | 0 |
+| `sda-pal` (unit) | 5 | 0 |
+| `sda-rootcheck` (unit) | 20 | 0 |
+| `sda-sca` (unit) | 5 | 0 |
+| `sda-updater` (unit) | 16 | 0 |
+| `sda-updater` (integration: `checker_http`) | 3 | 0 |
 | **Total** | **391** | **0** |
 
 Rolled up by crate (matching the shape of the table in `PROGRESS.md`):
 
 | Crate | Passed |
 |---|---|
-| `wda-active-response` | 29 |
-| `wda-agent` | 29 |
-| `wda-comms` | 31 |
-| `wda-core` | 2 |
-| `wda-enhanced-inventory` | 56 |
-| `wda-event-bus` | 4 |
-| `wda-fim` | 69 |
-| `wda-inventory` | 32 |
-| `wda-local-detection` | 56 |
-| `wda-logcollector` | 34 |
-| `wda-pal` | 5 |
-| `wda-rootcheck` | 20 |
-| `wda-sca` | 5 |
-| `wda-updater` | 19 |
+| `sda-active-response` | 29 |
+| `sda-agent` | 29 |
+| `sda-comms` | 31 |
+| `sda-core` | 2 |
+| `sda-enhanced-inventory` | 56 |
+| `sda-event-bus` | 4 |
+| `sda-fim` | 69 |
+| `sda-inventory` | 32 |
+| `sda-local-detection` | 56 |
+| `sda-logcollector` | 34 |
+| `sda-pal` | 5 |
+| `sda-rootcheck` | 20 |
+| `sda-sca` | 5 |
+| `sda-updater` | 19 |
 | **Total** | **391** |
 
 Notes on deltas vs. the previously recorded `PROGRESS.md` table (361 total):
 
-- `wda-agent`: 18 → 29 (+11 new agent-level unit tests).
-- `wda-enhanced-inventory`: 57 → 56 (one unit test was refactored into the integration test binaries; total across unit + integration is 56 here vs 57 previously, i.e. net –1).
-- `wda-fim`: 68 → 69 (+1 unit test).
-- `wda-updater`: (absent) → 19. This crate is not listed in the old PROGRESS.md table at all; 16 unit tests + 3 `checker_http` integration tests.
+- `sda-agent`: 18 → 29 (+11 new agent-level unit tests).
+- `sda-enhanced-inventory`: 57 → 56 (one unit test was refactored into the integration test binaries; total across unit + integration is 56 here vs 57 previously, i.e. net –1).
+- `sda-fim`: 68 → 69 (+1 unit test).
+- `sda-updater`: (absent) → 19. This crate is not listed in the old PROGRESS.md table at all; 16 unit tests + 3 `checker_http` integration tests.
 - All other crates are unchanged.
 
 No tests failed, so no fixes were required. `PROGRESS.md` has been updated
-to reflect the new 391/0 count and the added `wda-updater` row.
+to reflect the new 391/0 count and the added `sda-updater` row.
 
 ## Base E2E Tests (vs. Local Wazuh 4.9.2)
 
@@ -106,9 +106,9 @@ Per-assertion counters observed by the harness:
 - Baseline-scan syscheck alerts: 6 (scan-test-1/2/3)
 - Deletion alerts: 3 (scan-test-2.txt removed)
 - Inventory (syscollector) events in archives: 1088
-- Log-collection alerts: 1 ("Failed password" tailed from `/tmp/wda-e2e-logs/test.log`)
-- Journal log events in archives: 1 (`wda-e2e-test` via `logger`)
-- Rootcheck marker events in archives: 18 (hits on `/tmp/wda-e2e-rootkit-marker`)
+- Log-collection alerts: 1 ("Failed password" tailed from `/tmp/sda-e2e-logs/test.log`)
+- Journal log events in archives: 1 (`sda-e2e-test` via `logger`)
+- Rootcheck marker events in archives: 18 (hits on `/tmp/sda-e2e-rootkit-marker`)
 - Enhanced-inventory log-oracle hits: running_software=1, SBOM=2, browser-extensions=2
 
 ## Security E2E Tests (vs. Local Wazuh 4.9.2)
@@ -145,11 +145,11 @@ security E2E assertions passed on the first attempt.
 
 - The E2E and security E2E harnesses both hung during the `trap cleanup`
   step after printing `ALL CHECKS PASSED`. Root cause: the harnesses
-  launch the agent via `timeout 300 sudo ./target/release/wda-agent …`
+  launch the agent via `timeout 300 sudo ./target/release/sda-agent …`
   and then run `kill "$AGENT_PID"; wait "$AGENT_PID"` from an
   unprivileged shell. `$AGENT_PID` is the non-privileged `timeout`
   wrapper, so the unprivileged SIGTERM never reaches the root
-  `wda-agent` process. Issuing `sudo pkill -f wda-agent` unblocked the
+  `sda-agent` process. Issuing `sudo pkill -f sda-agent` unblocked the
   `wait` in both runs. All assertion results above were already
   recorded before the hang, so the test outcomes are not affected, but
   the harness cleanup path is worth hardening (e.g.

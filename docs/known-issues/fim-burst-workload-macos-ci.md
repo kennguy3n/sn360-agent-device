@@ -1,8 +1,8 @@
 # FIM burst workload test hangs on macOS CI
 
 - **Status:** mitigated
-- **Affected test:** `wda_fim::tests::burst_workload::test_burst_does_not_block_event_loop`
-- **Source:** `crates/wda-fim/tests/burst_workload.rs`
+- **Affected test:** `sda_fim::tests::burst_workload::test_burst_does_not_block_event_loop`
+- **Source:** `crates/sda-fim/tests/burst_workload.rs`
 - **Environments:** GitHub-hosted `macos-latest` (Apple Silicon, macOS 15). Passes on `ubuntu-latest` and `windows-latest`.
 - **First observed:** CI for PR #26 (`perf(ci,build): shrink binary <5MB and fix macOS CI runner slowness`), after the new `timeout-minutes: 30` guardrail made the hang visible instead of letting the job run for hours.
 
@@ -31,7 +31,7 @@ and never completes. The 30-minute job timeout cancels it. An orphan `burst_work
 
 ## Suggested next steps
 
-- [ ] Reproduce on a local Apple-Silicon macOS machine with `cargo test -p wda-fim --test burst_workload -- --nocapture`.
+- [ ] Reproduce on a local Apple-Silicon macOS machine with `cargo test -p sda-fim --test burst_workload -- --nocapture`.
 - [ ] Add `#[tokio::test(flavor = "multi_thread", worker_threads = 2)]` and see if the symptom clears. If it does, the root cause is synchronous file I/O starving the current-thread executor and the test should be changed (not ignored).
 - [ ] Instrument the drain loop to print `events` / `hashed` periodically so the macOS CI log tells us whether events are arriving at all or whether we're stuck behind `server_rx.recv()`.
 - [ ] If the issue is truly `notify`/kqueue flakiness on the runner, follow the existing convention in `baseline_scan_integration.rs` and mark this test `#[cfg_attr(target_os = "macos", ignore = "...")]` with a link to this document.
@@ -45,7 +45,7 @@ by `#[tokio::test]`, starving the async executor and therefore the FIM module's 
 loop and the in-test keepalive task. On Linux/Windows CI the bridge caught up in time;
 on macOS CI it did not, and the test hung until the job timeout killed it.
 
-Mitigated in `crates/wda-fim/tests/burst_workload.rs` by:
+Mitigated in `crates/sda-fim/tests/burst_workload.rs` by:
 
 1. Switching the attribute on `test_burst_does_not_block_event_loop` from
    `#[tokio::test]` to `#[tokio::test(flavor = "multi_thread", worker_threads = 2)]`
@@ -64,7 +64,7 @@ Mitigated in `crates/wda-fim/tests/burst_workload.rs` by:
    runners), which is independent of the runtime-starvation bug the first two changes
    fix. Following the existing convention in `baseline_scan_integration.rs`, the test
    is now skipped on macOS. It can still be forced locally with
-   `cargo test -p wda-fim --test burst_workload -- --include-ignored`.
+   `cargo test -p sda-fim --test burst_workload -- --include-ignored`.
 
 ## Related PR
 

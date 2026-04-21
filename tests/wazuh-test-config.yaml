@@ -12,14 +12,14 @@ modules:
     enabled: true
     scan_interval: 20
     directories:
-      - path: "/tmp/wda-e2e-fim"
+      - path: "/tmp/sda-e2e-fim"
         realtime: true
         check_sha256: true
   logcollector:
     enabled: true
     sources:
       - source_type: "file"
-        path: "/tmp/wda-e2e-logs/test.log"
+        path: "/tmp/sda-e2e-logs/test.log"
         format: "syslog"
       - source_type: "journald"
         format: "syslog"
@@ -46,7 +46,7 @@ modules:
     enabled: true
     scan_interval_secs: 15
     signature_paths:
-      - "/tmp/wda-e2e-rootkit-marker"
+      - "/tmp/sda-e2e-rootkit-marker"
     hidden_process_check: false
     binary_integrity_check: false
   enhanced_inventory:

@@ -9,7 +9,7 @@ manager running in Docker.
 ## Prerequisites
 
 - **Docker + Compose v2** — `docker` and `docker compose` on `PATH`.
-- **Rust 1.75+** — the harness builds `./target/release/wda-agent`
+- **Rust 1.75+** — the harness builds `./target/release/sda-agent`
   on first run (and reuses any prebuilt binary on subsequent runs).
 - **`sudo`** — the agent writes its enrollment keys under
   `/etc/sn360-desktop-agent/` and its baseline databases under
@@ -86,5 +86,5 @@ skipped on CI).
   `/etc/sn360-desktop-agent/client.keys` and any previously-enrolled
   agents from the manager; if a run is killed with `SIGKILL` you may
   need to remove these by hand before the next run.
-- **Agent log** — each run tails `/tmp/wda-agent-e2e.log` into the
+- **Agent log** — each run tails `/tmp/sda-agent-e2e.log` into the
   final summary; this is the first place to look when a check fails.

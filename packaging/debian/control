@@ -1,4 +1,4 @@
-Package: wda-agent
+Package: sda-agent
 Version: 0.1.0
 Section: admin
 Priority: optional

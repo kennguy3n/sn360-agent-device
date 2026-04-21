@@ -2,7 +2,7 @@
 
 **Date:** 2026-04-19
 **Host:** Ubuntu Linux x86_64 (Docker in / sysstat installed)
-**SN360 Desktop Agent (SDA) build:** `target/release/wda-agent` built with `cargo build --release` (crate prefix `wda-` is historical; the product name is SDA)
+**SN360 Desktop Agent (SDA) build:** `target/release/sda-agent` built with `cargo build --release` (crate prefix `sda-` is historical; the product name is SDA)
 **Reference agent:** Wazuh Agent 4.9.2 (`wazuh-agent_4.9.2-1_amd64.deb`)
 **Reference manager:** `wazuh/wazuh-manager:4.9.2` running in Docker on `127.0.0.1:1514/1515`
 
@@ -30,7 +30,7 @@ daemon most equivalent to the SDA responsibility is used
 
 | Component | Wazuh 4.9.2 | SDA |
 |---|---|---|
-| `wazuh-agentd` / `wda-agent` (communications) | 752 KB | 4.6 MB |
+| `wazuh-agentd` / `sda-agent` (communications) | 752 KB | 4.6 MB |
 | `wazuh-syscheckd` (FIM) | 888 KB | *(integrated)* |
 | `wazuh-logcollector` (log collection) | 780 KB | *(integrated)* |
 | `wazuh-modulesd` (inventory / SCA / rootcheck) | 700 KB | *(integrated)* |
@@ -89,7 +89,7 @@ OpenSSL under `/var/ossec`.
 | **SDA (current)** | **3 %** | **1.33 %** |
 
 > **Target: < 3 % peak.** **Met.** After the lazy-hashing /
-> rate-limiting / batching work landed in `crates/wda-fim` (see
+> rate-limiting / batching work landed in `crates/sda-fim` (see
 > PR #24), the 1 000-file burst now drives peak %CPU to 3 % and the
 > 15-s average to 1.33 %. The burst itself completes in ~3 100 ms;
 > pidstat samples at 1 s granularity, so the peak reflects actual
@@ -119,7 +119,7 @@ OpenSSL under `/var/ossec`.
   single static Rust binary; the Wazuh agent is five dynamically-linked
   daemons plus shared libraries under `/var/ossec/lib`. A more
   like-for-like comparison would measure the full install footprint
-  (`du -sh /var/ossec` vs. `du -sh target/release/wda-agent`).
+  (`du -sh /var/ossec` vs. `du -sh target/release/sda-agent`).
 - Idle-CPU for Wazuh reflects only `wazuh-agentd`. The remaining four
   daemons have their own idle overhead that was not summed.
 - FIM stress pattern (1 000 files created back-to-back) is worst-case.

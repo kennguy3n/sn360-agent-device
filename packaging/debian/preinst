@@ -1,5 +1,5 @@
 #!/bin/sh
-# preinst script for wda-agent
+# preinst script for sda-agent
 #
 # Runs before the package payload is unpacked. We use this window to
 # migrate legacy wazuh-desktop-agent install paths from pre-rename

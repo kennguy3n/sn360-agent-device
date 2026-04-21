@@ -57,8 +57,8 @@ jobs:
           - os: ubuntu-latest
             profile: release
             profile_dir: release
-            binary: wda-agent
-            artifact: wda-agent-linux
+            binary: sda-agent
+            artifact: sda-agent-linux
           - os: macos-latest
             # macOS GitHub runners are extremely slow under fat LTO; use the
             # `ci` profile (thin LTO, 4 codegen units) to keep wall-clock time
@@ -66,13 +66,13 @@ jobs:
             # release workflow with `--release`.
             profile: ci
             profile_dir: ci
-            binary: wda-agent
-            artifact: wda-agent-macos
+            binary: sda-agent
+            artifact: sda-agent-macos
           - os: windows-latest
             profile: release
             profile_dir: release
-            binary: wda-agent.exe
-            artifact: wda-agent-windows
+            binary: sda-agent.exe
+            artifact: sda-agent-windows
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
@@ -81,7 +81,7 @@ jobs:
         if: runner.os == 'Linux'
         run: sudo apt-get update && sudo apt-get install -y libsystemd-dev
       - name: Build
-        run: cargo build --profile ${{ matrix.profile }} -p wda-agent
+        run: cargo build --profile ${{ matrix.profile }} -p sda-agent
       - name: Upload agent binary
         uses: actions/upload-artifact@v4
         with:
@@ -103,8 +103,8 @@ jobs:
           - os: ubuntu-latest
             script: bash tests/scripts/run-e2e.sh
             deps: sudo apt-get update && sudo apt-get install -y libsystemd-dev
-            artifact: wda-agent-linux
-            binary: wda-agent
+            artifact: sda-agent-linux
+            binary: sda-agent
             profile_dir: release
           # macos-latest is intentionally excluded: GitHub-hosted macOS runners
           # do not have Docker, which `run-e2e-macos.sh` requires to bring up

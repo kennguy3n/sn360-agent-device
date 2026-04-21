@@ -1,5 +1,5 @@
 #!/bin/bash
-# macOS postinstall script for wda-agent.
+# macOS postinstall script for sda-agent.
 #
 # Creates the state/log directories, loads the launchd daemon, and
 # kicks off the first run. Runs as root during installation.
