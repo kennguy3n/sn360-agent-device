@@ -109,12 +109,45 @@ jobs:
 
       - name: Flatten artefacts for release upload
         run: |
+          set -euo pipefail
           mkdir -p release-upload
+
+          # Rename raw binaries to include the platform suffix so the
+          # Linux and macOS builds (both named `sda-agent`) don't
+          # collide in the flat release directory. `.deb` / `.rpm` /
+          # `.pkg` / `.msi` filenames are already platform-unique so
+          # copying them verbatim is fine.
+          declare -A unix_binaries=(
+            [sda-agent-linux-x86_64]=sda-agent-linux-x86_64
+            [sda-agent-macos]=sda-agent-macos
+          )
+          for src_artifact in "${!unix_binaries[@]}"; do
+            src="release-artifacts/${src_artifact}/target/release/sda-agent"
+            dst="release-upload/${unix_binaries[$src_artifact]}"
+            if [[ -f "$src" ]]; then
+              cp -v "$src" "$dst"
+            else
+              echo "::error ::expected binary not found: $src" >&2
+              exit 1
+            fi
+          done
+
+          # Windows .exe is already platform-unique; keep its suffix.
+          win_src="release-artifacts/sda-agent-windows-x86_64/target/release/sda-agent.exe"
+          if [[ -f "$win_src" ]]; then
+            cp -v "$win_src" "release-upload/sda-agent-windows-x86_64.exe"
+          else
+            echo "::error ::expected binary not found: $win_src" >&2
+            exit 1
+          fi
+
+          # Installer packages have unique filenames by extension /
+          # version; copy them verbatim.
           find release-artifacts -type f \
-            \( -name 'sda-agent' -o -name 'sda-agent.exe' \
-               -o -name '*.deb' -o -name '*.rpm' \
+            \( -name '*.deb' -o -name '*.rpm' \
                -o -name '*.pkg' -o -name '*.msi' \) \
             -exec cp -v {} release-upload/ \;
+
           ls -lh release-upload
 
       - name: Generate per-artefact SHA-256 checksums

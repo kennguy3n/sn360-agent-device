@@ -56,7 +56,6 @@ pub fn spawn_power_profile_task(
     mut shutdown: ShutdownSignal,
 ) -> JoinHandle<()> {
     tokio::spawn(async move {
-        let monitor = PowerMonitor::new();
         let mut ticker = tokio::time::interval(POWER_PROFILE_POLL_INTERVAL);
         // Consume the immediate first tick — the channel is already
         // seeded with an initial profile at creation time and we want
@@ -73,9 +72,25 @@ pub fn spawn_power_profile_task(
                 }
 
                 _ = ticker.tick() => {
-                    let new_profile =
-                        PowerProfile::detect(&monitor, POWER_PROFILE_IDLE_THRESHOLD);
+                    // PowerProfile::detect() reads sysfs on Linux and
+                    // shells out to `loginctl` to derive user-idle
+                    // time; on macOS/Windows it calls into IOKit /
+                    // Win32. Run it on the blocking pool so the
+                    // async runtime never waits on a syscall or a
+                    // subprocess.
                     let current = *tx.borrow();
+                    let new_profile = match tokio::task::spawn_blocking(|| {
+                        let monitor = PowerMonitor::new();
+                        PowerProfile::detect(&monitor, POWER_PROFILE_IDLE_THRESHOLD)
+                    })
+                    .await
+                    {
+                        Ok(p) => p,
+                        Err(e) => {
+                            debug!(error = %e, "power-profile detect task panicked or was cancelled; keeping current profile");
+                            current
+                        }
+                    };
                     if new_profile != current {
                         info!(
                             previous = ?current,
