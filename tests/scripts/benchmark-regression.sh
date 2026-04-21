@@ -32,7 +32,11 @@ MAX_FIM_PEAK_CPU_PCT="3.0"          # 3 %
 
 IDLE_MEASURE_SECS="${IDLE_MEASURE_SECS:-30}"
 FIM_FILE_COUNT="${FIM_FILE_COUNT:-1000}"
-FIM_DIR="${FIM_DIR:-/tmp/sda-regression-fim}"
+# MUST match an FIM-monitored directory in $SDA_CONFIG, otherwise the
+# FIM module never sees the burst and the peak-CPU gate silently
+# measures idle CPU. tests/wazuh-test-config.yaml monitors
+# /tmp/sda-e2e-fim.
+FIM_DIR="${FIM_DIR:-/tmp/sda-e2e-fim}"
 OUTPUT_DIR="${REGRESSION_OUTPUT_DIR:-$REPO_ROOT/target/benchmark-regression}"
 SDA_BIN="${SDA_BIN:-$REPO_ROOT/target/release/sda-agent}"
 SDA_CONFIG="${SDA_CONFIG:-$REPO_ROOT/tests/wazuh-test-config.yaml}"
@@ -47,14 +51,9 @@ fail() { echo "FAIL: $*" | tee -a "$REPORT"; FAILED=1; }
 pass() { echo "PASS: $*" | tee -a "$REPORT"; }
 info() { echo "info: $*" | tee -a "$REPORT"; }
 
-# bc is the simplest way to compare floating-point metrics in bash.
-require_bc() {
-  if ! command -v bc >/dev/null; then
-    echo "bc is required; install with 'sudo apt-get install -y bc'" >&2
-    exit 2
-  fi
-}
-
+# Float comparisons are handled entirely by awk below, so no external
+# dependency is needed. (An earlier draft guarded on `bc` being
+# installed, but nothing in this script ever calls bc.)
 float_gt() {
   # float_gt <a> <b> — returns 0 if a > b, non-zero otherwise.
   awk -v a="$1" -v b="$2" 'BEGIN { exit !(a+0 > b+0) }'
@@ -78,8 +77,6 @@ cleanup() {
   rm -rf "$FIM_DIR" 2>/dev/null || true
 }
 trap cleanup EXIT
-
-require_bc
 
 # ── 1. Build release binary ───────────────────────────────────────────
 info "Building release binary..."
