@@ -16,7 +16,7 @@ cd "$REPO_ROOT"
 # without duplicating the 500-line test body. Callers export
 # `E2E_COMPOSE_FILE` before exec'ing this script; unset falls back to
 # the canonical Wazuh 4.9.2 compose file.
-E2E_COMPOSE_FILE="${E2E_COMPOSE_FILE:-$E2E_COMPOSE_FILE}"
+E2E_COMPOSE_FILE="${E2E_COMPOSE_FILE:-tests/docker-compose.yml}"
 echo "==> Using compose file: $E2E_COMPOSE_FILE"
 
 echo "==> Docker version:"
