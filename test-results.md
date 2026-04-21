@@ -11,15 +11,15 @@ Wazuh Manager: `wazuh/wazuh-manager:4.9.2`
 
 Command: `cargo test --all`
 
-**Result: 391 passing / 0 failed.**
+**Result: 431 passing / 0 failed.**
 
 Per-crate breakdown (unit + integration test binaries):
 
 | Crate | Passed | Failed |
 |---|---|---|
 | `sda-active-response` (unit) | 29 | 0 |
-| `sda-agent` (unit) | 29 | 0 |
-| `sda-comms` (unit) | 31 | 0 |
+| `sda-agent` (unit) | 30 | 0 |
+| `sda-comms` (unit) | 48 | 0 |
 | `sda-core` (unit) | 2 | 0 |
 | `sda-enhanced-inventory` (unit) | 50 | 0 |
 | `sda-enhanced-inventory` (integration: `browser_extensions_integration`) | 3 | 0 |
@@ -33,12 +33,12 @@ Per-crate breakdown (unit + integration test binaries):
 | `sda-inventory` (unit) | 32 | 0 |
 | `sda-local-detection` (unit) | 56 | 0 |
 | `sda-logcollector` (unit) | 34 | 0 |
-| `sda-pal` (unit) | 5 | 0 |
-| `sda-rootcheck` (unit) | 20 | 0 |
+| `sda-pal` (unit) | 10 | 0 |
+| `sda-rootcheck` (unit) | 35 | 0 |
 | `sda-sca` (unit) | 5 | 0 |
-| `sda-updater` (unit) | 16 | 0 |
+| `sda-updater` (unit) | 18 | 0 |
 | `sda-updater` (integration: `checker_http`) | 3 | 0 |
-| **Total** | **391** | **0** |
+| **Total** | **431** | **0** |
 
 Rolled up by crate (matching the shape of the table in `PROGRESS.md`):
 
@@ -54,22 +54,29 @@ Rolled up by crate (matching the shape of the table in `PROGRESS.md`):
 | `sda-inventory` | 32 |
 | `sda-local-detection` | 56 |
 | `sda-logcollector` | 34 |
-| `sda-pal` | 5 |
-| `sda-rootcheck` | 20 |
+| `sda-pal` | 10 |
+| `sda-rootcheck` | 35 |
 | `sda-sca` | 5 |
-| `sda-updater` | 19 |
-| **Total** | **391** |
+| `sda-updater` | 21 |
+| **Total** | **431** |
 
-Notes on deltas vs. the previously recorded `PROGRESS.md` table (361 total):
+Notes on deltas vs. the previously recorded 391/0 baseline:
 
-- `sda-agent`: 18 → 29 (+11 new agent-level unit tests).
-- `sda-enhanced-inventory`: 57 → 56 (one unit test was refactored into the integration test binaries; total across unit + integration is 56 here vs 57 previously, i.e. net –1).
-- `sda-fim`: 68 → 69 (+1 unit test).
-- `sda-updater`: (absent) → 19. This crate is not listed in the old PROGRESS.md table at all; 16 unit tests + 3 `checker_http` integration tests.
+- `sda-pal`: 5 → 10 (+5 new unit tests covering the loginctl-based
+  Linux user-idle detector added for P1.8 — `parse_idle_since_hint`
+  edge cases + a smoke test for `linux_user_idle_duration`).
+- `sda-rootcheck`: 20 → 35 (+15: 14 new `content_checks` unit tests
+  covering `/etc/ld.so.preload`, `/etc/crontab`, and `/etc/hosts`
+  inspection for P1.4, plus 1 new platform-gated hidden-process
+  test for macOS / Windows from P1.5).
+- `sda-agent`: 29 → 30 (+1), `sda-comms`: 31 → 48 (+17),
+  `sda-updater`: 19 → 21 (+2). These landed on `main` via
+  PR #55 and are now reflected in the fresh `cargo test --all`
+  baseline.
 - All other crates are unchanged.
 
 No tests failed, so no fixes were required. `PROGRESS.md` has been updated
-to reflect the new 391/0 count and the added `sda-updater` row.
+to reflect the new 431/0 count.
 
 ## Base E2E Tests (vs. Local Wazuh 4.9.2)
 

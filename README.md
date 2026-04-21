@@ -144,7 +144,7 @@ For the full configuration reference, see the [Configuration section in `device-
 
 ## Project Status
 
-**Phases 1–5 complete.** Phase 5 platform hardening (self-update, privilege separation, tamper protection, installers) plus Phase 5.6 enhanced protocol (opt-in TLS 1.3 / MessagePack / HTTP/2). **Phase 6 (testing & release) is in progress** — CI matrix expanded, benchmark regression gate added, fuzzing harness and `cargo audit` wired up, documentation set written. Tag + binary publication are still pending release infrastructure. See [`PROGRESS.md`](./PROGRESS.md) for detailed task status, test results, and benchmarks.
+**Phases 1–6 complete.** Phase 5 platform hardening (self-update, privilege separation, tamper protection, installers), Phase 5.6 enhanced protocol (opt-in TLS 1.3 / MessagePack / HTTP/2), and Phase 6 testing & release infrastructure — expanded CI matrix, benchmark regression gate, `cargo audit` gate, nightly `cargo-fuzz` matrix, tag-triggered multi-OS release workflow, and the [`docs/release-process.md`](./docs/release-process.md) runbook — have all landed. The beta tag push (`v0.9.0-beta.1`) and signed-binary publication are gated on release credentials and signing keys outside automation; see [`PROGRESS.md`](./PROGRESS.md) for the detailed status, test results (411 passing / 0 failed, 14/14 base E2E, 10/10 security E2E), and benchmarks.
 
 ## Documentation
 

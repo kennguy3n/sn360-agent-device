@@ -10,6 +10,53 @@ minor bump.
 
 ### Added
 
+- **Rootcheck content-based inspection (P1.4).**
+  New `crates/sda-rootcheck/src/content_checks.rs` module reads
+  `/etc/ld.so.preload`, `/etc/crontab`, and `/etc/hosts` and flags
+  indicators that don’t show up in file-existence signatures:
+  LD_PRELOAD entries outside the benign allow-list,
+  `curl … | bash` and `/dev/tcp/` reverse-shell patterns in cron,
+  and redirections of security-update domains (e.g.
+  `update.microsoft.com`) to non-loopback IPs. Wired into the
+  rootcheck sweep via `tokio::task::spawn_blocking`.
+- **Cross-platform hidden-process detection (P1.5).**
+  `hidden_process::scan` now has three backends:
+  `/proc` + `kill(pid, 0)` on Linux (existing),
+  `sysctl(CTL_KERN, KERN_PROC, KERN_PROC_ALL)` + `kill(pid, 0)` on
+  macOS, and `CreateToolhelp32Snapshot` /
+  `Process32FirstW` / `Process32NextW` +
+  `OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, ...)` on
+  Windows. Platform-gated unit tests cover each backend; the
+  public API is unchanged.
+- **Linux user-idle detection via `loginctl` (P1.8).**
+  `PowerMonitor::user_idle_duration()` now returns a real
+  `Some(Duration)` on systemd hosts by reading the
+  `IdleSinceHint` property of the current session via
+  `loginctl show-session self`. A pure
+  `parse_idle_since_hint()` helper is exported for unit testing,
+  and the function returns `None` on headless or non-systemd
+  hosts without errors. Unblocks `PowerProfile::IdleAC` /
+  `PowerProfile::BatteryIdle` on Linux.
+- **Release workflow (`.github/workflows/release.yml`).**
+  Tag-triggered (`v*`) multi-OS build matrix that runs
+  `make release` + `make deb rpm` / `make pkg` / `make msi` on
+  `ubuntu-latest` / `macos-latest` / `windows-latest`, uploads
+  every artefact, computes per-file `SHA256SUMS`, and drafts a
+  GitHub Release with the `[Unreleased]` section of this
+  changelog as the body. The draft is not auto-published;
+  maintainers sign / notarise out-of-band per
+  [`docs/release-process.md`](./docs/release-process.md) and
+  promote manually.
+- **Nightly `cargo-fuzz` CI job.**
+  `.github/workflows/ci.yml` § `nightly-fuzz` runs
+  `cargo +nightly fuzz run` against `protocol_decode`,
+  `protocol_decompress`, `msgpack_event_decode`, and
+  `rule_store_msgpack` for 5 minutes per target on the cron
+  schedule.
+- **Release runbook (`docs/release-process.md`).**
+  Step-by-step for cutting, signing (Linux apt/yum keys, macOS
+  Developer ID + notarisation, Windows EV code-sign), promoting,
+  and rolling back a release.
 - **Phase 5.6 enhanced protocol (opt-in).** TLS 1.3 transport
   (`rustls`, TLS 1.3 only, optional CA bundle + SHA-256 cert
   pinning), MessagePack event serialisation (`rmp-serde`), and

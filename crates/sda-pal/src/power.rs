@@ -70,10 +70,12 @@ impl PowerMonitor {
         {
             return windows_imp::user_idle_duration();
         }
-        #[cfg(not(any(target_os = "macos", target_os = "windows")))]
+        #[cfg(target_os = "linux")]
         {
-            // Idle detection on Linux requires XScreenSaver or session-bus
-            // integration; not yet implemented.
+            linux_user_idle_duration()
+        }
+        #[cfg(not(any(target_os = "linux", target_os = "macos", target_os = "windows")))]
+        {
             None
         }
     }
@@ -127,6 +129,72 @@ fn linux_battery_percentage() -> Option<u8> {
         }
     }
     None
+}
+
+/// Linux user-idle detection.
+///
+/// Queries `logind` via the standard `loginctl show-session self
+/// --property=IdleSinceHint --value` command and interprets the
+/// returned microseconds-since-UNIX-epoch timestamp. Returns:
+///
+/// * `Some(Duration::ZERO)` when logind reports the session as not
+///   idle (`IdleSinceHint == 0`).
+/// * `Some(elapsed)` when the session has been idle for `elapsed`.
+/// * `None` when `loginctl` is missing, the current process has no
+///   logind session (headless systems, non-systemd hosts, or inside
+///   containers without `/run/systemd/sessions`), or the output
+///   cannot be parsed.
+///
+/// This keeps adaptive scheduling correct on all mainstream systemd
+/// distributions without adding a D-Bus dependency. Hosts without
+/// logind fall through to `None`, which preserves the pre-existing
+/// behaviour (`PowerProfile::IdleAC` / `BatteryIdle` not entered).
+#[cfg(target_os = "linux")]
+fn linux_user_idle_duration() -> Option<Duration> {
+    let output = std::process::Command::new("loginctl")
+        .args([
+            "show-session",
+            "self",
+            "--property=IdleSinceHint",
+            "--value",
+        ])
+        .output()
+        .ok()?;
+    if !output.status.success() {
+        return None;
+    }
+    let raw = std::str::from_utf8(&output.stdout).ok()?;
+    let now_usec = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .ok()?
+        .as_micros();
+    parse_idle_since_hint(raw, now_usec)
+}
+
+/// Parse the raw `IdleSinceHint` value returned by `loginctl` into
+/// an idle [`Duration`].
+///
+/// Pure function split out so unit tests can exercise the full
+/// matrix (not idle / idle / clock skew / garbage input) without
+/// needing logind on the host.
+#[cfg(target_os = "linux")]
+fn parse_idle_since_hint(raw: &str, now_usec: u128) -> Option<Duration> {
+    let trimmed = raw.trim();
+    if trimmed.is_empty() {
+        return None;
+    }
+    let idle_since_usec: u64 = trimmed.parse().ok()?;
+    if idle_since_usec == 0 {
+        // logind convention: 0 means "not currently idle".
+        return Some(Duration::ZERO);
+    }
+    let idle_since = idle_since_usec as u128;
+    if idle_since > now_usec {
+        // Clock skew; don't fabricate a negative duration.
+        return None;
+    }
+    let elapsed_usec = now_usec - idle_since;
+    u64::try_from(elapsed_usec).ok().map(Duration::from_micros)
 }
 
 #[cfg(target_os = "macos")]
@@ -482,5 +550,58 @@ mod tests {
     fn test_windows_user_idle_duration_is_some() {
         let monitor = PowerMonitor::new();
         assert!(monitor.user_idle_duration().is_some());
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn test_parse_idle_since_hint_not_idle() {
+        // IdleSinceHint == 0 means logind considers the session active.
+        let now = 1_700_000_000_000_000_u128;
+        assert_eq!(parse_idle_since_hint("0\n", now), Some(Duration::ZERO));
+        assert_eq!(parse_idle_since_hint("0", now), Some(Duration::ZERO));
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn test_parse_idle_since_hint_idle_for_30_seconds() {
+        let now: u128 = 1_700_000_030_000_000;
+        let thirty_s_ago: u64 = 1_700_000_000_000_000;
+        let got = parse_idle_since_hint(&thirty_s_ago.to_string(), now);
+        assert_eq!(got, Some(Duration::from_secs(30)));
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn test_parse_idle_since_hint_rejects_future_timestamps() {
+        let now: u128 = 1_000_000;
+        let in_the_future: u64 = 2_000_000;
+        assert_eq!(parse_idle_since_hint(&in_the_future.to_string(), now), None);
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn test_parse_idle_since_hint_rejects_garbage_and_empty() {
+        let now = 1_700_000_000_000_000_u128;
+        assert_eq!(parse_idle_since_hint("", now), None);
+        assert_eq!(parse_idle_since_hint("   \n", now), None);
+        assert_eq!(parse_idle_since_hint("not-a-number", now), None);
+        assert_eq!(parse_idle_since_hint("-1", now), None);
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn test_linux_user_idle_duration_does_not_panic() {
+        // Environments without logind (minimal containers, headless
+        // CI runners) return `None`; with a session the value is
+        // `Some(..)`. Either way the call must complete cleanly —
+        // we only assert that nothing panics and the duration is
+        // non-negative when present.
+        let monitor = PowerMonitor::new();
+        if let Some(d) = monitor.user_idle_duration() {
+            // Duration is unsigned; the only guarantee we can make
+            // without a real session is that we didn't observe
+            // seconds-in-the-future nonsense.
+            assert!(d.as_secs() < 60 * 60 * 24 * 365);
+        }
     }
 }
