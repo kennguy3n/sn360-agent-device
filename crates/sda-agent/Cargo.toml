@@ -9,9 +9,21 @@ license.workspace = true
 name = "sda-agent"
 path = "src/main.rs"
 
+[features]
+# The default build ships the legacy SIEM (Wazuh-compatible)
+# transport adapter alongside the SN360 native-protocol building
+# blocks. A proprietary-only distribution can compile the legacy
+# adapter out with `--no-default-features`; see
+# `docs/proprietary-licensing-rationale.md` for the rationale.
+default = ["legacy-siem"]
+
+# Forwarded to `sda-comms/legacy-siem` so the enrolment, connection,
+# crypto, protocol, and keepalive modules are compiled in.
+legacy-siem = ["sda-comms/legacy-siem"]
+
 [dependencies]
 sda-core = { workspace = true }
-sda-comms = { workspace = true }
+sda-comms = { workspace = true, default-features = false }
 sda-event-bus = { workspace = true }
 sda-pal = { workspace = true }
 sda-fim = { workspace = true }
