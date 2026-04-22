@@ -98,12 +98,20 @@ impl EventBus {
     /// Publish an event and also queue it for server delivery.
     pub async fn publish_to_server(&self, event: Event) -> Result<(), EventBusError> {
         // Queue for server delivery first
-        if self.server_tx.try_send(event.clone()).is_err() {
-            warn!("server event queue full, dropping event");
-            return Err(EventBusError::ChannelFull);
+        match self.server_tx.try_send(event.clone()) {
+            Ok(()) => {}
+            Err(mpsc::error::TrySendError::Closed(_)) => {
+                // Receiver was dropped (e.g. legacy-siem feature disabled).
+                // Not an error — skip server delivery silently.
+                debug!("server channel closed, skipping server delivery");
+            }
+            Err(mpsc::error::TrySendError::Full(_)) => {
+                warn!("server event queue full, dropping server-bound copy");
+            }
         }
 
-        // Also broadcast to local subscribers
+        // Always broadcast to local subscribers regardless of server
+        // delivery outcome.
         self.publish(event)
     }
 
@@ -187,5 +195,51 @@ mod tests {
 
         let _rx2 = bus.subscribe();
         assert_eq!(bus.subscriber_count(), 2);
+    }
+
+    #[tokio::test]
+    async fn test_publish_to_server_after_receiver_dropped() {
+        let (bus, server_rx) = EventBus::new(64, 64);
+        let mut local_sub = bus.subscribe();
+
+        // Drop the server receiver to simulate legacy-siem disabled
+        drop(server_rx);
+
+        let event = Event::new("test", Priority::Normal, EventKind::Keepalive);
+        // Must NOT return an error — local delivery must still work
+        bus.publish_to_server(event).await.unwrap();
+
+        let received =
+            tokio::time::timeout(std::time::Duration::from_millis(100), local_sub.recv())
+                .await
+                .unwrap();
+        assert!(received.is_some());
+        assert_eq!(received.unwrap().source, "test");
+    }
+
+    #[tokio::test]
+    async fn test_publish_to_server_when_queue_full_still_broadcasts_locally() {
+        // Create a bus with a tiny server queue (capacity 1)
+        let (bus, _server_rx) = EventBus::new(64, 1);
+        let mut local_sub = bus.subscribe();
+
+        // Fill the server queue
+        let event1 = Event::new("fill", Priority::Normal, EventKind::Keepalive);
+        bus.publish_to_server(event1).await.unwrap();
+
+        // This should NOT block local delivery even though server queue is full
+        let event2 = Event::new("overflow", Priority::Normal, EventKind::Keepalive);
+        bus.publish_to_server(event2).await.unwrap();
+
+        // Both events should have been broadcast locally
+        let r1 = tokio::time::timeout(std::time::Duration::from_millis(100), local_sub.recv())
+            .await
+            .unwrap();
+        assert_eq!(r1.unwrap().source, "fill");
+
+        let r2 = tokio::time::timeout(std::time::Duration::from_millis(100), local_sub.recv())
+            .await
+            .unwrap();
+        assert_eq!(r2.unwrap().source, "overflow");
     }
 }

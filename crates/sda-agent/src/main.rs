@@ -139,6 +139,10 @@ async fn main() -> Result<()> {
     #[cfg(not(feature = "legacy-siem"))]
     {
         info!("legacy-siem feature disabled: skipping enrolment and server transport");
+        // Drop the server-bound receiver so publish_to_server() callers
+        // get TrySendError::Closed immediately instead of buffering
+        // 1024 events that nobody consumes.
+        let _ = agent.take_server_rx();
     }
 
     // 5c. Privilege separation (P3.2): drop root now that enrollment and
