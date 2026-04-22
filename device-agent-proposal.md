@@ -4,6 +4,13 @@
 > **Target Platforms:** Windows 10/11, macOS 12+, Linux (Ubuntu/Fedora/Arch)
 > **Goal:** Sub-20 MB RAM idle, <0.5% CPU baseline, unnoticeable to end users
 
+> **Scope note (2026-04-22):** This proposal covers both agent-side and
+> server-side components. The agent-side implementation lives in this
+> repository (`sn360-agent-device`). All server-side Control Plane
+> components described herein — TRDS, IOCFS, SIS, Agent Gateway — are
+> implemented in
+> [`sn360-security-platform`](https://github.com/kennguy3n/sn360-security-platform).
+
 ---
 
 ## Table of Contents
