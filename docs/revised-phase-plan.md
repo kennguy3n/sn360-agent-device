@@ -20,6 +20,13 @@ required for the proprietary release:
 Phases 1–6 remain as described in `PROGRESS.md` and
 `device-agent-proposal.md`; this document picks up at Phase 7.
 
+> **Scope:** This repository (`sn360-agent-device`) contains only the
+> agent-side (on-device) code. All server-side Control Plane components
+> — Agent Gateway, TRDS, IOCFS, SIS — are implemented in
+> [`sn360-security-platform`](https://github.com/kennguy3n/sn360-security-platform).
+> Tasks below that describe server-side work are included for context
+> only and are marked with ⚙️ to indicate they belong to the other repository.
+
 ---
 
 ## Phase 7 — SN360 Native Protocol Promotion & Control Plane MVP
@@ -32,8 +39,8 @@ minimum Control Plane surface area the agent needs.
 |-----|--------------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | 7.1 | Promote SN360 native protocol to default         | Flip config defaults so `server.protocol = "http2"`, `server.enhanced.tls = true`, `server.enhanced.serialization = "msgpack"`. Legacy adapter moves behind the `legacy-siem` Cargo feature. |
 | 7.2 | Native enrolment                                 | Implement mTLS-based enrolment against the SN360 Agent Gateway in `sda-comms::enrollment::native` (replacing `authd`-style enrolment as the default path).                       |
-| 7.3 | Agent Gateway MVP                                | Minimal Agent Gateway that terminates mTLS, authenticates the agent's client certificate, and routes native-protocol frames to internal backends. Accelerated from Phase 4.13. |
-| 7.4 | TRDS MVP                                         | Minimal rule-distribution service so LDE (on-device rule engine) has a native rule source. Accelerated from Phase 4.10.                                                          |
+| 7.3 | Agent Gateway MVP ⚙️                             | Minimal Agent Gateway that terminates mTLS, authenticates the agent's client certificate, and routes native-protocol frames to internal backends. Accelerated from Phase 4.13. Implemented in `sn360-security-platform`, not this repo. |
+| 7.4 | TRDS MVP ⚙️                                      | Minimal rule-distribution service so LDE (on-device rule engine) has a native rule source. Accelerated from Phase 4.10. Implemented in `sn360-security-platform`, not this repo.                                                        |
 | 7.5 | Refactor `sda-comms`                             | Split the crate into native protocol modules (default) and a legacy adapter module (feature-gated). See § "sda-comms target layout" below.                                       |
 | 7.6 | Update E2E tests                                 | Create an E2E suite that runs against the SN360 Agent Gateway instead of a legacy SIEM manager. Keep the legacy E2E as `make e2e-legacy` for regression coverage.                |
 | 7.7 | Documentation sweep                              | Apply all document rewrites required to align the repo with the proprietary posture (LICENSE, README, proposal, architecture, admin/user guides, config reference, PROGRESS).    |
@@ -75,13 +82,17 @@ and collapses the native path into the hot code path.
 Goal: promote the Phase 7 Control Plane MVP to production quality.
 This phase replaces the old Phase 4.10 – 4.14 line items.
 
+> **Note:** All Phase 8 tasks are server-side and implemented in
+> [`sn360-security-platform`](https://github.com/kennguy3n/sn360-security-platform).
+> They are listed here for cross-reference only.
+
 | #   | Task                                                           |
 |-----|----------------------------------------------------------------|
-| 8.1 | TRDS full implementation — rule CRUD API, rule compiler, delta distribution |
-| 8.2 | IOCFS — feed ingestion, normalization, bloom filter compilation |
-| 8.3 | SIS — inventory ingestion, CVE matching, dashboard API         |
-| 8.4 | Agent Gateway production hardening — rate limiting, multi-tenant routing, HA |
-| 8.5 | Agent ↔ TRDS rule pull, hot-reload, version tracking           |
+| 8.1 | TRDS full implementation — rule CRUD API, rule compiler, delta distribution ⚙️ (sn360-security-platform) |
+| 8.2 | IOCFS — feed ingestion, normalization, bloom filter compilation ⚙️ (sn360-security-platform) |
+| 8.3 | SIS — inventory ingestion, CVE matching, dashboard API ⚙️ (sn360-security-platform) |
+| 8.4 | Agent Gateway production hardening — rate limiting, multi-tenant routing, HA ⚙️ (sn360-security-platform) |
+| 8.5 | Agent ↔ TRDS rule pull, hot-reload, version tracking ⚙️ (sn360-security-platform) |
 
 **Milestone 8:** A fleet of SDA agents can enrol, pull rules, ship
 inventory and detections, and be managed through the SN360
@@ -114,10 +125,10 @@ back in, but the shipped artefact is native-only.
   flip, not new protocol code — the TLS 1.3 / HTTP/2 / MessagePack
   implementation already landed in Phase 5.6.
 - **Phase 4.10 – 4.14** (server-side microservices) are absorbed by
-  Phases 7.3 – 7.4 (MVP) and Phase 8 (production hardening). The
-  server-side work still lives in the `sn360-security-platform`
-  repository; this document only references it so the agent plan
-  is self-contained.
+  Phases 7.3 – 7.4 (MVP) and Phase 8 (production hardening). All
+  server-side work is implemented in the
+  [`sn360-security-platform`](https://github.com/kennguy3n/sn360-security-platform)
+  repository and is **out of scope** for `sn360-agent-device`.
 
 ## Tracking
 

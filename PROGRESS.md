@@ -39,10 +39,10 @@ user-idle detector, on top of +20 tests that landed on `main`
 via PR #55 in `sda-comms`, `sda-agent`, and `sda-updater`), the
 base E2E harness passes **14/14** assertions against a local
 reference SIEM manager, and the security E2E suite passes
-**10/10** attack-scenario checks. Remaining work is the
-server-side SN360 Control Plane microservices — TRDS, IOCFS, SIS,
-and the Agent Gateway (Phase 4.10–4.14, tracked in other
-repositories).
+**10/10** attack-scenario checks. Server-side SN360 Control
+Plane microservices (TRDS, IOCFS, SIS, Agent Gateway) are **out
+of scope** for this repository and are implemented in
+[`sn360-security-platform`](https://github.com/kennguy3n/sn360-security-platform).
 
 ## Phase 1 — Core Plumbing (7/7)
 
@@ -84,8 +84,12 @@ Tasks below are tracked against
 [`device-agent-proposal.md` § 12 Phase 4 roadmap](./device-agent-proposal.md#phase-4-edge-detection-software-inventory--tenant-rule-distribution-weeks-15-22);
 see
 [`device-agent-proposal.md` § 13](./device-agent-proposal.md#13-phase-4-detail-edge-detection-software-inventory--tenant-rule-distribution)
-for the detailed design. Tasks 4.10–4.14 are server-side
-microservices that live outside this repository.
+for the detailed design.
+
+> **Scope note:** Tasks 4.10–4.14 are server-side Control Plane
+> microservices excluded from this repository. They are implemented
+> in [`sn360-security-platform`](https://github.com/kennguy3n/sn360-security-platform).
+> This repo contains only the agent-side (device) code.
 
 | # | Task | Status |
 |---|------|--------|
@@ -98,11 +102,11 @@ microservices that live outside this repository.
 | 4.7 | Enhanced Inventory: running software monitor (all platforms) | Done |
 | 4.8 | Enhanced Inventory: browser extension inventory (Chrome / Firefox / Edge / Safari) | Done |
 | 4.9 | Enhanced Inventory: CycloneDX SBOM generator (periodic + on-demand) | Done |
-| 4.10 | TRDS microservice: rule CRUD API, compiler, delta distribution | Not Started |
-| 4.11 | IOCFS microservice: feed ingestion, normalization, bloom filter compilation | Not Started |
-| 4.12 | SIS microservice: inventory ingestion, CVE matching, dashboard API | Not Started |
-| 4.13 | Agent Gateway: mTLS termination, tenant routing, rate limiting | Not Started |
-| 4.14 | Integration: agent ↔ TRDS rule pull, hot-reload, version tracking | Not Started |
+| 4.10 | TRDS microservice: rule CRUD API, compiler, delta distribution | Out of Scope — implemented in [sn360-security-platform](https://github.com/kennguy3n/sn360-security-platform) |
+| 4.11 | IOCFS microservice: feed ingestion, normalization, bloom filter compilation | Out of Scope — implemented in [sn360-security-platform](https://github.com/kennguy3n/sn360-security-platform) |
+| 4.12 | SIS microservice: inventory ingestion, CVE matching, dashboard API | Out of Scope — implemented in [sn360-security-platform](https://github.com/kennguy3n/sn360-security-platform) |
+| 4.13 | Agent Gateway: mTLS termination, tenant routing, rate limiting | Out of Scope — implemented in [sn360-security-platform](https://github.com/kennguy3n/sn360-security-platform) |
+| 4.14 | Integration: agent ↔ TRDS rule pull, hot-reload, version tracking | Out of Scope — agent-side integration only; server-side in [sn360-security-platform](https://github.com/kennguy3n/sn360-security-platform) |
 
 ## Unit Tests
 
@@ -235,9 +239,11 @@ open items are:
    `cargo test -p sda-fim --test burst_workload -- --include-ignored`.
    See
    [`docs/known-issues/fim-burst-workload-macos-ci.md`](./docs/known-issues/fim-burst-workload-macos-ci.md).
-2. **Server-side microservices out of scope for this repo**
-   (P2.11 / P2.12): TRDS, IOCFS, SIS, and the Agent Gateway live
-   in `sn360-security-platform` and are tracked there.
+2. **Server-side microservices excluded from this repo** — TRDS,
+   IOCFS, SIS, and the Agent Gateway are implemented in
+   [`sn360-security-platform`](https://github.com/kennguy3n/sn360-security-platform),
+   not in this repository. Phase 4.10–4.14 in the table above are
+   marked Out of Scope accordingly.
 
 ## Next Steps
 
@@ -277,8 +283,8 @@ strikethrough plus a short note for provenance.
 | P2.8 | ~~Enhanced Inventory: browser extension enumeration~~ — Done | 4.8 |
 | P2.9 | ~~Enhanced Inventory: SBOM generator (on-demand)~~ — Done | 4.9 |
 | P2.10 | ~~Wire Enhanced Inventory into main agent~~ — Done | 4.7–4.9 wiring |
-| P2.11 | Companion microservices (TRDS / IOCFS / SIS / Gateway) — server-side, outside this repo | 4.10–4.13 |
-| P2.12 | Agent ↔ TRDS rule pull, hot-reload, version tracking | 4.14 |
+| P2.11 | ~~Companion microservices (TRDS / IOCFS / SIS / Gateway)~~ — **Out of Scope**: implemented in [`sn360-security-platform`](https://github.com/kennguy3n/sn360-security-platform) | 4.10–4.13 |
+| P2.12 | Agent ↔ TRDS rule pull, hot-reload, version tracking — agent-side integration only; server-side in [`sn360-security-platform`](https://github.com/kennguy3n/sn360-security-platform) | 4.14 |
 
 ### Priority 3 — Phase 5: Platform Hardening
 

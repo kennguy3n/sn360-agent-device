@@ -56,6 +56,11 @@ foundation layer with minimal coupling to each other.
   +------------------------------------------------------------+
 ```
 
+> The "Manager (SN360 Control Plane)" box represents the server-side
+> infrastructure implemented in
+> [`sn360-security-platform`](https://github.com/kennguy3n/sn360-security-platform).
+> This repository contains only the agent (left side of the diagram).
+
 Every module publishes `EventKind` variants to the bus. The
 router in `sda-agent::main::map_event_to_message` maps each
 `EventKind` to a `MessageType` before handing it off to
@@ -118,8 +123,9 @@ SN360 native protocol against an SN360 Agent Gateway:
 ALPN identifiers: `b"h2"` for HTTP/2, `b"sda/1.0"` for native
 TCP-over-TLS. Certificate pinning is SHA-256 leaf-fingerprint
 based and configured via `server.enhanced.tls_pinned_sha256`.
-Native enrolment is mTLS against the SN360 Agent Gateway. The
-[revised phase plan](./revised-phase-plan.md) tracks the work to
+Native enrolment is mTLS against the SN360 Agent Gateway
+(implemented in [`sn360-security-platform`](https://github.com/kennguy3n/sn360-security-platform)).
+The [revised phase plan](./revised-phase-plan.md) tracks the work to
 promote the native path to default-on in a future phase.
 
 ## 4. Platform Abstraction Layer
