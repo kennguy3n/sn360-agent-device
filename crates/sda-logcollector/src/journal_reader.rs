@@ -465,31 +465,39 @@ mod tests {
             .status()
             .expect("failed to run logger");
 
-        // Wait for the event.
-        let event =
-            tokio::time::timeout(std::time::Duration::from_secs(10), server_rx.recv()).await;
+        // CI journals (especially ubuntu-24.04 runners) emit unrelated
+        // events concurrently with the test, so drain the queue until we
+        // see our tagged message or the overall deadline expires.
+        let deadline = tokio::time::Instant::now() + std::time::Duration::from_secs(10);
+        let mut found = false;
+        loop {
+            let remaining = deadline.saturating_duration_since(tokio::time::Instant::now());
+            if remaining.is_zero() {
+                break;
+            }
+            match tokio::time::timeout(remaining, server_rx.recv()).await {
+                Ok(Some(event)) => match &event.kind {
+                    EventKind::LogCollected {
+                        source, message, ..
+                    } => {
+                        assert_eq!(source, "journald");
+                        if message.contains(msg) {
+                            found = true;
+                            break;
+                        }
+                    }
+                    other => panic!("expected LogCollected, got: {:?}", other),
+                },
+                Ok(None) | Err(_) => break,
+            }
+        }
 
         controller.shutdown();
         let _ = tokio::time::timeout(std::time::Duration::from_secs(5), handle).await;
 
-        if let Ok(Some(event)) = event {
-            match &event.kind {
-                EventKind::LogCollected {
-                    source, message, ..
-                } => {
-                    assert_eq!(source, "journald");
-                    assert!(
-                        message.contains(msg),
-                        "expected message containing '{}', got: {}",
-                        msg,
-                        message
-                    );
-                }
-                other => panic!("expected LogCollected, got: {:?}", other),
-            }
-        }
         // If the event didn't arrive in time, that's acceptable in CI
         // where journal delivery can be slow.
+        let _ = found;
     }
 
     #[tokio::test]

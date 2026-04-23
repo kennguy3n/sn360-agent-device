@@ -726,31 +726,82 @@ mod tests {
         assert!(!same_process(&a, &b));
     }
 
+    #[test]
+    fn effective_ei_interval_pauses_on_critical_battery() {
+        let cfg = Duration::from_secs(1800);
+        assert!(effective_ei_interval(cfg, PowerProfile::CriticalBattery).is_none());
+        let normal = effective_ei_interval(cfg, PowerProfile::Normal).unwrap();
+        let battery = effective_ei_interval(cfg, PowerProfile::BatteryActive).unwrap();
+        assert!(
+            battery >= normal,
+            "battery interval {battery:?} must be >= normal interval {normal:?}"
+        );
+    }
+
+    #[tokio::test]
+    async fn rebuild_ei_timer_respects_disabled_flag() {
+        assert!(
+            rebuild_ei_timer(Duration::from_secs(60), PowerProfile::Normal, false).is_none(),
+            "disabled module must not build a timer"
+        );
+        assert!(
+            rebuild_ei_timer(Duration::from_secs(60), PowerProfile::CriticalBattery, true)
+                .is_none(),
+            "critical battery must pause the timer"
+        );
+        assert!(rebuild_ei_timer(Duration::from_secs(60), PowerProfile::Normal, true).is_some());
+    }
+
+    #[tokio::test]
+    async fn test_module_lifecycle_starts_and_stops() {
+        let agent_config = test_agent_config();
+        let (controller, signal) = sda_core::signal::ShutdownController::new();
+        let (bus, _server_rx) = EventBus::new(16, 16);
+        let (_power_tx, power_rx) = sda_core::power::channel(PowerProfile::Normal);
+
+        let handle = EnhancedInventoryModule::start(&agent_config, bus, signal, power_rx);
+
+        tokio::time::sleep(Duration::from_millis(50)).await;
+        controller.shutdown();
+
+        tokio::time::timeout(Duration::from_secs(2), handle.task)
+            .await
+            .expect("enhanced inventory task did not stop within 2s")
+            .expect("join error")
+            .expect("enhanced inventory run returned Err");
+    }
+
     #[tokio::test]
     async fn test_baseline_retries_when_publish_fails() {
-        // Capacity-1 server queue + a pre-seeded entry means the next
-        // `publish_to_server` call will hit `ChannelFull` and the baseline
-        // must NOT mark itself sent.
-        let (bus, mut server_rx) = EventBus::new(16, 1);
-        bus.publish_to_server(Event::new("test", Priority::Normal, EventKind::Keepalive))
-            .await
-            .expect("seeding the server queue to saturate it");
-
+        // Saturate the server queue BEFORE the first tick so the baseline
+        // publish fails. The `baseline_sent` flag and `previous` snapshot
+        // must stay empty, and the next tick (after draining the queue)
+        // must re-emit the baseline.
+        let (bus, mut server_rx) = EventBus::new(16, 2);
         let mut state = RunningSoftwareState::default();
-        run_running_software_tick(&bus, &mut state).await;
 
+        // Fill the server queue so publish_to_server returns Err(ChannelFull).
+        bus.publish_to_server(Event::new("x", Priority::Normal, EventKind::Keepalive))
+            .await
+            .expect("seed 1/2");
+        bus.publish_to_server(Event::new("y", Priority::Normal, EventKind::Keepalive))
+            .await
+            .expect("seed 2/2");
+
+        run_running_software_tick(&bus, &mut state).await;
         assert!(
             !state.baseline_sent,
-            "baseline_sent must stay false when publish fails, so the next tick retries the full snapshot instead of sending orphan deltas"
+            "baseline_sent must stay false when publish fails"
         );
         assert!(
             state.previous.is_empty(),
-            "previous snapshot must not be populated when the baseline was dropped"
+            "previous snapshot must stay empty so the baseline can be retried"
         );
 
-        // Drain the saturating keepalive and re-run the tick; the baseline
-        // should now go through and flip the flag.
-        let _seeded = server_rx.recv().await.expect("seeded event");
+        // Drain the saturating keepalives and re-run the tick; the
+        // baseline should now go through and flip the flag.
+        let _ = server_rx.recv().await.expect("seeded event 1");
+        let _ = server_rx.recv().await.expect("seeded event 2");
         run_running_software_tick(&bus, &mut state).await;
         let event = tokio::time::timeout(Duration::from_millis(500), server_rx.recv())
             .await
@@ -835,51 +886,6 @@ mod tests {
             other => panic!("unexpected event: {:?}", other),
         }
         assert!(!state.previous.contains_key(&phantom_pid));
-    }
-
-    #[test]
-    fn effective_ei_interval_pauses_on_critical_battery() {
-        let cfg = Duration::from_secs(1800);
-        assert!(effective_ei_interval(cfg, PowerProfile::CriticalBattery).is_none());
-        let normal = effective_ei_interval(cfg, PowerProfile::Normal).unwrap();
-        let battery = effective_ei_interval(cfg, PowerProfile::BatteryActive).unwrap();
-        assert!(
-            battery >= normal,
-            "battery interval {battery:?} must be >= normal interval {normal:?}"
-        );
-    }
-
-    #[tokio::test]
-    async fn rebuild_ei_timer_respects_disabled_flag() {
-        assert!(
-            rebuild_ei_timer(Duration::from_secs(60), PowerProfile::Normal, false).is_none(),
-            "disabled module must not build a timer"
-        );
-        assert!(
-            rebuild_ei_timer(Duration::from_secs(60), PowerProfile::CriticalBattery, true)
-                .is_none(),
-            "critical battery must pause the timer"
-        );
-        assert!(rebuild_ei_timer(Duration::from_secs(60), PowerProfile::Normal, true).is_some());
-    }
-
-    #[tokio::test]
-    async fn test_module_lifecycle_starts_and_stops() {
-        let agent_config = test_agent_config();
-        let (controller, signal) = sda_core::signal::ShutdownController::new();
-        let (bus, _server_rx) = EventBus::new(16, 16);
-        let (_power_tx, power_rx) = sda_core::power::channel(PowerProfile::Normal);
-
-        let handle = EnhancedInventoryModule::start(&agent_config, bus, signal, power_rx);
-
-        tokio::time::sleep(Duration::from_millis(50)).await;
-        controller.shutdown();
-
-        tokio::time::timeout(Duration::from_secs(2), handle.task)
-            .await
-            .expect("enhanced inventory task did not stop within 2s")
-            .expect("join error")
-            .expect("enhanced inventory run returned Err");
     }
 
     #[tokio::test]

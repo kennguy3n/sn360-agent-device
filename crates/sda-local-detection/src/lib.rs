@@ -1053,18 +1053,24 @@ mod tests {
 
     #[tokio::test]
     async fn test_drain_offline_queue_preserves_batch_on_publish_failure() {
-        // Regression — on a publish failure every unsent payload must stay
-        // on disk (at the head of the queue, with original ids) so it's
-        // retried in order on the next tick.  We force failures by dropping
-        // the server receiver so bus.publish_to_server() errors.
+        // Regression — when the server-bound queue is saturated the drain
+        // must leave every unsent payload on disk (at the head of the
+        // queue, with original ids) so it's retried in order on the next
+        // tick. We force failures by filling the server queue to capacity
+        // with an undrained event, so subsequent `publish_to_server` calls
+        // return `Err(ChannelFull)`.
         let q = OfflineQueue::in_memory(100).unwrap();
         for id in ["a", "b", "c"] {
             seed_alert(&q, id);
         }
         assert_eq!(q.len().unwrap(), 3);
 
-        let (bus, server_rx) = EventBus::new(4, 4);
-        drop(server_rx);
+        // Server queue capacity 1, keep the rx alive but never read from
+        // it and pre-fill it so publish_to_server fails with Full.
+        let (bus, _server_rx) = EventBus::new(4, 1);
+        bus.publish_to_server(Event::new("seed", Priority::Normal, EventKind::Keepalive))
+            .await
+            .expect("seed the server queue");
 
         drain_offline_queue(&q, &bus, 10).await;
 
@@ -1083,18 +1089,20 @@ mod tests {
     async fn test_drain_offline_queue_preserves_fifo_across_batches() {
         // Regression — with a bulk drain+re-enqueue strategy, items
         // beyond the batch could overtake items from inside the failing
-        // batch (re-enqueued rows get fresh AUTOINCREMENT ids).  We
+        // batch (re-enqueued rows get fresh AUTOINCREMENT ids). We
         // verify that peek/ack keeps strict FIFO across batches: the
-        // queue holds five items, we drain with batch=2 against an
-        // unreachable server, and every original item must still be at
-        // its original position afterwards.
+        // queue holds five items, we drain with batch=2 against a
+        // saturated server queue, and every original item must still be
+        // at its original position afterwards.
         let q = OfflineQueue::in_memory(100).unwrap();
         for id in ["a", "b", "c", "d", "e"] {
             seed_alert(&q, id);
         }
 
-        let (bus, server_rx) = EventBus::new(4, 4);
-        drop(server_rx);
+        let (bus, _server_rx) = EventBus::new(4, 1);
+        bus.publish_to_server(Event::new("seed", Priority::Normal, EventKind::Keepalive))
+            .await
+            .expect("seed the server queue");
 
         drain_offline_queue(&q, &bus, 2).await;
         drain_offline_queue(&q, &bus, 2).await;
