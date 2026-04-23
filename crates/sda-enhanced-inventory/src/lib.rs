@@ -772,6 +772,123 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn test_baseline_retries_when_publish_fails() {
+        // Saturate the server queue BEFORE the first tick so the baseline
+        // publish fails. The `baseline_sent` flag and `previous` snapshot
+        // must stay empty, and the next tick (after draining the queue)
+        // must re-emit the baseline.
+        let (bus, mut server_rx) = EventBus::new(16, 2);
+        let mut state = RunningSoftwareState::default();
+
+        // Fill the server queue so publish_to_server returns Err(ChannelFull).
+        bus.publish_to_server(Event::new("x", Priority::Normal, EventKind::Keepalive))
+            .await
+            .expect("seed 1/2");
+        bus.publish_to_server(Event::new("y", Priority::Normal, EventKind::Keepalive))
+            .await
+            .expect("seed 2/2");
+
+        run_running_software_tick(&bus, &mut state).await;
+        assert!(
+            !state.baseline_sent,
+            "baseline_sent must stay false when publish fails"
+        );
+        assert!(
+            state.previous.is_empty(),
+            "previous snapshot must stay empty so the baseline can be retried"
+        );
+
+        // Drain the saturating keepalives and re-run the tick; the
+        // baseline should now go through and flip the flag.
+        let _ = server_rx.recv().await.expect("seeded event 1");
+        let _ = server_rx.recv().await.expect("seeded event 2");
+        run_running_software_tick(&bus, &mut state).await;
+        let event = tokio::time::timeout(Duration::from_millis(500), server_rx.recv())
+            .await
+            .expect("expected a baseline event on retry")
+            .expect("server_rx closed");
+        match event.kind {
+            EventKind::EnhancedInventoryUpdate { category, data } => {
+                assert_eq!(category, "running_software");
+                assert_eq!(data["type"], "baseline");
+            }
+            other => panic!("unexpected event: {:?}", other),
+        }
+        assert!(state.baseline_sent);
+        assert!(!state.previous.is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_delta_retries_when_publish_fails() {
+        // Saturate the server queue AFTER the baseline has gone through,
+        // so the next tick's delta publish will fail. The `previous`
+        // snapshot must be retained so the phantom PID reappears in the
+        // delta on the next successful tick.
+        let (bus, mut server_rx) = EventBus::new(16, 2);
+        let mut state = RunningSoftwareState::default();
+
+        // Send the baseline.
+        run_running_software_tick(&bus, &mut state).await;
+        let _baseline = server_rx
+            .recv()
+            .await
+            .expect("expected baseline on server queue");
+        assert!(state.baseline_sent);
+
+        // Inject a phantom entry so the next tick wants to emit a delta.
+        let phantom_pid = u32::MAX;
+        state.previous.insert(
+            phantom_pid,
+            ProcessEntry {
+                pid: phantom_pid,
+                name: "phantom".into(),
+                path: None,
+                started_at: None,
+                publisher: None,
+            },
+        );
+
+        // Fill the server queue so the delta publish fails.
+        bus.publish_to_server(Event::new("x", Priority::Normal, EventKind::Keepalive))
+            .await
+            .expect("seed 1/2");
+        bus.publish_to_server(Event::new("y", Priority::Normal, EventKind::Keepalive))
+            .await
+            .expect("seed 2/2");
+
+        run_running_software_tick(&bus, &mut state).await;
+        assert!(
+            state.previous.contains_key(&phantom_pid),
+            "previous snapshot must still contain the phantom pid so the delta can be re-emitted; got {:?}",
+            state.previous.keys().collect::<Vec<_>>()
+        );
+
+        // Drain the seeded events and retry. The phantom must appear in
+        // the removed list on this tick.
+        let _ = server_rx.recv().await;
+        let _ = server_rx.recv().await;
+        run_running_software_tick(&bus, &mut state).await;
+        let event = tokio::time::timeout(Duration::from_millis(500), server_rx.recv())
+            .await
+            .expect("expected a delta event on retry")
+            .expect("server_rx closed");
+        match event.kind {
+            EventKind::EnhancedInventoryUpdate { category, data } => {
+                assert_eq!(category, "running_software");
+                assert_eq!(data["type"], "delta");
+                let removed = data["removed"].as_array().expect("removed must be array");
+                assert!(
+                    removed.iter().any(|p| p["pid"] == phantom_pid),
+                    "phantom pid must reappear in the retried delta: {:?}",
+                    removed
+                );
+            }
+            other => panic!("unexpected event: {:?}", other),
+        }
+        assert!(!state.previous.contains_key(&phantom_pid));
+    }
+
+    #[tokio::test]
     async fn test_module_lifecycle_with_running_software_disabled() {
         let mut agent_config = test_agent_config();
         agent_config

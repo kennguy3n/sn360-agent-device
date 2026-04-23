@@ -95,24 +95,45 @@ impl EventBus {
         }
     }
 
-    /// Publish an event and also queue it for server delivery.
+    /// Publish an event to local subscribers and also queue it for server
+    /// delivery.
+    ///
+    /// Local broadcast is unconditional — subscribers always receive the
+    /// event regardless of server-channel state. The returned `Result`
+    /// reflects only the outcome relevant to callers that need to retry or
+    /// spool on the server side:
+    ///
+    /// * `Ok(())` — event enqueued for server delivery, OR the server
+    ///   receiver has been dropped (e.g. `legacy-siem` disabled). In both
+    ///   cases the caller has nothing to retry.
+    /// * `Err(EventBusError::ChannelFull)` — the server queue is
+    ///   saturated; callers that persist data for later retry
+    ///   (offline-queue replay, baseline/delta inventory publishers)
+    ///   must observe this and keep their state to replay on the next
+    ///   tick.
     pub async fn publish_to_server(&self, event: Event) -> Result<(), EventBusError> {
-        // Queue for server delivery first
-        match self.server_tx.try_send(event.clone()) {
-            Ok(()) => {}
+        let server_result = match self.server_tx.try_send(event.clone()) {
+            Ok(()) => Ok(()),
             Err(mpsc::error::TrySendError::Closed(_)) => {
                 // Receiver was dropped (e.g. legacy-siem feature disabled).
-                // Not an error — skip server delivery silently.
+                // Server delivery is intentionally disabled — not an error.
                 debug!("server channel closed, skipping server delivery");
+                Ok(())
             }
             Err(mpsc::error::TrySendError::Full(_)) => {
                 warn!("server event queue full, dropping server-bound copy");
+                Err(EventBusError::ChannelFull)
             }
-        }
+        };
 
-        // Always broadcast to local subscribers regardless of server
-        // delivery outcome.
-        self.publish(event)
+        // Broadcast to local subscribers unconditionally so modules like
+        // Active Response and the Local Detection Engine receive every
+        // event regardless of server-channel state. A local broadcast
+        // failure is propagated in preference to a server-queue failure
+        // because it indicates the bus itself is in a worse state.
+        self.publish(event)?;
+
+        server_result
     }
 
     /// Get the configured capacity of the bus.
@@ -219,19 +240,26 @@ mod tests {
 
     #[tokio::test]
     async fn test_publish_to_server_when_queue_full_still_broadcasts_locally() {
-        // Create a bus with a tiny server queue (capacity 1)
+        // Tiny server queue (capacity 1) that we never drain.
         let (bus, _server_rx) = EventBus::new(64, 1);
         let mut local_sub = bus.subscribe();
 
-        // Fill the server queue
+        // Fill the server queue.
         let event1 = Event::new("fill", Priority::Normal, EventKind::Keepalive);
-        bus.publish_to_server(event1).await.unwrap();
+        bus.publish_to_server(event1)
+            .await
+            .expect("first publish should succeed");
 
-        // This should NOT block local delivery even though server queue is full
+        // The second publish must report ChannelFull so callers with
+        // spool/retry logic can preserve their state…
         let event2 = Event::new("overflow", Priority::Normal, EventKind::Keepalive);
-        bus.publish_to_server(event2).await.unwrap();
+        let err = bus
+            .publish_to_server(event2)
+            .await
+            .expect_err("second publish should surface ChannelFull");
+        assert!(matches!(err, EventBusError::ChannelFull));
 
-        // Both events should have been broadcast locally
+        // …and both events must still have been broadcast locally.
         let r1 = tokio::time::timeout(std::time::Duration::from_millis(100), local_sub.recv())
             .await
             .unwrap();

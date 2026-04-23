@@ -1025,4 +1025,100 @@ mod tests {
         let nothing = tokio::time::timeout(Duration::from_millis(50), server_rx.recv()).await;
         assert!(nothing.is_err(), "no events expected from empty queue");
     }
+
+    fn seed_alert(q: &OfflineQueue, id: &str) {
+        let kind = EventKind::LocalDetectionAlert {
+            rule_id: id.into(),
+            rule_type: "string".into(),
+            severity: "high".into(),
+            description: "".into(),
+            matched_value: id.into(),
+        };
+        q.enqueue(&serde_json::to_string(&kind).unwrap()).unwrap();
+    }
+
+    fn rule_ids_on_disk(q: &OfflineQueue) -> Vec<String> {
+        q.peek_batch(usize::MAX)
+            .unwrap()
+            .into_iter()
+            .map(|d| {
+                let kind: EventKind = serde_json::from_str(&d.payload).unwrap();
+                match kind {
+                    EventKind::LocalDetectionAlert { rule_id, .. } => rule_id,
+                    other => panic!("unexpected kind: {:?}", other),
+                }
+            })
+            .collect()
+    }
+
+    #[tokio::test]
+    async fn test_drain_offline_queue_preserves_batch_on_publish_failure() {
+        // Regression — when the server-bound queue is saturated the drain
+        // must leave every unsent payload on disk (at the head of the
+        // queue, with original ids) so it's retried in order on the next
+        // tick. We force failures by filling the server queue to capacity
+        // with an undrained event, so subsequent `publish_to_server` calls
+        // return `Err(ChannelFull)`.
+        let q = OfflineQueue::in_memory(100).unwrap();
+        for id in ["a", "b", "c"] {
+            seed_alert(&q, id);
+        }
+        assert_eq!(q.len().unwrap(), 3);
+
+        // Server queue capacity 1, keep the rx alive but never read from
+        // it and pre-fill it so publish_to_server fails with Full.
+        let (bus, _server_rx) = EventBus::new(4, 1);
+        bus.publish_to_server(Event::new("seed", Priority::Normal, EventKind::Keepalive))
+            .await
+            .expect("seed the server queue");
+
+        drain_offline_queue(&q, &bus, 10).await;
+
+        assert_eq!(
+            q.len().unwrap(),
+            3,
+            "all three payloads must stay on disk when publish fails"
+        );
+        assert_eq!(
+            rule_ids_on_disk(&q),
+            vec!["a".to_string(), "b".to_string(), "c".to_string()]
+        );
+    }
+
+    #[tokio::test]
+    async fn test_drain_offline_queue_preserves_fifo_across_batches() {
+        // Regression — with a bulk drain+re-enqueue strategy, items
+        // beyond the batch could overtake items from inside the failing
+        // batch (re-enqueued rows get fresh AUTOINCREMENT ids). We
+        // verify that peek/ack keeps strict FIFO across batches: the
+        // queue holds five items, we drain with batch=2 against a
+        // saturated server queue, and every original item must still be
+        // at its original position afterwards.
+        let q = OfflineQueue::in_memory(100).unwrap();
+        for id in ["a", "b", "c", "d", "e"] {
+            seed_alert(&q, id);
+        }
+
+        let (bus, _server_rx) = EventBus::new(4, 1);
+        bus.publish_to_server(Event::new("seed", Priority::Normal, EventKind::Keepalive))
+            .await
+            .expect("seed the server queue");
+
+        drain_offline_queue(&q, &bus, 2).await;
+        drain_offline_queue(&q, &bus, 2).await;
+        drain_offline_queue(&q, &bus, 2).await;
+
+        assert_eq!(q.len().unwrap(), 5);
+        assert_eq!(
+            rule_ids_on_disk(&q),
+            vec![
+                "a".to_string(),
+                "b".to_string(),
+                "c".to_string(),
+                "d".to_string(),
+                "e".to_string()
+            ],
+            "FIFO order must be preserved across failed drain ticks"
+        );
+    }
 }

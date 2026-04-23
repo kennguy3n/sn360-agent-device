@@ -112,7 +112,7 @@ for the detailed design.
 
 Command: `cargo test --all`
 
-**Result: 429 passing / 0 failed.**
+**Result: 433 passing / 0 failed.**
 
 | Crate | Passed |
 |---|---|
@@ -120,17 +120,17 @@ Command: `cargo test --all`
 | `sda-agent` | 30 |
 | `sda-comms` | 48 |
 | `sda-core` | 2 |
-| `sda-enhanced-inventory` | 54 |
+| `sda-enhanced-inventory` | 56 |
 | `sda-event-bus` | 6 |
 | `sda-fim` | 69 |
 | `sda-inventory` | 32 |
-| `sda-local-detection` | 54 |
+| `sda-local-detection` | 56 |
 | `sda-logcollector` | 34 |
 | `sda-pal` | 10 |
 | `sda-rootcheck` | 35 |
 | `sda-sca` | 5 |
 | `sda-updater` | 21 |
-| **Total** | **429** |
+| **Total** | **433** |
 
 Reproduce locally with `make test`. CI regenerates the result on every
 push across `ubuntu-latest`, `macos-latest`, and `windows-latest`.
@@ -380,7 +380,7 @@ summary.
 | A5 | #48 | 🔴 | `packaging/windows/build-msi.ps1` default binary path is `target\release\sda-agent.exe`, matching `make release`. |
 | A6 | #48 | 🔴 | `packaging/windows/sda-agent.wxs` ConfigFile component carries `NeverOverwrite="yes"` so operator edits survive upgrades. |
 | A7 | #48 | 🟡 | `packaging/systemd/sda-agent.service` no longer lists the dead-code `ReadOnlyPaths=/etc/sn360-desktop-agent`; a comment explains that the config directory is writable because enrolment persists `client.keys` there. |
-| A8 | #60 | 🔴 | `publish_to_server` no longer blocks local event delivery when the server channel is closed or full. When `legacy-siem` is disabled, `server_rx` is taken and dropped at startup so senders fail fast with `Closed`. Local broadcast subscribers (Active Response, LDE, etc.) now always receive events regardless of server channel state. Added CI job `test-no-legacy` to validate the `--no-default-features` build path. |
+| A8 | #60 | 🔴 | `publish_to_server` now has well-defined semantics that preserve data-safety for callers with spool/retry logic. Local broadcast is unconditional — subscribers (Active Response, LDE, etc.) always receive events regardless of server channel state. The returned `Result` reflects server-queue outcome: `Ok(())` when enqueued or when the receiver is dropped (e.g. `legacy-siem` disabled — nothing to retry); `Err(ChannelFull)` when the server queue is saturated, so callers that persist data for later retry (offline-queue replay, baseline/delta inventory publishers) observe this and keep their state to replay on the next tick. When `legacy-siem` is disabled, `server_rx` is taken and dropped at startup so senders fail fast with `Closed`. Added CI job `test-no-legacy` to validate the `--no-default-features` build path. |
 
 ## Release preparation status (Phase 6 task 6.6)
 
