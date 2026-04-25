@@ -193,13 +193,25 @@ impl WazuhMessage {
     /// message.  The server's `save_controlmsg` looks for `\n` in the
     /// body; if none is found it logs "Invalid message from agent".
     ///
-    /// Minimal format accepted by remoted:
-    ///   `#!-<uname>\n<shared_file_hash>\n`
+    /// Format accepted by remoted (mirrors what the upstream wazuh-agent
+    /// sends so `save_controlmsg` populates agent.os/version/config_sum;
+    /// without those fields populated, the manager's AR_Forward refuses
+    /// to dispatch active-response commands to this agent):
+    ///   `#!-<uname> [<distro>|<codename>] - Wazuh v<ver> / <cfg_md5>\n`
+    ///   `<merged_md5> merged.mg\n`
     pub fn keepalive(agent_id: &str) -> Self {
         let uname = basic_uname();
-        // Wazuh agent sends: "<md5> merged.mg\n" for the shared files line.
-        // We don't have a merged.mg, so send a placeholder hash.
-        let body = format!("#!-{}\nx merged.mg\n", uname);
+        let distro = basic_distro();
+        // The config hash and merged hash are placeholders here; the
+        // manager re-computes/syncs `merged.mg` on its own and we don't
+        // load any agent.conf-driven runtime config, so any stable hex
+        // value is fine. AR dispatch only requires the keepalive to
+        // *parse*, not to match.
+        let body = format!(
+            "#!-{} [{}] - Wazuh v4.13.1 / 11111111111111111111111111111111\n\
+             22222222222222222222222222222222 merged.mg\n",
+            uname, distro
+        );
         Self::new(agent_id, MessageType::Keepalive, body)
     }
 
@@ -240,6 +252,29 @@ pub fn decompress_payload(data: &[u8]) -> Option<Vec<u8>> {
     Some(result)
 }
 
+/// Return the `<distro>|<codename>` field of the keepalive control
+/// message. The Wazuh manager's `save_controlmsg` records this string
+/// verbatim into `agent.os.platform`, so the value should reflect the
+/// host's actual OS family rather than a hard-coded `Linux|generic`.
+fn basic_distro() -> &'static str {
+    #[cfg(target_os = "linux")]
+    {
+        "Linux|generic"
+    }
+    #[cfg(target_os = "macos")]
+    {
+        "Darwin|generic"
+    }
+    #[cfg(target_os = "windows")]
+    {
+        "Windows|generic"
+    }
+    #[cfg(not(any(target_os = "linux", target_os = "macos", target_os = "windows")))]
+    {
+        "Unknown|generic"
+    }
+}
+
 /// Return a minimal uname-style string for keepalive messages.
 ///
 /// Wazuh's `run_notify()` calls `getuname()` which returns something
@@ -258,8 +293,13 @@ fn basic_uname() -> String {
             .trim()
             .to_string();
         let machine = std::env::consts::ARCH;
+        // Pipe-separated field layout matches what the upstream
+        // wazuh-agent's `getuname()` emits (e.g. `Linux |host |5.15 |#1 SMP
+        // ... |x86_64`). The manager's `save_controlmsg` parser walks the
+        // string by `|` to populate the agent.os fields; without the
+        // pipes it falls back to NULL and AR_Forward stops dispatching.
         format!(
-            "Linux {} {} #1 SMP {} |Linux|{}",
+            "Linux |{} |{} |#1 SMP {} |{}",
             nodename, release, machine, machine
         )
     }

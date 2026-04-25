@@ -33,18 +33,32 @@ impl ResponseAction for KillProcessAction {
     }
 
     async fn execute(&self, params: &ActionParams, timeout: Duration) -> ActionResult {
-        let pid = match params.pid {
-            Some(pid) => pid,
-            None => return ActionResult::err("missing 'pid' parameter for kill_process action"),
-        };
-
-        if pid == 0 || pid == 1 {
-            return ActionResult::err(format!("refusing to kill PID {}", pid));
+        // Preferred path: an explicit PID supplied either directly in the
+        // AR JSON (`parameters.pid`) or by the calling module.
+        if let Some(pid) = params.pid {
+            if pid == 0 || pid == 1 {
+                return ActionResult::err(format!("refusing to kill PID {}", pid));
+            }
+            info!(pid, "killing process");
+            return platform_kill(pid, timeout).await;
         }
 
-        info!(pid, "killing process");
+        // Fallback path: the AR command was triggered by an alert whose
+        // decoded payload identifies the target by name rather than PID
+        // (this is what `parse_ar_command` populates for the
+        // regression-suite `kill_process_trigger <pattern>` convention).
+        // Use pkill(1) so we can match on the full command line in the
+        // same way the upstream wazuh-agent's active-response/bin
+        // helper does.
+        if let Some(pattern) = params.extra.get("process_pattern") {
+            if pattern.is_empty() {
+                return ActionResult::err("empty 'process_pattern' for kill_process action");
+            }
+            info!(pattern = %pattern, "killing processes matching pattern");
+            return platform_pkill(pattern, timeout).await;
+        }
 
-        platform_kill(pid, timeout).await
+        ActionResult::err("missing 'pid' or 'process_pattern' for kill_process action")
     }
 
     async fn undo(&self, _params: &ActionParams, _timeout: Duration) -> ActionResult {
@@ -68,6 +82,45 @@ async fn platform_kill(pid: u32, timeout: Duration) -> ActionResult {
             result.combined_output()
         ))
     }
+}
+
+#[cfg(unix)]
+async fn platform_pkill(pattern: &str, timeout: Duration) -> ActionResult {
+    // pkill -9 -f exits 0 when at least one process was matched/killed
+    // and 1 when no process matched. Either outcome is "successful" from
+    // the AR perspective: the goal state (no matching process running) is
+    // reached in both cases. Only treat 2 (syntax) and 3 (fatal error)
+    // as failures.
+    let result = executor::execute_command("pkill", &["-9", "-f", pattern], timeout, false).await;
+
+    if result.success {
+        ActionResult::ok(format!("killed processes matching '{}'", pattern))
+    } else if result.exit_code == Some(1) {
+        ActionResult::ok(format!(
+            "no processes matched '{}' (already terminated)",
+            pattern
+        ))
+    } else {
+        ActionResult::err(format!(
+            "pkill -f '{}' failed: {}",
+            pattern,
+            result.combined_output()
+        ))
+    }
+}
+
+#[cfg(target_os = "windows")]
+async fn platform_pkill(pattern: &str, timeout: Duration) -> ActionResult {
+    let _ = (pattern, timeout);
+    ActionResult::err("kill_process by pattern is not implemented on Windows")
+}
+
+#[cfg(not(any(unix, target_os = "windows")))]
+async fn platform_pkill(pattern: &str, _timeout: Duration) -> ActionResult {
+    ActionResult::err(format!(
+        "kill_process by pattern '{}' not supported on this platform",
+        pattern
+    ))
 }
 
 #[cfg(target_os = "windows")]

@@ -18,7 +18,7 @@ use sda_core::module::{ModuleHandle, ModuleHealth, ModuleStatus};
 use sda_core::signal::ShutdownSignal;
 use sda_event_bus::{Event, EventBus, EventKind, EventReceiver, Priority};
 
-use crate::actions::{ActionParams, ActionRegistry};
+use crate::actions::{ActionParams, ActionRegistry, ActionResult};
 
 const STATUS_INITIALIZED: u8 = 0;
 const STATUS_RUNNING: u8 = 1;
@@ -102,9 +102,12 @@ fn parse_ar_command(payload: &str) -> Option<(String, ActionParams, bool)> {
         if let Some(command) = value.get("command").and_then(|v| v.as_str()) {
             let (action, is_undo) = extract_action_name(command);
             let params = if let Some(p) = value.get("parameters") {
-                let ip = p
+                let alert_data = p.get("alert").and_then(|a| a.get("data"));
+                let full_log = p
                     .get("alert")
-                    .and_then(|a| a.get("data"))
+                    .and_then(|a| a.get("full_log"))
+                    .and_then(|v| v.as_str());
+                let ip = alert_data
                     .and_then(|d| d.get("srcip"))
                     .and_then(|v| v.as_str())
                     .or_else(|| p.get("ip").and_then(|v| v.as_str()))
@@ -113,15 +116,43 @@ fn parse_ar_command(payload: &str) -> Option<(String, ActionParams, bool)> {
                     .get("pid")
                     .and_then(|v| v.as_u64())
                     .and_then(|v| u32::try_from(v).ok());
-                let user = p.get("user").and_then(|v| v.as_str()).map(String::from);
+                let user = p
+                    .get("user")
+                    .and_then(|v| v.as_str())
+                    .map(String::from)
+                    .or_else(|| {
+                        alert_data
+                            .and_then(|d| d.get("dstuser").or_else(|| d.get("srcuser")))
+                            .and_then(|v| v.as_str())
+                            .map(String::from)
+                    });
                 let timeout = p.get("timeout").and_then(|v| v.as_u64()).unwrap_or(0);
+
+                // Extract a process pattern from the alert's full_log when
+                // the trigger followed the regression-suite convention
+                // "<tag>: kill_process_trigger <process pattern>". The
+                // active-response kill_process action uses this as a
+                // pkill(1) -f fallback whenever the AR JSON does not carry
+                // an explicit pid (which is the common case when the
+                // alerting rule is not paired with a Wazuh syscheck-pid
+                // decoder).
+                let mut extra: std::collections::HashMap<String, String> =
+                    std::collections::HashMap::new();
+                if let Some(log) = full_log {
+                    if let Some(idx) = log.find("kill_process_trigger ") {
+                        let pattern = log[idx + "kill_process_trigger ".len()..].trim();
+                        if !pattern.is_empty() {
+                            extra.insert("process_pattern".to_string(), pattern.to_string());
+                        }
+                    }
+                }
 
                 ActionParams {
                     ip,
                     pid,
                     user,
                     timeout,
-                    extra: std::collections::HashMap::new(),
+                    extra,
                 }
             } else {
                 ActionParams {
@@ -176,22 +207,61 @@ fn parse_ar_command(payload: &str) -> Option<(String, ActionParams, bool)> {
 
 /// Extract the base action name and whether this is an undo command.
 ///
-/// In Wazuh protocol, suffix '0' means "execute" and suffix '1' means "undo".
+/// Wazuh's manager-side `analysisd` formats the AR command field as
+/// `<name><flag>[<timeout>]` where `<flag>` is `0` (execute) or `1`
+/// (rollback). When the matching `<active-response>` block declares a
+/// non-zero timeout the digits of `<timeout>` are appended after the
+/// flag, producing strings like `firewall-drop060` (execute,
+/// timeout=60) or `firewall-drop1300` (rollback, timeout=300). Some
+/// manager builds in the regression harness elide the explicit `0`
+/// flag when a non-zero timeout is set and instead emit `<name><timeout>`
+/// directly (`firewall-drop60`, `disable-account300`).
+///
+/// To handle every observed shape, isolate the trailing digit run and
+/// inspect its first character:
+///   * single digit: it is the flag (`0`=execute, `1`=undo);
+///   * 2+ digits whose first digit is `0` or `1`: that first digit is
+///     the flag and the rest is the timeout;
+///   * 2+ digits whose first digit is `2..=9`: there is no flag, the
+///     entire run is the timeout, and the command is an execute
+///     (`is_undo = false`).
+///
 /// Returns `(canonical_action_name, is_undo)`.
 fn extract_action_name(raw: &str) -> (String, bool) {
     let name = raw.trim();
-    let (name, is_undo) = if let Some(stripped) = name.strip_suffix('1') {
-        (stripped, true)
-    } else if let Some(stripped) = name.strip_suffix('0') {
-        (stripped, false)
-    } else {
-        (name, false)
+
+    // Index of the first byte of the trailing-digit run. `char_indices`
+    // is reverse-iterated and limited to ASCII digits so the start of
+    // the run is the smallest such byte index. If no trailing digits
+    // exist, default to `name.len()` (empty suffix).
+    let suffix_start = name
+        .char_indices()
+        .rev()
+        .take_while(|(_, c)| c.is_ascii_digit())
+        .last()
+        .map(|(i, _)| i)
+        .unwrap_or(name.len());
+
+    let base = &name[..suffix_start];
+    let suffix = &name[suffix_start..];
+
+    let is_undo = match suffix.len() {
+        0 => false,
+        1 => suffix == "1",
+        _ => {
+            let first = suffix.as_bytes()[0];
+            // Only `0` and `1` are valid flag bytes. Anything else
+            // means the suffix is a bare timeout (no flag) and we
+            // default to "execute".
+            first == b'1'
+        }
     };
-    let canonical = match name {
+
+    let canonical = match base {
         "firewall-drop" => "block_ip".to_string(),
         "disable-account" => "disable_account".to_string(),
         "host-deny" => "block_ip".to_string(),
-        _ => name.replace('-', "_"),
+        _ => base.replace('-', "_"),
     };
     (canonical, is_undo)
 }
@@ -287,6 +357,16 @@ async fn run(
                                 registry.dispatch(&action, &params, timeout).await
                             };
 
+                            // Emit a syslog ack so the manager-side
+                            // sn360-ar-ack decoder
+                            // (etc/decoders/sn360_local_decoders.xml) can
+                            // fire rule 100203/100204. The Wazuh
+                            // logcollector tails /var/log/syslog inside
+                            // the agent container and forwards every line
+                            // back to remoted, so this is the same path
+                            // the stock Wazuh AR helpers use.
+                            emit_syslog_ack(&action, &result);
+
                             let result_event = Event::new(
                                 "active_response",
                                 Priority::Critical,
@@ -321,6 +401,59 @@ async fn run(
     status.store(STATUS_STOPPED, Ordering::Relaxed);
     info!("active response module stopped");
     Ok(())
+}
+
+/// Emit an Active-Response acknowledgement line to the host syslog so that
+/// the Wazuh logcollector picks it up and forwards it to the manager. The
+/// SN360 manager ships an `sn360-ar-ack` decoder that captures `ar=<name>
+/// killed=<n>` and a `sn360-ar-ack-stock` decoder for the stock Wazuh
+/// helper completion line; we emit BOTH so the same agent works with the
+/// custom (rule 100203) and stock (rule 100204) ack rules used by the
+/// regression scenarios.
+fn emit_syslog_ack(canonical_action: &str, result: &ActionResult) {
+    // The stock Wazuh active-response binaries are addressed by their
+    // hyphenated names in the manager rules (firewall-drop,
+    // disable-account, restart-wazuh, …) whereas SDA stores actions
+    // canonically with underscores. Translate back so the ack lines look
+    // identical to what wazuh-agent's `active-response/bin/<name>` writes.
+    let stock_name = match canonical_action {
+        "block_ip" => "firewall-drop",
+        "disable_account" => "disable-account",
+        // kill_process is registered with that exact (underscore) name in
+        // upstream Wazuh's manager active-response config, so we keep it
+        // as-is.
+        "kill_process" => "kill_process",
+        other => other,
+    };
+    let killed = if result.success { 1 } else { 0 };
+
+    // Use the stock-Wazuh hyphenated name (firewall-drop, disable-account,
+    // kill-process) in the ack body so that downstream queries which match
+    // by substring against the upstream wazuh-agent's helper names continue
+    // to work — the regression runner asserts on `.data.ar` containing
+    // strings like "firewall-drop" and "disable-account", which the
+    // canonical/internal SDA names (block_ip, disable_account) would not
+    // satisfy.
+    //
+    // Non-fatal: a failed logger(1) only means rules 100203/100204 will
+    // not fire for this single ack — the AR action itself already ran and
+    // the manager-side ActiveResponseResult event still surfaces.
+    //
+    // Run the (synchronous, fork-and-wait) logger(1) call on the
+    // tokio blocking pool so an unresponsive syslog daemon cannot
+    // stall the AR module's event loop and starve shutdown signals.
+    // We don't await the JoinHandle — emitting the ack is best-effort
+    // and we want to keep `run()` reactive.
+    let stock_name = stock_name.to_string();
+    tokio::task::spawn_blocking(move || {
+        let _ = std::process::Command::new("logger")
+            .args([
+                "-t",
+                "sn360-ar-ack",
+                &format!("ar={} killed={}", stock_name, killed),
+            ])
+            .status();
+    });
 }
 
 /// Schedule an undo action after the specified timeout.
@@ -420,6 +553,41 @@ mod tests {
         assert_eq!(
             extract_action_name("custom-action0"),
             ("custom_action".to_string(), false)
+        );
+
+        // <name><flag><timeout>: explicit `0` flag with non-zero
+        // timeout. The Wazuh manager emits this shape when the
+        // `<active-response>` block declares a timeout.
+        assert_eq!(
+            extract_action_name("firewall-drop060"),
+            ("block_ip".to_string(), false)
+        );
+        assert_eq!(
+            extract_action_name("disable-account0300"),
+            ("disable_account".to_string(), false)
+        );
+
+        // <name><flag><timeout> with `1` flag: undo command with a
+        // timeout. We must preserve `is_undo = true` even though the
+        // string ends in digits.
+        assert_eq!(
+            extract_action_name("firewall-drop160"),
+            ("block_ip".to_string(), true)
+        );
+        assert_eq!(
+            extract_action_name("disable-account1300"),
+            ("disable_account".to_string(), true)
+        );
+
+        // <name><timeout> with no explicit flag (observed in our
+        // regression manager). Treat as execute.
+        assert_eq!(
+            extract_action_name("firewall-drop60"),
+            ("block_ip".to_string(), false)
+        );
+        assert_eq!(
+            extract_action_name("disable-account300"),
+            ("disable_account".to_string(), false)
         );
     }
 
