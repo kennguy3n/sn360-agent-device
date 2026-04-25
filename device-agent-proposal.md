@@ -966,6 +966,13 @@ Management:
 
 ## 13. Phase 4 Detail: Edge Detection, Software Inventory & Tenant Rule Distribution
 
+> **Canonical reference:** For the *current* state of these components and
+> their server-side counterparts, see [`docs/integration.md`](./docs/integration.md)
+> and the platform repo's
+> [`docs/NON_WAZUH_COMPONENTS.md`](https://github.com/kennguy3n/sn360-security-platform/blob/main/docs/NON_WAZUH_COMPONENTS.md).
+> This section preserves the original design rationale; behaviour
+> described here may have evolved since the proposal was written.
+
 This section expands on Phase 4 of the implementation roadmap, detailing the Local Detection Engine, Enhanced Software Inventory module, and the companion microservices that support them.
 
 ### 13.1 Local Detection Engine (LDE) Module

@@ -154,6 +154,8 @@ For the full configuration reference, see the [Configuration section in `device-
 - [**docs/configuration-reference.md**](./docs/configuration-reference.md) — Full YAML schema reference
 - [**docs/platform-testing.md**](./docs/platform-testing.md) — CI matrix + Fedora/Arch manual procedures
 - [**docs/security-audit.md**](./docs/security-audit.md) — `cargo audit` + `cargo-fuzz` setup
+- [**docs/integration.md**](./docs/integration.md) — Integration with the SN360 Security Platform, non-Wazuh components
+- [**test-results.md**](./test-results.md) — Latest unit / E2E / security E2E results (with a Non-Wazuh Component Verification section)
 - [**CHANGELOG.md**](./CHANGELOG.md) — Release notes
 - [**device-agent-proposal.md**](./device-agent-proposal.md) — Original architecture & implementation proposal
 - [**PROGRESS.md**](./PROGRESS.md) — Phase status, test results, known gaps, and next steps

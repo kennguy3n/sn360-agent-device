@@ -90,6 +90,10 @@ for the detailed design.
 > microservices excluded from this repository. They are implemented
 > in [`sn360-security-platform`](https://github.com/kennguy3n/sn360-security-platform).
 > This repo contains only the agent-side (device) code.
+>
+> See [`docs/integration.md`](./docs/integration.md) for the full
+> integration picture (Path A / B / C, agent-side Non-Wazuh modules,
+> companion microservices).
 
 | # | Task | Status |
 |---|------|--------|
