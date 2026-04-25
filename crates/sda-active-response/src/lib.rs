@@ -210,39 +210,51 @@ fn parse_ar_command(payload: &str) -> Option<(String, ActionParams, bool)> {
 /// Wazuh's manager-side `analysisd` formats the AR command field as
 /// `<name><flag>[<timeout>]` where `<flag>` is `0` (execute) or `1`
 /// (rollback). When the matching `<active-response>` block declares a
-/// non-zero timeout (e.g. firewall-drop=60s, disable-account=300s) the
-/// timeout is appended as decimal digits, producing strings like
-/// `firewall-drop060` or `disable-account0300`. In practice we have also
-/// observed the manager omitting the explicit `0` flag when a timeout is
-/// present, yielding `firewall-drop60` / `disable-account300`. To be
-/// robust, peel any trailing digit run as the optional timeout, then peel
-/// a single `0` / `1` flag if one remains.
+/// non-zero timeout the digits of `<timeout>` are appended after the
+/// flag, producing strings like `firewall-drop060` (execute,
+/// timeout=60) or `firewall-drop1300` (rollback, timeout=300). Some
+/// manager builds in the regression harness elide the explicit `0`
+/// flag when a non-zero timeout is set and instead emit `<name><timeout>`
+/// directly (`firewall-drop60`, `disable-account300`).
+///
+/// To handle every observed shape, isolate the trailing digit run and
+/// inspect its first character:
+///   * single digit: it is the flag (`0`=execute, `1`=undo);
+///   * 2+ digits whose first digit is `0` or `1`: that first digit is
+///     the flag and the rest is the timeout;
+///   * 2+ digits whose first digit is `2..=9`: there is no flag, the
+///     entire run is the timeout, and the command is an execute
+///     (`is_undo = false`).
 ///
 /// Returns `(canonical_action_name, is_undo)`.
 fn extract_action_name(raw: &str) -> (String, bool) {
     let name = raw.trim();
 
-    // Strip a trailing run of digits (possible timeout suffix). Stop as
-    // soon as we hit a non-digit so `kill_process0` still leaves a single
-    // `0` to be interpreted as the flag below.
-    let trimmed: &str = if name.len() > 1
-        && name.chars().rev().take_while(|c| c.is_ascii_digit()).count() >= 2
-    {
-        let trim_to = name
-            .rfind(|c: char| !c.is_ascii_digit())
-            .map(|i| i + 1)
-            .unwrap_or(0);
-        &name[..trim_to]
-    } else {
-        name
-    };
+    // Index of the first byte of the trailing-digit run. `char_indices`
+    // is reverse-iterated and limited to ASCII digits so the start of
+    // the run is the smallest such byte index. If no trailing digits
+    // exist, default to `name.len()` (empty suffix).
+    let suffix_start = name
+        .char_indices()
+        .rev()
+        .take_while(|(_, c)| c.is_ascii_digit())
+        .last()
+        .map(|(i, _)| i)
+        .unwrap_or(name.len());
 
-    let (base, is_undo) = if let Some(stripped) = trimmed.strip_suffix('1') {
-        (stripped, true)
-    } else if let Some(stripped) = trimmed.strip_suffix('0') {
-        (stripped, false)
-    } else {
-        (trimmed, false)
+    let base = &name[..suffix_start];
+    let suffix = &name[suffix_start..];
+
+    let is_undo = match suffix.len() {
+        0 => false,
+        1 => suffix == "1",
+        _ => {
+            let first = suffix.as_bytes()[0];
+            // Only `0` and `1` are valid flag bytes. Anything else
+            // means the suffix is a bare timeout (no flag) and we
+            // default to "execute".
+            first == b'1'
+        }
     };
 
     let canonical = match base {
@@ -532,6 +544,41 @@ mod tests {
         assert_eq!(
             extract_action_name("custom-action0"),
             ("custom_action".to_string(), false)
+        );
+
+        // <name><flag><timeout>: explicit `0` flag with non-zero
+        // timeout. The Wazuh manager emits this shape when the
+        // `<active-response>` block declares a timeout.
+        assert_eq!(
+            extract_action_name("firewall-drop060"),
+            ("block_ip".to_string(), false)
+        );
+        assert_eq!(
+            extract_action_name("disable-account0300"),
+            ("disable_account".to_string(), false)
+        );
+
+        // <name><flag><timeout> with `1` flag: undo command with a
+        // timeout. We must preserve `is_undo = true` even though the
+        // string ends in digits.
+        assert_eq!(
+            extract_action_name("firewall-drop160"),
+            ("block_ip".to_string(), true)
+        );
+        assert_eq!(
+            extract_action_name("disable-account1300"),
+            ("disable_account".to_string(), true)
+        );
+
+        // <name><timeout> with no explicit flag (observed in our
+        // regression manager). Treat as execute.
+        assert_eq!(
+            extract_action_name("firewall-drop60"),
+            ("block_ip".to_string(), false)
+        );
+        assert_eq!(
+            extract_action_name("disable-account300"),
+            ("disable_account".to_string(), false)
         );
     }
 

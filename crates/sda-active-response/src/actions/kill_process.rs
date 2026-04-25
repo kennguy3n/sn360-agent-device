@@ -91,8 +91,7 @@ async fn platform_pkill(pattern: &str, timeout: Duration) -> ActionResult {
     // the AR perspective: the goal state (no matching process running) is
     // reached in both cases. Only treat 2 (syntax) and 3 (fatal error)
     // as failures.
-    let result =
-        executor::execute_command("pkill", &["-9", "-f", pattern], timeout, false).await;
+    let result = executor::execute_command("pkill", &["-9", "-f", pattern], timeout, false).await;
 
     if result.success {
         ActionResult::ok(format!("killed processes matching '{}'", pattern))
