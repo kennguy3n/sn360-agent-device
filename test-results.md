@@ -148,7 +148,7 @@ and is never archived by the manager. The agent's per-tick
 `debug!` lines (enabled via `RUST_LOG=…=debug` in step 5 of the
 harness) are the assertion oracle. The rationale lives in the
 test script comment at
-<ref_snippet file="/home/ubuntu/repos/sn360-agent-device/tests/scripts/run-e2e.sh" lines="481-488" />
+[`tests/scripts/run-e2e.sh` (lines 481-488)](./tests/scripts/run-e2e.sh#L481-L488)
 and is mirrored in
 [`docs/integration.md`](./docs/integration.md) §2.1.
 

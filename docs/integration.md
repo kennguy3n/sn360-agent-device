@@ -29,14 +29,14 @@ canonical wire-level documentation lives in the platform repo's
   (`tests/scripts/run-e2e.sh` boots a stock Wazuh manager via
   `tests/docker-compose.yml` and points `sda-agent` at it on `localhost:1514`).
 - Path A is exercised end-to-end by the platform repo's regression
-  harness (<ref_file file="/home/ubuntu/repos/sn360-security-platform/tests/regression/harness/sn360/docker-compose-up.sh" />).
+  harness ([`tests/regression/harness/sn360/docker-compose-up.sh`](https://github.com/kennguy3n/sn360-security-platform/blob/main/tests/regression/harness/sn360/docker-compose-up.sh)).
 - Path C is independent of A vs. B — bundle distribution is purely a
   pull from S3 over HTTPS; the agent verifies Ed25519 signatures
   before activating a bundle.
 
 For the per-path counter / cipher invariants (Wazuh `remoted`
 monotonicity, `WazuhCipher` lifecycle), see the protocol notes in
-<ref_file file="/home/ubuntu/repos/sn360-agent-device/crates/sda-comms/src/protocol.rs" />.
+[`crates/sda-comms/src/protocol.rs`](../crates/sda-comms/src/protocol.rs).
 
 ---
 
@@ -59,10 +59,10 @@ This section captures only what changes on the agent.
   `enhanced_inventory` envelope (it only matches `dbsync_*`
   variants) so the data path is fully outside `analysisd`. The
   E2E suite documents this in
-  <ref_snippet file="/home/ubuntu/repos/sn360-agent-device/tests/scripts/run-e2e.sh" lines="481-488" />
+  [`tests/scripts/run-e2e.sh` (lines 481-488)](../tests/scripts/run-e2e.sh#L481-L488)
   and the agent-log oracles for assertions 12–14 follow from that.
 - Crate layout:
-  <ref_file file="/home/ubuntu/repos/sn360-agent-device/crates/sda-enhanced-inventory/" />.
+  [`crates/sda-enhanced-inventory/`](../crates/sda-enhanced-inventory/).
 
 ### 2.2 Local Detection Engine (`sda-local-detection`)
 
@@ -71,13 +71,13 @@ This section captures only what changes on the agent.
 - Rule bundles and IOC packages are pulled by `sda-updater` from S3
   (Path C) — never via Wazuh's `agent.conf`. Bundles are Ed25519-
   signed msgpack and decoded by the shared
-  <ref_file file="/home/ubuntu/repos/sn360-security-platform/shared/sn360-bundle/" />
+  [`shared/sn360-bundle/`](https://github.com/kennguy3n/sn360-security-platform/tree/main/shared/sn360-bundle)
   crate.
 - Detection is **local** — alerts hit the agent event bus and the
   platform via Path A or Path B; nothing round-trips to `analysisd`
   for evaluation.
 - Crate layout:
-  <ref_file file="/home/ubuntu/repos/sn360-agent-device/crates/sda-local-detection/" />.
+  [`crates/sda-local-detection/`](../crates/sda-local-detection/).
   56 unit tests cover the rule engines + bundle decode path; the
   bundle decoder is also fuzzed.
 
