@@ -486,6 +486,9 @@ echo "==> Step 13: Verifying enhanced inventory events..."
 # anchor on the agent log (the scanners emit per-tick
 # `debug!` lines we enabled via `RUST_LOG=...=debug` in Step 5) and
 # treat any matching archives.json entry as a bonus signal.
+#
+# See docs/integration.md § 2.1 for the full explanation of why
+# enhanced inventory uses agent-log oracles instead of archives.json.
 sleep 15
 
 EI_ARCHIVES=$(docker compose -f $E2E_COMPOSE_FILE exec -T wazuh-manager \
