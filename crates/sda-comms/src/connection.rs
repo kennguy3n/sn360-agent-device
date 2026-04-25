@@ -12,6 +12,38 @@ use tracing::{debug, info, warn};
 use crate::crypto::{CryptoError, WazuhCipher};
 use crate::protocol::WazuhMessage;
 
+/// Strip the cleartext routing prefix `!{agent_id}!{crypto_token}` that
+/// Wazuh's `remoted` prepends to every frame it sends to an agent
+/// (mirrors what agents themselves send via `build_wire_frame`). The
+/// crypto_token is `:` for Blowfish and `#AES:` for AES; the body that
+/// follows is the encrypted ciphertext that the cipher knows how to
+/// decode. Without stripping this 6-12 byte cleartext header, the
+/// ciphertext length is no longer a multiple of the cipher's block
+/// size and CBC decryption silently returns an empty buffer, which
+/// previously surfaced as a stream of `received empty server frame`
+/// debug logs and made every server-pushed Active-Response command a
+/// no-op.
+fn strip_routing_prefix(buf: &[u8]) -> &[u8] {
+    // Frames from `remoted` to the agent omit the `!{agent_id}!` prefix
+    // that the agent itself sends -- the agent already knows its own id
+    // so the cleartext routing header is just the crypto token.
+    let body = if buf.first() == Some(&b'!') {
+        match buf[1..].iter().position(|&b| b == b'!') {
+            Some(idx) => &buf[idx + 2..],
+            None => buf,
+        }
+    } else {
+        buf
+    };
+    if body.starts_with(b"#AES:") {
+        &body[5..]
+    } else if body.first() == Some(&b':') {
+        &body[1..]
+    } else {
+        body
+    }
+}
+
 /// Decrypt a received frame, translating an empty decrypted payload
 /// into `Ok(None)` so the caller can distinguish a legitimate
 /// keep-open frame from a real decryption failure.
@@ -20,11 +52,28 @@ fn decrypt_frame(
     buf: Vec<u8>,
 ) -> Result<Option<Vec<u8>>, ConnectionError> {
     match cipher {
-        Some(cipher) => match cipher.decrypt(&buf) {
-            Ok(plaintext) => Ok(Some(plaintext)),
-            Err(CryptoError::EmptyPayload) => Ok(None),
-            Err(e) => Err(ConnectionError::ReceiveFailed(e.to_string())),
-        },
+        Some(cipher) => {
+            let body = strip_routing_prefix(&buf);
+            debug!(
+                buf_len = buf.len(),
+                body_len = body.len(),
+                first_buf_byte = format!("{:#04x}", buf.first().copied().unwrap_or(0)),
+                first_body_byte = format!("{:#04x}", body.first().copied().unwrap_or(0)),
+                "decrypt_frame"
+            );
+            match cipher.decrypt(body) {
+                Ok(plaintext) => {
+                    debug!(
+                        plaintext_len = plaintext.len(),
+                        first_byte = format!("{:#04x}", plaintext.first().copied().unwrap_or(0)),
+                        "decrypted server frame"
+                    );
+                    Ok(Some(plaintext))
+                }
+                Err(CryptoError::EmptyPayload) => Ok(None),
+                Err(e) => Err(ConnectionError::ReceiveFailed(e.to_string())),
+            }
+        }
         None => {
             if buf.is_empty() {
                 Ok(None)

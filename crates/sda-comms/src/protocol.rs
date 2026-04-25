@@ -193,13 +193,24 @@ impl WazuhMessage {
     /// message.  The server's `save_controlmsg` looks for `\n` in the
     /// body; if none is found it logs "Invalid message from agent".
     ///
-    /// Minimal format accepted by remoted:
-    ///   `#!-<uname>\n<shared_file_hash>\n`
+    /// Format accepted by remoted (mirrors what the upstream wazuh-agent
+    /// sends so `save_controlmsg` populates agent.os/version/config_sum;
+    /// without those fields populated, the manager's AR_Forward refuses
+    /// to dispatch active-response commands to this agent):
+    ///   `#!-<uname> [<distro>|<codename>] - Wazuh v<ver> / <cfg_md5>\n`
+    ///   `<merged_md5> merged.mg\n`
     pub fn keepalive(agent_id: &str) -> Self {
         let uname = basic_uname();
-        // Wazuh agent sends: "<md5> merged.mg\n" for the shared files line.
-        // We don't have a merged.mg, so send a placeholder hash.
-        let body = format!("#!-{}\nx merged.mg\n", uname);
+        // The config hash and merged hash are placeholders here; the
+        // manager re-computes/syncs `merged.mg` on its own and we don't
+        // load any agent.conf-driven runtime config, so any stable hex
+        // value is fine. AR dispatch only requires the keepalive to
+        // *parse*, not to match.
+        let body = format!(
+            "#!-{} [Linux|generic] - Wazuh v4.13.1 / 11111111111111111111111111111111\n\
+             22222222222222222222222222222222 merged.mg\n",
+            uname
+        );
         Self::new(agent_id, MessageType::Keepalive, body)
     }
 
@@ -258,8 +269,13 @@ fn basic_uname() -> String {
             .trim()
             .to_string();
         let machine = std::env::consts::ARCH;
+        // Pipe-separated field layout matches what the upstream
+        // wazuh-agent's `getuname()` emits (e.g. `Linux |host |5.15 |#1 SMP
+        // ... |x86_64`). The manager's `save_controlmsg` parser walks the
+        // string by `|` to populate the agent.os fields; without the
+        // pipes it falls back to NULL and AR_Forward stops dispatching.
         format!(
-            "Linux {} {} #1 SMP {} |Linux|{}",
+            "Linux |{} |{} |#1 SMP {} |{}",
             nodename, release, machine, machine
         )
     }
