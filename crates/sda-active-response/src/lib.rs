@@ -438,13 +438,22 @@ fn emit_syslog_ack(canonical_action: &str, result: &ActionResult) {
     // Non-fatal: a failed logger(1) only means rules 100203/100204 will
     // not fire for this single ack — the AR action itself already ran and
     // the manager-side ActiveResponseResult event still surfaces.
-    let _ = std::process::Command::new("logger")
-        .args([
-            "-t",
-            "sn360-ar-ack",
-            &format!("ar={} killed={}", stock_name, killed),
-        ])
-        .status();
+    //
+    // Run the (synchronous, fork-and-wait) logger(1) call on the
+    // tokio blocking pool so an unresponsive syslog daemon cannot
+    // stall the AR module's event loop and starve shutdown signals.
+    // We don't await the JoinHandle — emitting the ack is best-effort
+    // and we want to keep `run()` reactive.
+    let stock_name = stock_name.to_string();
+    tokio::task::spawn_blocking(move || {
+        let _ = std::process::Command::new("logger")
+            .args([
+                "-t",
+                "sn360-ar-ack",
+                &format!("ar={} killed={}", stock_name, killed),
+            ])
+            .status();
+    });
 }
 
 /// Schedule an undo action after the specified timeout.

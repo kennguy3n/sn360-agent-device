@@ -201,15 +201,16 @@ impl WazuhMessage {
     ///   `<merged_md5> merged.mg\n`
     pub fn keepalive(agent_id: &str) -> Self {
         let uname = basic_uname();
+        let distro = basic_distro();
         // The config hash and merged hash are placeholders here; the
         // manager re-computes/syncs `merged.mg` on its own and we don't
         // load any agent.conf-driven runtime config, so any stable hex
         // value is fine. AR dispatch only requires the keepalive to
         // *parse*, not to match.
         let body = format!(
-            "#!-{} [Linux|generic] - Wazuh v4.13.1 / 11111111111111111111111111111111\n\
+            "#!-{} [{}] - Wazuh v4.13.1 / 11111111111111111111111111111111\n\
              22222222222222222222222222222222 merged.mg\n",
-            uname
+            uname, distro
         );
         Self::new(agent_id, MessageType::Keepalive, body)
     }
@@ -249,6 +250,29 @@ pub fn decompress_payload(data: &[u8]) -> Option<Vec<u8>> {
     let mut result = Vec::new();
     decoder.read_to_end(&mut result).ok()?;
     Some(result)
+}
+
+/// Return the `<distro>|<codename>` field of the keepalive control
+/// message. The Wazuh manager's `save_controlmsg` records this string
+/// verbatim into `agent.os.platform`, so the value should reflect the
+/// host's actual OS family rather than a hard-coded `Linux|generic`.
+fn basic_distro() -> &'static str {
+    #[cfg(target_os = "linux")]
+    {
+        "Linux|generic"
+    }
+    #[cfg(target_os = "macos")]
+    {
+        "Darwin|generic"
+    }
+    #[cfg(target_os = "windows")]
+    {
+        "Windows|generic"
+    }
+    #[cfg(not(any(target_os = "linux", target_os = "macos", target_os = "windows")))]
+    {
+        "Unknown|generic"
+    }
 }
 
 /// Return a minimal uname-style string for keepalive messages.
