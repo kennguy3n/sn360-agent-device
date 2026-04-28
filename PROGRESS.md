@@ -112,96 +112,18 @@ for the detailed design.
 | 4.13 | Agent Gateway: mTLS termination, tenant routing, rate limiting | Out of Scope — implemented in [sn360-security-platform](https://github.com/kennguy3n/sn360-security-platform) |
 | 4.14 | Integration: agent ↔ TRDS rule pull, hot-reload, version tracking | Out of Scope — agent-side integration only; server-side in [sn360-security-platform](https://github.com/kennguy3n/sn360-security-platform) |
 
-## Unit Tests
+## Tests & Benchmarks
 
-Command: `cargo test --all`
+The full test surface — unit, base E2E (14/14), security E2E (10/10), platform top-10 (10/10), benchmarks against the reference legacy SIEM agent — is reproduced on every commit and recorded in [`TEST_RESULTS.md`](./TEST_RESULTS.md). The latest run (2026-04-28) is **433 / 433 unit, 14 / 14 base E2E, 10 / 10 security E2E, 10 / 10 platform top-10**.
 
-**Result: 433 passing / 0 failed.**
-
-| Crate | Passed |
-|---|---|
-| `sda-active-response` | 29 |
-| `sda-agent` | 30 |
-| `sda-comms` | 48 |
-| `sda-core` | 2 |
-| `sda-enhanced-inventory` | 56 |
-| `sda-event-bus` | 6 |
-| `sda-fim` | 69 |
-| `sda-inventory` | 32 |
-| `sda-local-detection` | 56 |
-| `sda-logcollector` | 34 |
-| `sda-pal` | 10 |
-| `sda-rootcheck` | 35 |
-| `sda-sca` | 5 |
-| `sda-updater` | 21 |
-| **Total** | **433** |
-
-Reproduce locally with `make test`. CI regenerates the result on every
-push across `ubuntu-latest`, `macos-latest`, and `windows-latest`.
-
-## E2E Tests vs. Local SIEM Manager (v4.9.2)
-
-Command: `make e2e` (wraps `tests/scripts/run-e2e.sh`).
-
-The E2E harness brings up a reference SIEM manager container
-(`wazuh/wazuh-manager:4.9.2`) via `tests/docker-compose.yml`,
-enrolls the agent through the legacy adapter, exercises each
-module, then queries the manager's `syscheck`, `syscollector`,
-and archived-alerts streams for the expected events. The manager
-image is used purely as a public, publicly-available
-interoperability target for the legacy SIEM wire protocol.
-
-**Result: 14/14 assertions pass.**
+Reproduce locally:
 
 ```
-  E2E Test Summary
-  PASS: Agent enrolled successfully
-  PASS: Agent still enrolled after keepalive
-  PASS: FIM syscheck alerts received by server
-  PASS: Baseline scan syscheck alerts received by server
-  PASS: Baseline scan detected file deletion
-  PASS: Inventory data received by server
-  PASS: Log collection alerts received by server
-  PASS: Journal log collection events received by server
-  PASS: Active response command processed
-  PASS: SCA policy evaluation received by server
-  PASS: Rootcheck signature alert received by server
-  PASS: Enhanced inventory running-software scanner active
-  PASS: Enhanced inventory SBOM scanner active
-  PASS: Enhanced inventory browser-extensions scanner active
-  RESULT: ALL CHECKS PASSED
-```
-
-## Security E2E Tests vs. Local SIEM Manager (v4.9.2)
-
-Command: `make security-e2e` (wraps
-`tests/scripts/run-security-e2e.sh`).
-
-Extends the base E2E harness with ten security-focused scenarios:
-malware file drop, brute-force SSH, privilege-escalation (sudo
-abuse), config-file tampering, ransomware simulation (bulk
-rename), active response `kill_process`, IP block (IPv4 + IPv6),
-unauthorized package install, system-binary tampering, and
-account-disable AR. The harness injects minimal
-`<active-response>` blocks into the stock reference SIEM manager
-image so `disable-account0` / `firewall-drop0` resolve correctly
-before the agent enrolls through the legacy adapter.
-
-**Result: 10/10 assertions pass.**
-
-```
-  Security E2E Test Summary
-  PASS: Malware file drop detected
-  PASS: Brute-force SSH simulation detected
-  PASS: Privilege escalation (sudo abuse) detected
-  PASS: Config file tampering detected
-  PASS: Ransomware simulation detected
-  PASS: Active response kill_process command sent
-  PASS: IP blocking active response commands sent (IPv4 + IPv6)
-  PASS: Package inventory update detected after install
-  PASS: System binary tampering detected
-  PASS: Account disable AR configured and dispatched by server
-  RESULT: ALL CHECKS PASSED
+cargo test --all                                    # unit
+make e2e                                            # base E2E vs. wazuh-manager:4.9.2
+make security-e2e                                   # 10 attacker scenarios
+(cd ../sn360-security-platform && \
+  bash tests/regression/security-scenarios/run-top10-security-e2e.sh)
 ```
 
 ## Continuous Integration
@@ -215,23 +137,15 @@ The `e2e` job runs on push to `main` on `ubuntu-latest` only —
 is Linux-only, so macOS / Windows E2E runs are executed locally
 via `make e2e-macos` / `make e2e-windows`.
 
-## Benchmark vs. Reference Legacy SIEM Agent (v4.9.2)
+## Benchmarks
 
-See [`benchmark-results.md`](./benchmark-results.md) for
-methodology and raw numbers. Summary vs. proposal targets:
-
-| Metric | Target | Reference legacy SIEM agent (v4.9.2) | SN360 Desktop Agent (SDA) | Status |
-|---|---|---|---|---|
-| Idle RAM (single process) | < 15 MB | ~56 MB across 5 daemons | 5.7 MB | Done |
-| Idle CPU | < 0.1 % | 0.45 % (primary agent daemon only) | 0.00 % | Done |
-| Shipped binary size | < 7 MB | 3.8 MB (5 daemons combined) | 6.49 MB | Done |
-| FIM scan peak CPU (1 000 files) | < 3 % | 9 % | 3 % (15 s avg 1.33 %) | Done |
+Latest benchmark numbers vs. proposal targets live in [`benchmark-results.md`](./benchmark-results.md); a one-line summary is also published in [`TEST_RESULTS.md`](./TEST_RESULTS.md). All four headline metrics (idle RAM / idle CPU / binary size / FIM scan peak CPU) are within target.
 
 ## Known Gaps
 
 All previously-open Phase 1–3 items and the four agent-side
-Phase-6 gaps have been resolved on this branch. The remaining
-open items are:
+Phase-6 gaps have been resolved on `main`. The remaining open
+items are:
 
 1. **macOS FIM burst test permanently skipped on CI** — mitigated,
    not fixed. The runtime-starvation bug is fixed (multi-thread
