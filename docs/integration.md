@@ -118,7 +118,7 @@ For the per-service detail, see the platform repo's
 The latest device-side numbers (and the explicit "Non-Wazuh
 Component Verification" section explaining why enhanced-inventory
 assertions use agent-log oracles) live in
-[`test-results.md`](../test-results.md) at the repo root.
+[`TEST_RESULTS.md`](../TEST_RESULTS.md) at the repo root.
 
 ---
 

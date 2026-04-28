@@ -258,12 +258,12 @@ runs on rather than any change on this branch. Likely causes:
   `WazuhMessage`, Blowfish-encrypted, and written to the 1514 TCP
   socket, which is extra work per hash event.
 
-PR #60 itself does not exercise any legacy-siem code path at
-runtime — the diff only rearranges module declarations and adds a
-`--no-default-features` compile mode — so the honest reading is
-that the recorded baseline needs to be re-captured on a
-representative runner (ideally the nightly CI benchmark runner) in
-a dedicated follow-up, independent of this PR. For now the
+The legacy-siem feature flag does not exercise any legacy-siem
+code path at runtime — the underlying change only rearranges
+module declarations and adds a `--no-default-features` compile
+mode — so the honest reading is that the recorded baseline needs
+to be re-captured on a representative runner (ideally the
+nightly CI benchmark runner) in a dedicated follow-up. The
 binary-size budget remains a meaningful hard gate (PASS on both
 branches) and the three runtime budgets should be interpreted
 against a fresh, host-matched baseline rather than the 2026-04-21

@@ -155,20 +155,22 @@ For the full configuration reference, see the [Configuration section in `device-
 - [**docs/platform-testing.md**](./docs/platform-testing.md) — CI matrix + Fedora/Arch manual procedures
 - [**docs/security-audit.md**](./docs/security-audit.md) — `cargo audit` + `cargo-fuzz` setup
 - [**docs/integration.md**](./docs/integration.md) — Integration with the SN360 Security Platform, non-Wazuh components
-- [**test-results.md**](./test-results.md) — Latest unit / E2E / security E2E results (with a Non-Wazuh Component Verification section)
+- [**TEST_RESULTS.md**](./TEST_RESULTS.md) — Latest unit / E2E / security E2E results (with a Non-Wazuh Component Verification section)
 - [**CHANGELOG.md**](./CHANGELOG.md) — Release notes
 - [**device-agent-proposal.md**](./device-agent-proposal.md) — Original architecture & implementation proposal
 - [**PROGRESS.md**](./PROGRESS.md) — Phase status, test results, known gaps, and next steps
 - [**benchmark-results.md**](./benchmark-results.md) — Performance benchmarks vs. a reference legacy SIEM agent
 - [**tests/README.md**](./tests/README.md) — Test harness, Docker setup, and E2E reference
 
+## Related Repositories
+
+| Repo | Purpose |
+|---|---|
+| [`sn360-security-platform`](https://github.com/kennguy3n/sn360-security-platform) | Multi-tenant control plane (Gateway, TRDS, IOCFS, SIS, alert-forwarder) |
+| [`sn360-agent-device`](https://github.com/kennguy3n/sn360-agent-device) | Endpoint agent (Windows / Linux / macOS) — this repo |
+| [`sn360-agent-vm`](https://github.com/kennguy3n/sn360-agent-vm) | Server / VM agent |
+| [`sn360-agent-k8s`](https://github.com/kennguy3n/sn360-agent-k8s) | Kubernetes agent |
+
 ## License
 
-Proprietary — see [LICENSE](./LICENSE). Copyright (c) 2026 SN360 Inc. All rights reserved.
-
-This software is proprietary and confidential. Unauthorized copying, distribution,
-modification, or use of this software, via any medium, is strictly prohibited without
-the prior written consent of SN360 Inc. For licensing inquiries, contact
-[licensing@sn360.com](mailto:licensing@sn360.com).
-
-See [`docs/proprietary-licensing-rationale.md`](./docs/proprietary-licensing-rationale.md) for the licensing posture and clean-room interoperability statement.
+SN360 Proprietary — see [`LICENSE`](./LICENSE) for the full license terms. Copyright (c) 2026 SN360 Inc. All rights reserved. For licensing inquiries, contact [licensing@sn360.com](mailto:licensing@sn360.com). See [`docs/proprietary-licensing-rationale.md`](./docs/proprietary-licensing-rationale.md) for the licensing posture and clean-room interoperability statement.
