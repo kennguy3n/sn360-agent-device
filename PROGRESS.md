@@ -12,37 +12,37 @@ Status legend:
 
 ## Current Status
 
-Phases 1–6 are complete. Phase 5.6 enhanced protocol (TLS 1.3 +
-MessagePack + HTTP/2 under `server.enhanced`) shipped alongside
-the Phase 6 testing & release infrastructure: the E2E harness
-runs against a reference SIEM manager v4.9.2 (`make e2e`) and
-v4.7.5 (`make e2e-compat`), the CI matrix covers Ubuntu
-22.04/24.04, macOS 13/14, and Windows Server 2022, a `cargo audit`
-gate, a performance regression gate (`make benchmark-ci`), and a
-nightly `cargo-fuzz` matrix (5-minute budget per target) all run
-in CI, and the tag-triggered release workflow
-(`.github/workflows/release.yml`) builds `.deb` / `.rpm` /
-`.pkg` / `.msi` installers on matching OS runners and drafts a
-GitHub Release with `CHANGELOG.md` as the body. The
-user/admin/architecture/configuration docs landed under `docs/`,
-including the new [`docs/release-process.md`](./docs/release-process.md)
-runbook for tagging, signing, and promoting a draft. The only
-Phase 6 items not drivable from this repo are the beta tag
-(`v0.9.0-beta.1`) and signed-binary publication, which need
-release credentials and signing keys outside this session. All
-four proposal benchmark targets (idle RSS 5.7 MB, idle CPU
-0.00 %, shipped binary 4.6 MB, FIM scan peak 3 %) continue to be
-met. `cargo test --all` shows **431 passing / 0 failed** (adds
-15 rootcheck tests for content-based checks + cross-platform
-hidden-process detection and 5 PAL tests for the new Linux
-user-idle detector, on top of +20 tests that landed on `main`
-via PR #55 in `sda-comms`, `sda-agent`, and `sda-updater`), the
-base E2E harness passes **14/14** assertions against a local
-reference SIEM manager, and the security E2E suite passes
-**10/10** attack-scenario checks. Server-side SN360 Control
-Plane microservices (TRDS, IOCFS, SIS, Agent Gateway) are **out
-of scope** for this repository and are implemented in
+Phases 1–6 are complete. `cargo test --all` shows
+**433 passing / 0 failed**, the base E2E harness passes
+**14/14** assertions against a local reference SIEM manager, and
+the security E2E suite passes **10/10** attack-scenario checks.
+All four proposal benchmark targets (idle RSS, idle CPU, binary
+size, FIM scan peak CPU) continue to be met — see
+[`benchmark-results.md`](./benchmark-results.md).
+
+Server-side SN360 Control Plane microservices (TRDS, IOCFS, SIS,
+Agent Gateway) are **out of scope** for this repository and are
+implemented in
 [`sn360-security-platform`](https://github.com/kennguy3n/sn360-security-platform).
+Future work (Phases 7–9) is tracked in
+[`docs/revised-phase-plan.md`](./docs/revised-phase-plan.md);
+high-level phase status lives in [`PHASES.md`](./PHASES.md).
+
+The only Phase 6 items not drivable from this repo are the beta
+tag (`v0.9.0-beta.1`) and signed-binary publication, which need
+release credentials and signing keys outside this session.
+
+### History
+
+The per-PR landing history is captured in
+[`CHANGELOG.md`](./CHANGELOG.md). Phase 5 platform hardening
+landed across PRs [#48](https://github.com/kennguy3n/sn360-agent-device/pull/48),
+[#49](https://github.com/kennguy3n/sn360-agent-device/pull/49),
+and [#50](https://github.com/kennguy3n/sn360-agent-device/pull/50);
+Phase 5.6 enhanced protocol and Phase 6 testing/release
+infrastructure landed via
+[#55](https://github.com/kennguy3n/sn360-agent-device/pull/55)
+and [#56](https://github.com/kennguy3n/sn360-agent-device/pull/56).
 
 ## Phase 1 — Core Plumbing (7/7)
 
@@ -183,7 +183,7 @@ strikethrough plus a short note for provenance.
 | P1.6 | ~~Record Phase 2.9 Rootcheck as Complete~~ | Done |
 | P1.7 | ~~Wire adaptive power-aware scheduling into module loops~~ | Done |
 | P1.8 | ~~Linux user-idle detection~~ — implemented via `loginctl show-session self --property=IdleSinceHint --value` with a pure `parse_idle_since_hint()` helper; returns `None` on headless / non-systemd hosts, so no regression for bare-metal or container deployments. | Done |
-| P1.9 | ~~Re-run FIM burst benchmark on the merged pipeline~~ — rerun on this branch with `bash tests/scripts/fim-burst-bench.sh`; peak 3 %, 15-s avg 1.33 % still meet the strict < 3 % target. See [`benchmark-results.md`](./benchmark-results.md). | Done |
+| P1.9 | ~~Re-run FIM burst benchmark on the merged pipeline~~ — rerun via `bash tests/scripts/fim-burst-bench.sh`; peak 3 %, 15-s avg 1.33 % still meet the strict < 3 % target. See [`benchmark-results.md`](./benchmark-results.md). | Done |
 | P1.10 | ~~Tune FIM defaults for burst-heavy environments~~ — current defaults (`max_hashes_per_sec = 100`, `batch_size = 50`, `batch_timeout_ms = 200`) already meet all budgets; no tuning required. Rationale captured in [`benchmark-results.md`](./benchmark-results.md#fim-scan-cpu-creation-of-1-000-files-in-a-watched-directory). | Done |
 | P1.11 | ~~Regenerate E2E coverage for enhanced inventory~~ | Done |
 
@@ -202,7 +202,7 @@ strikethrough plus a short note for provenance.
 | P2.9 | ~~Enhanced Inventory: SBOM generator (on-demand)~~ — Done | 4.9 |
 | P2.10 | ~~Wire Enhanced Inventory into main agent~~ — Done | 4.7–4.9 wiring |
 | P2.11 | ~~Companion microservices (TRDS / IOCFS / SIS / Gateway)~~ — **Out of Scope**: implemented in [`sn360-security-platform`](https://github.com/kennguy3n/sn360-security-platform) | 4.10–4.13 |
-| P2.12 | Agent ↔ TRDS rule pull, hot-reload, version tracking — agent-side integration only; server-side in [`sn360-security-platform`](https://github.com/kennguy3n/sn360-security-platform) | 4.14 |
+| P2.12 | Agent ↔ TRDS rule pull, hot-reload, version tracking — Not Started; agent-side integration tracked under Phase 7 in [`docs/revised-phase-plan.md`](./docs/revised-phase-plan.md#phase-7--sn360-native-protocol-promotion--control-plane-mvp); server-side in [`sn360-security-platform`](https://github.com/kennguy3n/sn360-security-platform) | 4.14 |
 
 ### Priority 3 — Phase 5: Platform Hardening
 
@@ -223,7 +223,7 @@ All Priority 3 tasks have landed. Phase 5 is complete.
 | Privilege separation (drop-privileges, minimal caps per module) | Done | [#50](https://github.com/kennguy3n/sn360-agent-device/pull/50) |
 | Tamper protection (binary / config / keys integrity + watchdog) | Done | [#50](https://github.com/kennguy3n/sn360-agent-device/pull/50) |
 | Installers — `.deb`, `.rpm`, `.pkg`, `.msi`, hardened systemd unit | Done | [#48](https://github.com/kennguy3n/sn360-agent-device/pull/48) |
-| **5.6 Enhanced protocol — TLS 1.3 + MessagePack + HTTP/2 (opt-in)** | **Done** | *(this branch)* |
+| **5.6 Enhanced protocol — TLS 1.3 + MessagePack + HTTP/2 (opt-in)** | **Done** | [#55](https://github.com/kennguy3n/sn360-agent-device/pull/55) (initial), [#56](https://github.com/kennguy3n/sn360-agent-device/pull/56) (review fixes) |
 
 ### Phase 5.6 detail — Enhanced protocol
 
@@ -284,8 +284,8 @@ authoritative record for now.
 
 ## Review Bug Fixes
 
-Eight bugs identified in PR reviews for #48 / #49 / #50 / #60 are fixed
-on this branch. See the corresponding section in
+Eight bugs identified in PR reviews for #48 / #49 / #50 / #60 have been
+fixed on `main`. See the corresponding section in
 [`CHANGELOG.md`](./CHANGELOG.md#fixed) for the user-facing
 summary.
 
@@ -302,8 +302,8 @@ summary.
 
 ## Release preparation status (Phase 6 task 6.6)
 
-All code, CI, and documentation work for the beta release lives on
-this branch:
+All code, CI, and documentation work for the beta release has
+landed on `main`:
 
 - **Release workflow** — `.github/workflows/release.yml` fires on
   `v*` tag push, builds on `ubuntu-latest` / `macos-latest` /

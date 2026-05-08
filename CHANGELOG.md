@@ -149,7 +149,7 @@ lives in `PROGRESS.md`; representative PRs:
 ## Release preparation status (Phase 6 task 6.6)
 
 Code, documentation, and CI infrastructure for the beta release
-live in this branch. The remaining release-infrastructure items
+have landed on `main`. The remaining release-infrastructure items
 (signed binary builds for Linux x86_64, macOS x86_64/aarch64,
 Windows x86_64; `.deb`, `.rpm`, `.pkg`, `.msi` publishing; GitHub
 Release creation via the release API; tag `v0.9.0-beta.1`) require

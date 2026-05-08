@@ -16,7 +16,7 @@ the shape of the code as shipped today.
 | `sda-core`                     | Config loading/validation (`AgentConfig`) and shutdown coordination.           |
 | `sda-pal`                      | Platform Abstraction Layer: filesystem watcher, power monitor, system info.   |
 | `sda-event-bus`                | Bounded async channels with priority queues and back-pressure.                 |
-| `sda-comms`                    | Communication layer. SN360 native protocol (TLS 1.3 + HTTP/2 + MessagePack, default) and optional legacy SIEM protocol adapter (TCP/UDP + Blowfish/AES, behind the `legacy-siem` Cargo feature). |
+| `sda-comms`                    | Communication layer. SN360 native protocol (TLS 1.3 + HTTP/2 + MessagePack, opt-in) and optional legacy SIEM protocol adapter (TCP/UDP + Blowfish/AES, behind the `legacy-siem` Cargo feature). |
 | `sda-fim`                      | File integrity monitoring: real-time watcher, idle-aware baseline scan, SQLite state. |
 | `sda-logcollector`             | Log collection: file tailers, journald (Linux), EvtSubscribe (Windows), OSLog (macOS). |
 | `sda-inventory`                | Classic syscollector-compatible inventory.                                     |
