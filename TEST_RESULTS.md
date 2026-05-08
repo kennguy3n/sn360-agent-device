@@ -310,9 +310,9 @@ local Wazuh 4.9.2 stack.
 <summary><b>2026-04-21 — PR #60 rerun (`legacy-siem` feature gating)</b></summary>
 
 After feature-gating the legacy SIEM adapter under `legacy-siem` (see
-PR #60), the full suite was re-run on this branch against the same
-local Wazuh 4.9.2 compose environment. All three suites reproduce the
-recorded outcomes with identical counts:
+PR #60), the full suite was re-run on PR #60's branch against the
+same local Wazuh 4.9.2 compose environment. All three suites
+reproduce the recorded outcomes with identical counts:
 
 - `cargo test --all` — **431 passing / 0 failed** (per-crate split
   unchanged from the 2026-04-21 baseline below).
@@ -336,7 +336,7 @@ suites observe.
 #### Benchmark regression gate on this host (2026-04-21)
 
 `make benchmark-ci` (see [`benchmark-results.md`](./benchmark-results.md)
-for the full methodology) was re-run on this branch **and on
+for the full methodology) was re-run on PR #60's branch **and on
 `main`** against the same local Wazuh 4.9.2 manager on the same
 host. Binary size passes both runs; idle RSS, idle CPU, and FIM
 peak CPU are over budget on both branches with near-identical

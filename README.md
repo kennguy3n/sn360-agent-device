@@ -140,7 +140,7 @@ SN360 Desktop Agent (SDA) uses YAML configuration files. See the test configs fo
 - [`tests/sda-test-config-macos.yaml`](./tests/sda-test-config-macos.yaml) — macOS
 - [`tests/sda-test-config-windows.yaml`](./tests/sda-test-config-windows.yaml) — Windows
 
-For the full configuration reference, see the [Configuration section in `device-agent-proposal.md`](./device-agent-proposal.md#11-configuration--deployment).
+For the full configuration reference, see [`docs/configuration-reference.md`](./docs/configuration-reference.md). The original design rationale is in [`device-agent-proposal.md` §11](./device-agent-proposal.md#11-configuration--deployment).
 
 ## Project Status
 
@@ -148,6 +148,9 @@ For the full configuration reference, see the [Configuration section in `device-
 
 ## Documentation
 
+- [**ARCHITECTURE.md**](./ARCHITECTURE.md) — Crate map + event flow at a glance (links to the full reference)
+- [**PHASES.md**](./PHASES.md) — Phase 1–9 status overview
+- [**PROPOSAL.md**](./PROPOSAL.md) — Pointer to the full architecture & implementation proposal
 - [**docs/user-guide.md**](./docs/user-guide.md) — Per-host install, enrolment, and troubleshooting
 - [**docs/admin-guide.md**](./docs/admin-guide.md) — Fleet deployment, module tuning, upgrades, legacy migration
 - [**docs/architecture.md**](./docs/architecture.md) — Crate map, event flow, PAL design, protocol details
@@ -155,6 +158,7 @@ For the full configuration reference, see the [Configuration section in `device-
 - [**docs/platform-testing.md**](./docs/platform-testing.md) — CI matrix + Fedora/Arch manual procedures
 - [**docs/security-audit.md**](./docs/security-audit.md) — `cargo audit` + `cargo-fuzz` setup
 - [**docs/integration.md**](./docs/integration.md) — Integration with the SN360 Security Platform, non-Wazuh components
+- [**docs/revised-phase-plan.md**](./docs/revised-phase-plan.md) — Design reference for Phases 7–9
 - [**TEST_RESULTS.md**](./TEST_RESULTS.md) — Latest unit / E2E / security E2E results (with a Non-Wazuh Component Verification section)
 - [**CHANGELOG.md**](./CHANGELOG.md) — Release notes
 - [**device-agent-proposal.md**](./device-agent-proposal.md) — Original architecture & implementation proposal

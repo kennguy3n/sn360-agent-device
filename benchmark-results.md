@@ -112,8 +112,8 @@ libraries, Python, and OpenSSL under `/var/ossec`, and it does
 > bash tests/scripts/fim-burst-bench.sh  # runs the burst_watcher example
 > ```
 >
-> **P1.9 re-run (2026-04-21).** The burst benchmark was re-run on
-> this branch after the full Phase 5/6 pipeline merged
+> **P1.9 re-run (2026-04-21).** The burst benchmark was re-run
+> after the full Phase 5/6 pipeline merged
 > (content-based rootcheck, cross-platform hidden-process
 > detection, Linux user-idle detection, release workflow, nightly
 > fuzz). Peak %CPU remains 3 % and 15-s avg 1.33 %, i.e. on the
@@ -220,15 +220,15 @@ cat target/benchmark-regression/benchmark-regression.txt
 
 ## PR #60 rerun (2026-04-21)
 
-The benchmark regression gate was re-run on this branch after the
-`legacy-siem` feature-gating landed (see PR #60) and, for
+The benchmark regression gate was re-run on PR #60's branch after
+the `legacy-siem` feature-gating landed and, for
 comparison, on `origin/main` at commit `f3d5e61` on the same host
 against the same local Wazuh 4.9.2 manager. Both runs used
 `tests/sda-test-config.yaml` and a fresh Wazuh enrolment
 (client.keys cleared, stale agent entries removed from
 `manage_agents -l`) between runs.
 
-| Metric | Budget | PR #60 (this branch) | `main` @ `f3d5e61` | Status |
+| Metric | Budget | PR #60 | `main` @ `f3d5e61` | Status |
 |---|---|---|---|---|
 | Binary size | < 7 MB (7 340 032 B) | **6.49 MB** (6 803 288 B) | 6.49 MB (6 803 608 B) | **PASS** on both |
 | Idle RSS | < 15 MB (15 360 KB) | 15 516 KB | 18 608 KB | FAIL on both |
@@ -246,7 +246,7 @@ The three over-budget metrics are **not regressions from PR #60**:
 `main` breaches them by the same margin (or more) on the same host,
 so the delta vs. the prior recorded baseline (5.7 MB idle RSS,
 0.00 % idle CPU, 3 % FIM peak) reflects the host this session
-runs on rather than any change on this branch. Likely causes:
+runs on rather than any change in PR #60. Likely causes:
 
 - The rerun host is a container-in-container Linux VM; CPU samples
   from `pidstat` reflect the noisier scheduler envelope of that
