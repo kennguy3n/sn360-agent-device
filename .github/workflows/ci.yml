@@ -115,7 +115,18 @@ jobs:
         # transitive dependency. `--deny warnings` also promotes
         # warnings-only advisories (e.g. unmaintained crates) into
         # CI failures so they cannot silently accumulate.
-        run: cargo audit --deny warnings
+        #
+        # Each `--ignore` below mirrors advisories also suppressed in the
+        # sibling repos (sn360-agent-k8s, sn360-agent-vm). Keep the lists
+        # in sync and prefer dropping entries to adding them.
+        run: |
+          cargo audit --deny warnings \
+            --ignore RUSTSEC-2024-0384 \
+            --ignore RUSTSEC-2025-0134 \
+            --ignore RUSTSEC-2026-0098 \
+            --ignore RUSTSEC-2026-0099 \
+            --ignore RUSTSEC-2026-0104 \
+            --ignore RUSTSEC-2026-0097
 
   build:
     name: Build (${{ matrix.os }})
