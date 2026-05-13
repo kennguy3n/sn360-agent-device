@@ -2,7 +2,7 @@
 
 This document is the consolidated architecture reference for SDA.
 It is intentionally narrower than the original
-[`device-agent-proposal.md`](../device-agent-proposal.md) — that
+[`device-agent-proposal.md`](./device-agent-proposal.md) — that
 document still captures the design rationale; this one captures
 the shape of the code as shipped today.
 
@@ -161,7 +161,7 @@ proposal. Hard budgets (idle RSS < 15 MB, idle CPU < 0.1 %, binary
 ## 7. Further reading
 
 - Roadmap and status: [`PROGRESS.md`](../PROGRESS.md)
-- Original design rationale: [`device-agent-proposal.md`](../device-agent-proposal.md)
+- Original design rationale: [`device-agent-proposal.md`](./device-agent-proposal.md)
 - YAML reference: [`configuration-reference.md`](./configuration-reference.md)
 - Security audit + fuzzing: [`security-audit.md`](./security-audit.md)
 - Platform matrix + manual tests: [`platform-testing.md`](./platform-testing.md)

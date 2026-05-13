@@ -22,7 +22,7 @@ scratch in Rust. Concretely:
 - The SDA architecture, module boundaries, data model, resource
   budgeting strategy, and build system were authored inside this
   repository. The design rationale is captured in
-  [`device-agent-proposal.md`](../device-agent-proposal.md) and the
+  [`device-agent-proposal.md`](./device-agent-proposal.md) and the
   shipped shape of the code is documented in
   [`docs/architecture.md`](./architecture.md).
 - All crate-level code lives under `crates/sda-*` and is original

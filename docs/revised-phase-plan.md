@@ -1,7 +1,7 @@
 # SDA Revised Phase Plan — Phases 7–9
 
 This document supersedes the late-phase entries in
-[`device-agent-proposal.md` §12](../device-agent-proposal.md#12-implementation-roadmap)
+[`device-agent-proposal.md` §12](./device-agent-proposal.md#12-implementation-roadmap)
 for the post-beta work. It describes how SDA evolves from its
 current shape (legacy SIEM protocol as the transport used in CI,
 SN360 native protocol shipped but opt-in) to the target shape

@@ -383,7 +383,7 @@ pub struct RootcheckConfig {
 /// The LDE evaluates detection rules locally at the edge — IOC matching
 /// via Aho-Corasick + bloom filters, behavioral rule state machines,
 /// and YARA file scanning — without a server round-trip. See
-/// [`device-agent-proposal.md`](../../../device-agent-proposal.md) § 5.x / Phase 4 tasks 4.1–4.6.
+/// [`device-agent-proposal.md`](../../../docs/device-agent-proposal.md) § 5.x / Phase 4 tasks 4.1–4.6.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct LocalDetectionConfig {
     /// Whether the LDE is enabled. Off by default — operators opt in.
@@ -447,7 +447,7 @@ pub struct LocalDetectionConfig {
 /// The enhanced inventory extends the base inventory with running
 /// software monitoring (task 4.7), browser extension enumeration
 /// (task 4.8), and CycloneDX SBOM generation (task 4.9). See
-/// [`device-agent-proposal.md`](../../../device-agent-proposal.md) § 13.2 for design details.
+/// [`device-agent-proposal.md`](../../../docs/device-agent-proposal.md) § 13.2 for design details.
 ///
 /// The module is **off by default** — operators opt in explicitly
 /// because running-software snapshots touch `/proc` on Linux and the
