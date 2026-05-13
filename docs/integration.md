@@ -129,4 +129,4 @@ assertions use agent-log oracles) live in
 - Canonical Non-Wazuh component reference:
   [`sn360-security-platform/docs/NON_WAZUH_COMPONENTS.md`](https://github.com/kennguy3n/sn360-security-platform/blob/main/docs/NON_WAZUH_COMPONENTS.md).
 - Original device-side design rationale (preserved for history):
-  [`device-agent-proposal.md`](../device-agent-proposal.md) §13.
+  [`device-agent-proposal.md`](./device-agent-proposal.md) §13.
