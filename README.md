@@ -24,12 +24,12 @@ See [`device-agent-proposal.md`](./docs/device-agent-proposal.md) for the full a
 ## Prerequisites
 
 - **Rust 1.75+** (install via [rustup](https://rustup.rs/))
-- **Linux:** `pkg-config`, `libssl-dev`, `libyara-dev` (or the equivalents for your distro)
-- **macOS:** Xcode Command Line Tools, `brew install yara`
-- **Windows:** Visual Studio Build Tools (MSVC), a prebuilt YARA for Windows
+- **Linux:** `pkg-config`, `libssl-dev`, `libsystemd-dev` (for the journald log collector)
+- **macOS:** Xcode Command Line Tools
+- **Windows:** Visual Studio Build Tools (MSVC)
 - **Cross-compilation:** [`cross`](https://github.com/cross-rs/cross) (`cargo install cross`)
 
-YARA is a **required** runtime dependency of the Local Detection Engine (it is not feature-gated); build hosts must have YARA development headers available.
+YARA is built from vendored source (`yara-sys` with `features = ["vendored"]`); no system YARA headers or libraries are required.
 
 ## Quick Start
 

@@ -9,8 +9,8 @@ as hosted runners:
 |---------------------------|--------------|-------------------------------------------|
 | Ubuntu 22.04 LTS          | `ubuntu-22.04` | `cargo test --all`, clippy, rustfmt     |
 | Ubuntu 24.04 LTS          | `ubuntu-24.04` | `cargo test --all`                      |
-| macOS 13 Ventura (x86_64) | `macos-13`    | `cargo test --all`                       |
 | macOS 14 Sonoma (arm64)   | `macos-14`    | `cargo test --all`                       |
+| macOS 15 Sequoia (arm64)  | `macos-15`    | `cargo test --all`                       |
 | Windows Server 2022       | `windows-2022`| `cargo test --all`                       |
 
 Fedora and Arch Linux are not available as hosted runners, so they
@@ -25,7 +25,7 @@ fanotify-based FIM permission handling.
    disk).
 2. Install build dependencies:
    ```sh
-   sudo dnf install -y rust cargo systemd-devel yara yara-devel
+   sudo dnf install -y rust cargo systemd-devel
    ```
 3. Build the release binary:
    ```sh
@@ -58,7 +58,7 @@ fanotify-based FIM permission handling.
 1. Provision a fresh `archlinux:latest` container or a rolling VM.
 2. Install dependencies:
    ```sh
-   sudo pacman -S --needed rust cargo systemd yara make
+   sudo pacman -S --needed rust cargo systemd make
    ```
 3. Build and install:
    ```sh
@@ -81,7 +81,7 @@ fanotify-based FIM permission handling.
 
 ## macOS 12 Monterey
 
-macOS 13 and 14 are exercised in CI; macOS 12 Monterey is still
+macOS 14 and 15 are exercised in CI; macOS 12 Monterey is still
 formally supported and must be validated by hand before each release.
 
 1. Provision a Monterey VM or use a bare-metal Mac mini.

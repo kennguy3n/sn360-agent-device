@@ -60,8 +60,8 @@ jobs:
         os:
           - ubuntu-22.04
           - ubuntu-24.04
-          - macos-13
           - macos-14
+          - macos-15
           - windows-2022
     steps:
       - uses: actions/checkout@v4
@@ -83,7 +83,7 @@ jobs:
       matrix:
         os:
           - ubuntu-22.04
-          - macos-14
+          - macos-15
           - windows-2022
     steps:
       - uses: actions/checkout@v4
@@ -260,7 +260,7 @@ jobs:
         with:
           workspaces: fuzz
       - name: Install system dependencies
-        run: sudo apt-get update && sudo apt-get install -y libsystemd-dev libyara-dev
+        run: sudo apt-get update && sudo apt-get install -y libsystemd-dev
       - name: Install cargo-fuzz
         run: cargo install --locked cargo-fuzz
       - name: Run fuzz target (${{ matrix.target }}) — 5 min budget
