@@ -116,17 +116,17 @@ jobs:
         # warnings-only advisories (e.g. unmaintained crates) into
         # CI failures so they cannot silently accumulate.
         #
-        # Each `--ignore` below mirrors advisories also suppressed in the
-        # sibling repos (sn360-agent-k8s, sn360-agent-vm). Keep the lists
-        # in sync and prefer dropping entries to adding them.
-        run: |
-          cargo audit --deny warnings \
-            --ignore RUSTSEC-2024-0384 \
-            --ignore RUSTSEC-2025-0134 \
-            --ignore RUSTSEC-2026-0098 \
-            --ignore RUSTSEC-2026-0099 \
-            --ignore RUSTSEC-2026-0104 \
-            --ignore RUSTSEC-2026-0097
+        # 2026-05-18: All six previous `--ignore` entries
+        # (RUSTSEC-2024-0384, 2025-0134, 2026-0097/0098/0099/0104)
+        # were resolved by upstream dependency updates already in
+        # Cargo.lock (rustls 0.23.38, rustls-webpki 0.103.13,
+        # rand 0.9.4, instant no longer flagged). Stale ignores
+        # removed to keep the audit honest — matching sn360-agent-vm.
+        # If a new advisory appears, prefer upgrading the dep; only
+        # add `--ignore RUSTSEC-YYYY-NNNN` as a last resort and keep
+        # the list in sync with sibling repos (sn360-agent-k8s,
+        # sn360-agent-vm).
+        run: cargo audit --deny warnings
 
   build:
     name: Build (${{ matrix.os }})
